@@ -27,9 +27,17 @@ const MODALITIES = [
 
 interface VignetteGeneratorProps {
   clientId: string
+  scenario?: string
+  skill?: string
+  reflection?: string
 }
 
-export function VignetteGenerator({ clientId }: VignetteGeneratorProps) {
+export function VignetteGenerator({
+  clientId,
+  scenario: externalScenario,
+  skill: externalSkill,
+  reflection: externalReflection,
+}: VignetteGeneratorProps) {
   // 1. Setup API Base from your .env.local
   const API_BASE = "https://clinical-ai-backend.neuvoteam.workers.dev"
   
@@ -44,6 +52,12 @@ export function VignetteGenerator({ clientId }: VignetteGeneratorProps) {
   const [scenario, setScenario] = useState<string>("")
   const [skill, setSkill] = useState<string>("")
   const [reflection, setReflection] = useState<string>("")
+
+  const resolvedScenario = externalScenario ?? scenario
+  const resolvedSkill = externalSkill ?? skill
+  const resolvedReflection = externalReflection ?? reflection
+
+  const isExternalVignette = Boolean(externalScenario)
 
   const worksheetRef = useRef<HTMLDivElement>(null)
 
@@ -159,35 +173,61 @@ export function VignetteGenerator({ clientId }: VignetteGeneratorProps) {
           </div>
         )}
 
-        {step === 3 && (
+        {(step === 3 || isExternalVignette) && (
           <div className="space-y-6">
-            <div id="worksheet" ref={worksheetRef} className="p-8 border rounded-2xl bg-white shadow-sm space-y-8">
+            <div
+              id="worksheet"
+              ref={worksheetRef}
+              className="p-8 border rounded-2xl bg-white shadow-sm space-y-8"
+            >
               <div className="border-b pb-4">
-                <h3 className="text-xl font-bold text-zinc-900">Therapeutic Homework</h3>
-                <p className="text-sm text-muted-foreground">Focused on {selectedModality.toUpperCase()}</p>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase text-zinc-400">The Scenario</h4>
-                <p className="text-zinc-700 leading-relaxed">{scenario}</p>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase text-zinc-400">The Skill</h4>
-                <p className="text-zinc-700 leading-relaxed">{skill}</p>
+                <h3 className="text-xl font-bold text-zinc-900">
+                  Therapeutic Homework
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Focused on {selectedModality.toUpperCase()}
+                </p>
               </div>
 
-              <div className="pt-6 border-t">
-                <h4 className="text-sm font-bold mb-4 italic">Reflection Exercise:</h4>
-                <div className="h-32 w-full border-2 border-dashed border-zinc-200 rounded-xl flex items-center justify-center text-zinc-400 text-sm">
-                  Client reflection area (for physical copy)
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase text-zinc-400">
+                  The Scenario
+                </h4>
+                <p className="text-zinc-700 leading-relaxed">
+                  {resolvedScenario}
+                </p>
+              </div>
+
+              {resolvedSkill && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase text-zinc-400">
+                    The Skill
+                  </h4>
+                  <p className="text-zinc-700 leading-relaxed">
+                    {resolvedSkill}
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {resolvedReflection && (
+                <div className="pt-6 border-t">
+                  <h4 className="text-sm font-bold mb-4 italic">
+                    Reflection Exercise:
+                  </h4>
+                  <p className="text-zinc-700 leading-relaxed">
+                    {resolvedReflection}
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-between items-center">
-              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
-            </div>
+            {!isExternalVignette && (
+              <div className="flex justify-between items-center">
+                <Button variant="ghost" onClick={() => setStep(2)}>
+                  Back
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
