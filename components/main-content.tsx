@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 
 import { Button } from "@/components/ui/button"
@@ -30,13 +30,30 @@ import {
   ScrollText,
 } from "lucide-react"
 
+/* ─────────────────────────────
+   Constants & Types
+───────────────────────────── */
+
 const API_BASE = "https://clinical-ai-backend.neuvoteam.workers.dev"
+const CLIENT_ID = "0d4593bf-ab30-413e-bd17-0982685fad86"
+
+interface RiskFlag {
+  label: string
+  severity: "low" | "moderate" | "high" | "unspecified"
+  confidence: number
+  evidence: string[]
+}
 
 interface AnalysisResult {
-  formulationId?: string
   inferredModality?: string
-  riskFlags: string[]
+  riskFlags: RiskFlag[]
   rationale: string
+}
+
+interface SavedVignette {
+  id: string
+  content: string
+  created_at: string
 }
 
 interface MainContentProps {
@@ -53,86 +70,144 @@ const MODALITIES = [
   { value: "motivational", label: "Motivational Interviewing" },
 ]
 
+/* ─────────────────────────────
+   Helpers
+───────────────────────────── */
+
+/**
+ * Normalise risk flags so the UI never crashes
+ * and remains backward compatible.
+ */
+function normalizeRiskFlags(raw: any[]): RiskFlag[] {
+  return raw.map((flag) => {
+    if (typeof flag === "string") {
+      return {
+        label: flag,
+        severity: "unspecified",
+        confidence: 0.5,
+        evidence: [],
+      }
+    }
+
+    return {
+      label: flag.label ?? "Unspecified risk",
+      severity: flag.severity ?? "unspecified",
+      confidence:
+        typeof flag.confidence === "number" ? flag.confidence : 0.5,
+      evidence: Array.isArray(flag.evidence) ? flag.evidence : [],
+    }
+  })
+}
+
+/**
+ * Highlight evidence phrases inline in the clinical rationale.
+ */
+function highlightRationale(rationale: string, flags: RiskFlag[]) {
+  let html = rationale
+
+  flags.forEach((flag) => {
+    flag.evidence.forEach((phrase) => {
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const regex = new RegExp(`(${escaped})`, "gi")
+      html = html.replace(
+        regex,
+        `<mark class="bg-amber-200 rounded px-1">$1</mark>`
+      )
+    })
+  })
+
+  return html
+}
+
+/* ─────────────────────────────
+   Component
+───────────────────────────── */
+
 export function MainContent({ activeTab }: MainContentProps) {
   const { toast } = useToast()
 
-  const [selectedClientId] = useState(
-    "0d4593bf-ab30-413e-bd17-0982685fad86"
-  )
-
+  /* ── Primary State ── */
   const [sessionInput, setSessionInput] = useState("")
+  const [analysisResult, setAnalysisResult] =
+    useState<AnalysisResult | null>(null)
+  const [editableRationale, setEditableRationale] = useState("")
   const [selectedModality, setSelectedModality] = useState("cbt")
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisResult, setAnalysisResult] =
-    useState<AnalysisResult | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const [editableRationale, setEditableRationale] = useState("")
+  const [vignetteContent, setVignetteContent] = useState("")
+  const [savedVignettes, setSavedVignettes] = useState<SavedVignette[]>([])
 
-  const [isGeneratingVignette, setIsGeneratingVignette] =
-    useState(false)
+  /* ─────────────────────────────
+     Fetch saved vignettes
+  ───────────────────────────── */
 
-  const [vignetteScenario, setVignetteScenario] = useState("")
-  const [vignetteSkill, setVignetteSkill] = useState("")
-  const [vignetteReflection, setVignetteReflection] = useState("")
+  const fetchVignettes = async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/vignettes?clientId=${CLIENT_ID}`
+      )
+      const text = await res.text()
+      setSavedVignettes(JSON.parse(text))
+    } catch (err) {
+      console.error("Failed to fetch vignettes", err)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "vignette") {
+      fetchVignettes()
+    }
+  }, [activeTab])
+
+  /* ─────────────────────────────
+     Handlers
+  ───────────────────────────── */
 
   const handleAnalyze = async () => {
     if (!sessionInput.trim()) return
 
     setIsAnalyzing(true)
     setAnalysisResult(null)
-    setVignetteScenario("")
-    setVignetteSkill("")
-    setVignetteReflection("")
+    setVignetteContent("")
 
     try {
-      const response = await fetch(`${API_BASE}/analyze/session`, {
+      const res = await fetch(`${API_BASE}/analyze/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionNotes: sessionInput,
-          clientId: selectedClientId,
+          clientId: CLIENT_ID,
         }),
       })
 
-      if (!response.ok) {
-        const text = await response.text()
-        console.error("Analyze failed", response.status, text)
-        throw new Error(`Analysis failed: ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await res.json()
+      const normalizedFlags = normalizeRiskFlags(
+        Array.isArray(data.riskFlags) ? data.riskFlags : []
+      )
 
       setAnalysisResult({
-        formulationId: data.formulationId,
         inferredModality: data.inferredModality,
-        riskFlags: Array.isArray(data.riskFlags)
-          ? data.riskFlags
-          : [],
-        rationale: data.rationale ?? "",
+        rationale: data.rationale || "",
+        riskFlags: normalizedFlags,
       })
 
-      setEditableRationale(data.rationale ?? "")
+      setEditableRationale(data.rationale || "")
 
       if (data.inferredModality) {
-        const matched = MODALITIES.find(
-          (m) =>
-            m.value.toLowerCase() ===
-            data.inferredModality.toLowerCase()
+        const match = MODALITIES.find(
+          (m) => m.value === data.inferredModality.toLowerCase()
         )
-        if (matched) {
-          setSelectedModality(matched.value)
-        }
+        if (match) setSelectedModality(match.value)
       }
     } catch (err) {
       console.error(err)
-      setAnalysisResult({
-        riskFlags: ["Error occurred during analysis"],
-        rationale: "Unable to analyze session. Please try again.",
+      toast({
+        title: "Analysis Error",
+        description: "Unable to analyze session notes.",
+        variant: "destructive",
       })
-      setEditableRationale(
-        "Unable to analyze session. Please try again."
-      )
     } finally {
       setIsAnalyzing(false)
     }
@@ -141,192 +216,149 @@ export function MainContent({ activeTab }: MainContentProps) {
   const handleGenerateVignette = async () => {
     if (!analysisResult) return
 
-    setIsGeneratingVignette(true)
+    setIsGenerating(true)
 
     try {
-      const payload: {
-        sessionNotes: string
-        verifiedModality: string
-        clientId: string
-        formulationId?: string
-      } = {
-        sessionNotes: sessionInput,
-        verifiedModality: selectedModality,
-        clientId: selectedClientId,
-      }
-
-      if (analysisResult.formulationId) {
-        payload.formulationId = analysisResult.formulationId
-      }
-
-      const response = await fetch(`${API_BASE}/generate/vignette`, {
+      const res = await fetch(`${API_BASE}/generate/vignette`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          sessionNotes: sessionInput,
+          verifiedModality: selectedModality,
+          clientId: CLIENT_ID,
+        }),
       })
 
-      if (!response.ok) {
-        const text = await response.text()
-        console.error("Vignette failed", response.status, text)
-        throw new Error(`Vignette generation failed: ${response.status}`)
+      const data = await res.json()
+
+      // Defensive guard: never render JSON as vignette
+      if (String(data.content).trim().startsWith("{")) {
+        throw new Error("Invalid vignette output")
       }
 
-      const data = await response.json()
-
-      setVignetteScenario(
-        data.scenario || data.vignette || data.content || ""
-      )
-      setVignetteSkill(data.skill || "")
-      setVignetteReflection(data.reflection || "")
+      setVignetteContent(data.content)
 
       toast({
-        title: "Saved to Client Record",
-        description:
-          "The vignette has been successfully saved to the client's record.",
+        title: "Vignette Created",
+        description: "Saved to client record.",
       })
+
+      fetchVignettes()
     } catch (err) {
       console.error(err)
-
-      setVignetteScenario(
-        "Unable to generate vignette. Please try again."
-      )
-      setVignetteSkill("")
-      setVignetteReflection("")
-
       toast({
-        title: "Error",
-        description: "Failed to save vignette. Please try again.",
+        title: "Generation Error",
+        description: "Failed to generate vignette.",
         variant: "destructive",
       })
     } finally {
-      setIsGeneratingVignette(false)
+      setIsGenerating(false)
     }
   }
 
-  /* ───────────────────────── Summaries Tab ───────────────────────── */
+  /* ─────────────────────────────
+     Render
+  ───────────────────────────── */
 
   if (activeTab === "summaries") {
     return (
-      <main className="flex-1 overflow-auto bg-background p-8">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-6 text-2xl font-semibold">
-            Session Summaries
-          </h2>
-
-          <Card>
-            <CardContent className="flex min-h-[400px] items-center justify-center p-12">
-              <div className="text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                  <ScrollText className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="mb-2 text-lg font-medium">
-                  Coming Soon
-                </h3>
-                <p className="text-muted-foreground">
-                  AI-powered session summaries will be available in
-                  a future update.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <main className="p-8 text-center text-muted-foreground">
+        <ScrollText className="mx-auto mb-4" />
+        Session summaries coming soon.
       </main>
     )
   }
 
-  /* ───────────────────────── Vignette Tab ───────────────────────── */
-
   return (
     <main className="flex-1 overflow-auto bg-background p-8">
-      <div className="mx-auto max-w-4xl">
-        <h2 className="mb-2 text-2xl font-semibold">
-          Session Analysis
-        </h2>
-        <p className="mb-6 text-muted-foreground">
-          Enter session notes for AI-powered risk analysis and vignette
-          generation.
-        </p>
+      <div className="mx-auto max-w-4xl space-y-6">
 
         {/* Session Input */}
-        <Card className="mb-6">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">
-              Session Input
-            </CardTitle>
+            <CardTitle>Session Input</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Enter your session notes here..."
               value={sessionInput}
               onChange={(e) => setSessionInput(e.target.value)}
-              className="mb-4 min-h-[180px] resize-y"
+              placeholder="Enter session notes..."
+              className="min-h-[160px] mb-4"
             />
-
-            <Button
-              onClick={handleAnalyze}
-              disabled={!sessionInput.trim() || isAnalyzing}
-              className="gap-2"
-            >
+            <Button onClick={handleAnalyze} disabled={isAnalyzing}>
               {isAnalyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing…
-                </>
+                <Loader2 className="animate-spin" />
               ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Analyze
-                </>
+                <Sparkles />
               )}
+              Analyze
             </Button>
           </CardContent>
         </Card>
 
-        {/* Analysis Results */}
+        {/* Analysis Review */}
         {analysisResult && (
-          <Card className="mb-6">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Risk Flags & Analysis
-              </CardTitle>
+              <CardTitle>Risk Flags & Clinical Analysis</CardTitle>
             </CardHeader>
+            <CardContent className="space-y-4">
 
-            <CardContent>
-              <div className="mb-4">
-                {analysisResult.riskFlags.length > 0 ? (
-                  <ul className="space-y-2">
-                    {analysisResult.riskFlags.map((flag, i) => (
-                      <li
-                        key={i}
-                        className="flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
-                      >
-                        <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        {flag}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="flex gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    No significant risk flags identified.
+              {/* Risk Flags */}
+              {analysisResult.riskFlags.length > 0 ? (
+                analysisResult.riskFlags.map((flag, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-lg border p-3 ${
+                      flag.severity === "high"
+                        ? "bg-red-50 border-red-200"
+                        : flag.severity === "moderate"
+                        ? "bg-amber-50 border-amber-200"
+                        : flag.severity === "low"
+                        ? "bg-green-50 border-green-200"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <div className="flex justify-between">
+                      <span className="font-medium">{flag.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Confidence:{" "}
+                        {Math.round(flag.confidence * 100)}%
+                      </span>
+                    </div>
+
+                    <div className="text-xs italic text-muted-foreground">
+                      Severity:{" "}
+                      {flag.severity === "unspecified"
+                        ? "NOT SPECIFIED – review manually"
+                        : flag.severity.toUpperCase()}
+                    </div>
                   </div>
-                )}
-              </div>
+                ))
+              ) : (
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle2 className="h-4 w-4" />
+                  No significant risks identified
+                </div>
+              )}
 
-              <Textarea
-                value={editableRationale}
-                onChange={(e) =>
-                  setEditableRationale(e.target.value)
-                }
-                className="mb-4 min-h-[120px]"
+              {/* Inline highlighted rationale */}
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: highlightRationale(
+                    editableRationale,
+                    analysisResult.riskFlags
+                  ),
+                }}
               />
 
+              {/* Modality Verification */}
               <Select
                 value={selectedModality}
                 onValueChange={setSelectedModality}
               >
-                <SelectTrigger className="mb-4 max-w-sm">
+                <SelectTrigger>
                   <SelectValue placeholder="Select modality" />
                 </SelectTrigger>
                 <SelectContent>
@@ -339,36 +371,51 @@ export function MainContent({ activeTab }: MainContentProps) {
               </Select>
 
               <Button
-                onClick={handleGenerateVignette}
-                disabled={isGeneratingVignette}
                 variant="secondary"
-                className="gap-2"
+                onClick={handleGenerateVignette}
+                disabled={isGenerating}
               >
-                {isGeneratingVignette ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating…
-                  </>
+                {isGenerating ? (
+                  <Loader2 className="animate-spin" />
                 ) : (
-                  <>
-                    <FileCheck className="h-4 w-4" />
-                    Verify & Generate Vignette
-                  </>
+                  <FileCheck />
                 )}
+                Verify & Generate Vignette
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Vignette Display */}
-        {vignetteScenario && (
+        {/* Generated Vignette */}
+        {vignetteContent && (
           <VignetteGenerator
-            clientId={selectedClientId}
-            scenario={vignetteScenario}
-            skill={vignetteSkill}
-            reflection={vignetteReflection}
+            clientId={CLIENT_ID}
+            scenario={vignetteContent}
           />
         )}
+
+        {/* Historical Vignettes (Audit Ready) */}
+        {savedVignettes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Previous Vignettes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {savedVignettes.map((v) => (
+                <Card key={v.id} className="p-4">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Generated:{" "}
+                    {new Date(v.created_at).toLocaleString()}
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm">
+                    {v.content}
+                  </p>
+                </Card>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
       </div>
     </main>
   )
