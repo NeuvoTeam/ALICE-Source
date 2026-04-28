@@ -1,422 +1,148 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useToast } from "@/hooks/use-toast"
-
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+import { useEffect, useState } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card"
+import dynamic from 'next/dynamic'
 
-import { VignetteGenerator } from "@/components/vignette-generator"
+// This tells Next.js to load the component ONLY on the client (MacBook screen)
+// and skip trying to "build" it on the server.
+const VignetteGenerator = dynamic(() => import("./vignette-generator"), { 
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  )
+})
+import { History, LayoutDashboard, Settings, Loader2, AlertCircle } from "lucide-react"
 
-import {
-  Sparkles,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  FileCheck,
-  ScrollText,
-} from "lucide-react"
+export function MainContent() {
+  const [savedVignettes, setSavedVignettes] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-/* ─────────────────────────────
-   Constants & Types
-───────────────────────────── */
-
-const API_BASE = "https://clinical-ai-backend.neuvoteam.workers.dev"
-const CLIENT_ID = "0d4593bf-ab30-413e-bd17-0982685fad86"
-
-interface RiskFlag {
-  label: string
-  severity: "low" | "moderate" | "high" | "unspecified"
-  confidence: number
-  evidence: string[]
-}
-
-interface AnalysisResult {
-  inferredModality?: string
-  riskFlags: RiskFlag[]
-  rationale: string
-}
-
-interface SavedVignette {
-  id: string
-  content: string
-  created_at: string
-}
-
-interface MainContentProps {
-  activeTab: "vignette" | "summaries"
-}
-
-const MODALITIES = [
-  { value: "cbt", label: "Cognitive Behavioral Therapy (CBT)" },
-  { value: "dbt", label: "Dialectical Behavior Therapy (DBT)" },
-  { value: "psychodynamic", label: "Psychodynamic Therapy" },
-  { value: "humanistic", label: "Humanistic / Person-Centered" },
-  { value: "emdr", label: "EMDR" },
-  { value: "act", label: "Acceptance & Commitment Therapy (ACT)" },
-  { value: "motivational", label: "Motivational Interviewing" },
-]
-
-/* ─────────────────────────────
-   Helpers
-───────────────────────────── */
-
-/**
- * Normalise risk flags so the UI never crashes
- * and remains backward compatible.
- */
-function normalizeRiskFlags(raw: any[]): RiskFlag[] {
-  return raw.map((flag) => {
-    if (typeof flag === "string") {
-      return {
-        label: flag,
-        severity: "unspecified",
-        confidence: 0.5,
-        evidence: [],
-      }
-    }
-
-    return {
-      label: flag.label ?? "Unspecified risk",
-      severity: flag.severity ?? "unspecified",
-      confidence:
-        typeof flag.confidence === "number" ? flag.confidence : 0.5,
-      evidence: Array.isArray(flag.evidence) ? flag.evidence : [],
-    }
-  })
-}
-
-/**
- * Highlight evidence phrases inline in the clinical rationale.
- */
-function highlightRationale(rationale: string, flags: RiskFlag[]) {
-  let html = rationale
-
-  flags.forEach((flag) => {
-    flag.evidence.forEach((phrase) => {
-      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      const regex = new RegExp(`(${escaped})`, "gi")
-      html = html.replace(
-        regex,
-        `<mark class="bg-amber-200 rounded px-1">$1</mark>`
-      )
-    })
-  })
-
-  return html
-}
-
-/* ─────────────────────────────
-   Component
-───────────────────────────── */
-
-export function MainContent({ activeTab }: MainContentProps) {
-  const { toast } = useToast()
-
-  /* ── Primary State ── */
-  const [sessionInput, setSessionInput] = useState("")
-  const [analysisResult, setAnalysisResult] =
-    useState<AnalysisResult | null>(null)
-  const [editableRationale, setEditableRationale] = useState("")
-  const [selectedModality, setSelectedModality] = useState("cbt")
-
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  const [vignetteContent, setVignetteContent] = useState("")
-  const [savedVignettes, setSavedVignettes] = useState<SavedVignette[]>([])
-
-  /* ─────────────────────────────
-     Fetch saved vignettes
-  ───────────────────────────── */
+  const API_BASE = process.env.NEXT_PUBLIC_CLINICAL_AI_API_BASE
+  const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || "default-user"
 
   const fetchVignettes = async () => {
+    if (!API_BASE) return
+    setIsLoading(true)
+    setError(null)
+    
     try {
-      const res = await fetch(
-        `${API_BASE}/vignettes?clientId=${CLIENT_ID}`
-      )
+      const res = await fetch(`${API_BASE}/latest-session`)
       const text = await res.text()
-      setSavedVignettes(JSON.parse(text))
+
+      // FIX: Check if Cloudflare sent an error page instead of JSON
+      if (text.includes("error code: 1016")) {
+        setError("Cloudflare Engine is warming up. Please wait 30 seconds.")
+        return
+      }
+
+      // Only parse if the response looks like a JSON array or object
+      if (text.startsWith("[") || text.startsWith("{")) {
+        const data = JSON.parse(text)
+        setSavedVignettes(data)
+      }
     } catch (err) {
-      console.error("Failed to fetch vignettes", err)
+      console.error("Failed to fetch vignettes:", err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    if (activeTab === "vignette") {
-      fetchVignettes()
-    }
-  }, [activeTab])
-
-  /* ─────────────────────────────
-     Handlers
-  ───────────────────────────── */
-
-  const handleAnalyze = async () => {
-    if (!sessionInput.trim()) return
-
-    setIsAnalyzing(true)
-    setAnalysisResult(null)
-    setVignetteContent("")
-
-    try {
-      const res = await fetch(`${API_BASE}/analyze/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionNotes: sessionInput,
-          clientId: CLIENT_ID,
-        }),
-      })
-
-      const data = await res.json()
-      const normalizedFlags = normalizeRiskFlags(
-        Array.isArray(data.riskFlags) ? data.riskFlags : []
-      )
-
-      setAnalysisResult({
-        inferredModality: data.inferredModality,
-        rationale: data.rationale || "",
-        riskFlags: normalizedFlags,
-      })
-
-      setEditableRationale(data.rationale || "")
-
-      if (data.inferredModality) {
-        const match = MODALITIES.find(
-          (m) => m.value === data.inferredModality.toLowerCase()
-        )
-        if (match) setSelectedModality(match.value)
-      }
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: "Analysis Error",
-        description: "Unable to analyze session notes.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const handleGenerateVignette = async () => {
-    if (!analysisResult) return
-
-    setIsGenerating(true)
-
-    try {
-      const res = await fetch(`${API_BASE}/generate/vignette`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionNotes: sessionInput,
-          verifiedModality: selectedModality,
-          clientId: CLIENT_ID,
-        }),
-      })
-
-      const data = await res.json()
-
-      // Defensive guard: never render JSON as vignette
-      if (String(data.content).trim().startsWith("{")) {
-        throw new Error("Invalid vignette output")
-      }
-
-      setVignetteContent(data.content)
-
-      toast({
-        title: "Vignette Created",
-        description: "Saved to client record.",
-      })
-
-      fetchVignettes()
-    } catch (err) {
-      console.error(err)
-      toast({
-        title: "Generation Error",
-        description: "Failed to generate vignette.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  /* ─────────────────────────────
-     Render
-  ───────────────────────────── */
-
-  if (activeTab === "summaries") {
-    return (
-      <main className="p-8 text-center text-muted-foreground">
-        <ScrollText className="mx-auto mb-4" />
-        Session summaries coming soon.
-      </main>
-    )
-  }
+    fetchVignettes()
+  }, [])
 
   return (
-    <main className="flex-1 overflow-auto bg-background p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <main className="container mx-auto py-10 px-4 max-w-6xl space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-8">
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-zinc-900">
+            Clinical <span className="text-primary">Dashboard</span>
+          </h1>
+          <p className="text-zinc-500 font-medium">Professional Session Analysis & Vignette Generation</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full border">
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-xs font-bold text-zinc-600 uppercase tracking-widest">System Active</span>
+        </div>
+      </div>
 
-        {/* Session Input */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Session Input</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={sessionInput}
-              onChange={(e) => setSessionInput(e.target.value)}
-              placeholder="Enter session notes..."
-              className="min-h-[160px] mb-4"
-            />
-            <Button onClick={handleAnalyze} disabled={isAnalyzing}>
-              {isAnalyzing ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Sparkles />
-              )}
-              Analyze
-            </Button>
-          </CardContent>
-        </Card>
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-sm animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="h-5 w-5" />
+          <p className="font-semibold">{error}</p>
+        </div>
+      )}
 
-        {/* Analysis Review */}
-        {analysisResult && (
-          <Card>
+      <Tabs defaultValue="generate" className="w-full space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-md h-12 p-1 bg-zinc-100 rounded-xl">
+          <TabsTrigger value="generate" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <LayoutDashboard className="h-4 w-4 mr-2" /> New Case
+          </TabsTrigger>
+          <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <History className="h-4 w-4 mr-2" /> History
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Settings className="h-4 w-4 mr-2" /> Config
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="generate" className="space-y-4">
+          <VignetteGenerator clientId={CLIENT_ID} />
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card className="rounded-3xl border-2">
             <CardHeader>
-              <CardTitle>Risk Flags & Clinical Analysis</CardTitle>
+              <CardTitle>Clinical History</CardTitle>
+              <CardDescription>Review and download previously generated worksheets.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-
-              {/* Risk Flags */}
-              {analysisResult.riskFlags.length > 0 ? (
-                analysisResult.riskFlags.map((flag, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-lg border p-3 ${
-                      flag.severity === "high"
-                        ? "bg-red-50 border-red-200"
-                        : flag.severity === "moderate"
-                        ? "bg-amber-50 border-amber-200"
-                        : flag.severity === "low"
-                        ? "bg-green-50 border-green-200"
-                        : "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    <div className="flex justify-between">
-                      <span className="font-medium">{flag.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Confidence:{" "}
-                        {Math.round(flag.confidence * 100)}%
-                      </span>
-                    </div>
-
-                    <div className="text-xs italic text-muted-foreground">
-                      Severity:{" "}
-                      {flag.severity === "unspecified"
-                        ? "NOT SPECIFIED – review manually"
-                        : flag.severity.toUpperCase()}
-                    </div>
-                  </div>
-                ))
+            <CardContent>
+              {isLoading ? (
+                <div className="flex flex-col items-center py-20 gap-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-zinc-400">Querying Clinical Database...</p>
+                </div>
+              ) : savedVignettes.length === 0 ? (
+                <div className="text-center py-20 border-2 border-dashed rounded-3xl">
+                  <p className="text-zinc-400 font-medium">No vignettes generated yet for this client ID.</p>
+                </div>
               ) : (
-                <div className="flex items-center gap-2 text-green-700">
-                  <CheckCircle2 className="h-4 w-4" />
-                  No significant risks identified
+                <div className="grid gap-4">
+                  {/* Map through history here */}
                 </div>
               )}
-
-              {/* Inline highlighted rationale */}
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: highlightRationale(
-                    editableRationale,
-                    analysisResult.riskFlags
-                  ),
-                }}
-              />
-
-              {/* Modality Verification */}
-              <Select
-                value={selectedModality}
-                onValueChange={setSelectedModality}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select modality" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODALITIES.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant="secondary"
-                onClick={handleGenerateVignette}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <FileCheck />
-                )}
-                Verify & Generate Vignette
-              </Button>
             </CardContent>
           </Card>
-        )}
-
-        {/* Generated Vignette */}
-        {vignetteContent && (
-          <VignetteGenerator
-            clientId={CLIENT_ID}
-            scenario={vignetteContent}
-          />
-        )}
-
-        {/* Historical Vignettes (Audit Ready) */}
-        {savedVignettes.length > 0 && (
-          <Card>
+        </TabsContent>
+        
+        <TabsContent value="settings">
+          <Card className="rounded-3xl border-2">
             <CardHeader>
-              <CardTitle>Previous Vignettes</CardTitle>
+              <CardTitle>Engine Configuration</CardTitle>
+              <CardDescription>Verify your Cloudflare Worker and Heidi API connection.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {savedVignettes.map((v) => (
-                <Card key={v.id} className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Generated:{" "}
-                    {new Date(v.created_at).toLocaleString()}
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {v.content}
-                  </p>
-                </Card>
-              ))}
+              <div className="p-4 rounded-xl bg-zinc-50 border text-xs font-mono break-all">
+                <span className="text-zinc-400">ENDPOINT:</span> {API_BASE || "NOT_SET"}
+              </div>
+              <div className="p-4 rounded-xl bg-zinc-50 border text-xs font-mono">
+                <span className="text-zinc-400">CLIENT_ID:</span> {CLIENT_ID}
+              </div>
             </CardContent>
           </Card>
-        )}
-
-      </div>
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }
