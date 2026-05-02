@@ -1,52 +1,54 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { BrainCircuit, Sparkles, Loader2 } from "lucide-react"
 
-// This interface now uses a 'catch-all' to stop TypeScript overload errors
 interface VignetteGeneratorProps {
   clientId: string
   initialSessionNotes?: string
-  vignetteRestore?: any
-  onSessionNotesChange?: (notes: string) => void
-  onAnalysisComplete?: (data: any) => void
-  [key: string]: any // Allows any other props passed from parent
 }
 
-export default function VignetteGenerator({ 
-  clientId, 
-  initialSessionNotes = "", 
-  onSessionNotesChange,
-  onAnalysisComplete,
-  ...props // Captures any other extra props
-}: VignetteGeneratorProps) {
-  
+export default function VignetteGenerator({ clientId, initialSessionNotes = "" }: VignetteGeneratorProps) {
   const [step, setStep] = useState(1)
   const [sessionInput, setSessionInput] = useState(initialSessionNotes)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-
-  // Ensure hydration stability
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  useEffect(() => {
-    setSessionInput(initialSessionNotes)
-  }, [initialSessionNotes])
-
-  if (!isMounted) return null
+  const [analysisResult, setAnalysisResult] = useState<any>(null)
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true)
-    // Simulate analysis delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsAnalyzing(false)
-    setStep(2)
-    if (onAnalysisComplete) onAnalysisComplete({ status: "success" })
+    
+    // We send sessionNotes explicitly to match backend expectations
+    const payload = {
+      sessionNotes: typeof sessionInput === 'string' ? sessionInput : "",
+      clientId: clientId
+    }
+
+    try {
+      const response = await fetch('/api/analyze/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      
+      // If we don't get a 200 OK, the text() method will reveal the HTML error page
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("SERVER ERROR HTML:", errorText)
+        throw new Error(`Server returned ${response.status}: Route might be missing.`)
+      }
+      
+      const data = await response.json()
+      setAnalysisResult(data)
+      setStep(2)
+    } catch (error: any) {
+      console.error("Fetch Error:", error)
+      alert("Error: " + error.message + ". Check Console for details.")
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -62,14 +64,12 @@ export default function VignetteGenerator({
           <div className="space-y-4">
             <Textarea 
               value={sessionInput} 
-              onChange={(e) => {
-                setSessionInput(e.target.value)
-                onSessionNotesChange?.(e.target.value)
-              }}
+              onChange={(e) => setSessionInput(e.target.value)}
               placeholder="Paste clinical notes here..."
               className="min-h-[200px] rounded-2xl"
             />
             <Button 
+              type="button" 
               onClick={handleAnalyze} 
               className="w-full h-12 rounded-xl"
               disabled={isAnalyzing}
@@ -82,8 +82,13 @@ export default function VignetteGenerator({
         
         {step === 2 && (
           <div className="space-y-4 animate-in fade-in">
-            <p className="text-sm text-zinc-600">Analysis finalized for Client: {clientId}</p>
-            <Button onClick={() => setStep(1)} variant="outline" className="w-full">Restart</Button>
+            <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200">
+              <p className="text-sm font-semibold text-zinc-800 mb-2">Analysis Result:</p>
+              <p className="text-sm text-zinc-600 whitespace-pre-wrap">
+                {analysisResult?.vignette || "No vignette content returned."}
+              </p>
+            </div>
+            <Button onClick={() => setStep(1)} variant="outline" className="w-full">Start New Analysis</Button>
           </div>
         )}
       </CardContent>
