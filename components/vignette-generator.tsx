@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -21,6 +21,7 @@ import {
   Activity,
   ShieldCheck
 } from "lucide-react"
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 
 type StepId = 1 | 2 | 3
 
@@ -36,6 +37,88 @@ const MODALITIES = [
   { value: "dbt", label: "Dialectical Behavior Therapy (DBT)" },
   { value: "act", label: "Acceptance & Commitment Therapy (ACT)" },
 ]
+
+const MODERN_COLOR_SYNTAX_RE = /\b(lab|oklch|oklab|lch)\(|color-mix\(/i
+
+let colorScratchEl: HTMLDivElement | null = null
+
+function getColorScratchEl(): HTMLDivElement {
+  if (!colorScratchEl) {
+    colorScratchEl = document.createElement("div")
+    colorScratchEl.setAttribute("aria-hidden", "true")
+    colorScratchEl.style.cssText =
+      "position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;"
+    document.body.appendChild(colorScratchEl)
+  }
+  return colorScratchEl
+}
+
+/**
+ * Chromium often serializes computed colors as lab()/oklch(); html2canvas's parser rejects those.
+ */
+function coerceStyleValueForHtml2Canvas(prop: string, value: string, priority: string): string {
+  if (!value || !MODERN_COLOR_SYNTAX_RE.test(value)) return value
+  const scratch = getColorScratchEl()
+  const reset =
+    "position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;"
+  scratch.style.cssText = reset
+  try {
+    scratch.style.setProperty(prop, value, priority as "important" | "")
+    const resolved = getComputedStyle(scratch).getPropertyValue(prop)
+    if (resolved && !MODERN_COLOR_SYNTAX_RE.test(resolved)) return resolved.trim()
+  } catch {
+    /* ignore */
+  } finally {
+    scratch.style.cssText = reset
+  }
+  try {
+    const ctx = document.createElement("canvas").getContext("2d")
+    if (ctx) {
+      ctx.fillStyle = "#000"
+      ctx.fillStyle = value
+      const c = ctx.fillStyle
+      if (typeof c === "string" && c && !MODERN_COLOR_SYNTAX_RE.test(c)) return c
+    }
+  } catch {
+    /* ignore */
+  }
+  if (prop === "color") return "rgb(0, 0, 0)"
+  if (prop === "fill" || prop === "stroke") return "rgb(0, 0, 0)"
+  if (/(^|-)color$/.test(prop)) return "rgb(128, 128, 128)"
+  if (prop.includes("shadow")) return "none"
+  if (prop.startsWith("background")) return "rgba(0, 0, 0, 0)"
+  if (prop.startsWith("border")) return "none"
+  return "transparent"
+}
+
+/** html2canvas cannot parse oklch/lab(); inline sRGB-safe values onto the clone before rasterizing. */
+function inlineComputedStylesForCapture(original: Element, clone: Element) {
+  if (
+    !(original instanceof HTMLElement || original instanceof SVGElement) ||
+    !(clone instanceof HTMLElement || clone instanceof SVGElement)
+  ) {
+    return
+  }
+  const computed = window.getComputedStyle(original)
+  for (let i = 0; i < computed.length; i++) {
+    const name = computed.item(i)
+    const value = computed.getPropertyValue(name)
+    const priority = computed.getPropertyPriority(name)
+    const safe = coerceStyleValueForHtml2Canvas(name, value, priority)
+    clone.style.setProperty(name, safe, priority as "important" | "")
+  }
+  clone.removeAttribute("class")
+  for (let i = 0; i < original.children.length; i++) {
+    inlineComputedStylesForCapture(original.children[i], clone.children[i])
+  }
+}
+
+/** Tailwind v4 emits oklch/lab in cloned <style> tags; html2canvas throws when parsing those rules. */
+function stripClonedDocumentStyles(documentClone: Document) {
+  documentClone
+    .querySelectorAll('style, link[rel="stylesheet"], link[rel~="stylesheet"]')
+    .forEach((node) => node.remove())
+}
 
 export default function VignetteGenerator({ clientId }: { clientId: string }) {
   const [step, setStep] = useState<StepId>(1)
@@ -53,7 +136,6 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
   })
 
   const worksheetRef = useRef<HTMLDivElement>(null)
-  const API_BASE = process.env.NEXT_PUBLIC_CLINICAL_AI_API_BASE
 
   const handleHeidiImport = async () => {
     try {
@@ -73,7 +155,14 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
         import("jspdf").then((m) => m.default),
         import("html2canvas").then((m) => m.default),
       ])
-      const canvas = await html2canvas(worksheetRef.current, { scale: 2 })
+      const canvas = await html2canvas(worksheetRef.current, {
+        scale: 2,
+        onclone: (documentClone, clonedRoot) => {
+          const orig = worksheetRef.current
+          if (orig && clonedRoot) inlineComputedStylesForCapture(orig, clonedRoot)
+          stripClonedDocumentStyles(documentClone)
+        },
+      })
       const imgData = canvas.toDataURL("image/png")
       const pdf = new jsPDF("p", "mm", "a4")
       pdf.addImage(imgData, "PNG", 10, 10, 190, (canvas.height * 190) / canvas.width)
@@ -219,7 +308,10 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
 
         {step === 3 && (
           <div className="space-y-6 animate-in zoom-in-95">
-            <div ref={worksheetRef} className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm">
+            <div
+              ref={worksheetRef}
+              className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm"
+            >
               <div className="flex justify-between items-start border-b pb-8">
                 <div>
                   <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Clinical Practice</h3>

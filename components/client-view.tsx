@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Calendar, AlertCircle, Loader2, ChevronLeft, Send } from "lucide-react"
-
-const API_BASE = "https://clinical-ai-backend.neuvoteam.workers.dev"
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 const CLIENT_ID = "01c80187-20bf-4a7b-9bbd-3a6f17399405"
 
 interface AssignedVignette {

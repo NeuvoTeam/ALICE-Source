@@ -22,17 +22,16 @@ const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
   )
 })
 import { History, LayoutDashboard, Settings, Loader2, AlertCircle } from "lucide-react"
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 
 export function MainContent() {
   const [savedVignettes, setSavedVignettes] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_BASE = process.env.NEXT_PUBLIC_CLINICAL_AI_API_BASE
   const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || "default-user"
 
   const fetchVignettes = async () => {
-    if (!API_BASE) return
     setIsLoading(true)
     setError(null)
     
@@ -134,7 +133,7 @@ export function MainContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 rounded-xl bg-zinc-50 border text-xs font-mono break-all">
-                <span className="text-zinc-400">ENDPOINT:</span> {API_BASE || "NOT_SET"}
+                <span className="text-zinc-400">ENDPOINT:</span> {API_BASE}
               </div>
               <div className="p-4 rounded-xl bg-zinc-50 border text-xs font-mono">
                 <span className="text-zinc-400">CLIENT_ID:</span> {CLIENT_ID}
