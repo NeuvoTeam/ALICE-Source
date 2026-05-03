@@ -1,7 +1,14 @@
 "use client"
 
-import { FileText, ScrollText, Sparkles, User, Stethoscope } from "lucide-react"
+import {
+  FileText,
+  ScrollText,
+  Sparkles,
+  User,
+  Stethoscope,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ClientNode } from "@/components/sidebar/ClientNode"
 
 type ViewMode = "clinician" | "client"
 type ClinicianTab = "vignette" | "summaries"
@@ -13,21 +20,26 @@ interface DashboardSidebarProps {
   onTabChange: (tab: ClinicianTab) => void
 }
 
-export function DashboardSidebar({ 
-  viewMode, 
-  activeTab, 
-  onViewModeChange, 
-  onTabChange 
+export function DashboardSidebar({
+  viewMode,
+  activeTab,
+  onViewModeChange,
+  onTabChange,
 }: DashboardSidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar">
+      {/* Header */}
       <div className="flex items-center gap-2 border-b border-sidebar-border px-6 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
           <Sparkles className="h-5 w-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-sidebar-foreground">MindCare</h1>
-          <p className="text-xs text-muted-foreground">Clinical Portal</p>
+          <h1 className="text-lg font-semibold text-sidebar-foreground">
+            MindCare
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Clinical Portal
+          </p>
         </div>
       </div>
 
@@ -49,6 +61,7 @@ export function DashboardSidebar({
             <Stethoscope className="h-4 w-4" />
             Clinician
           </button>
+
           <button
             onClick={() => onViewModeChange("client")}
             className={cn(
@@ -63,47 +76,61 @@ export function DashboardSidebar({
           </button>
         </div>
       </div>
-      
-      {/* Clinician Navigation */}
+
+      {/* CLINICIAN MODE */}
       {viewMode === "clinician" && (
-        <nav className="flex-1 px-3 py-4">
-          <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Tools
-          </p>
-          <ul className="space-y-1">
-            <li>
-              <button
-                onClick={() => onTabChange("vignette")}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  activeTab === "vignette"
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <FileText className="h-4 w-4" />
-                Vignette Generator
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => onTabChange("summaries")}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  activeTab === "summaries"
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <ScrollText className="h-4 w-4" />
-                Session Summaries
-              </button>
-            </li>
-          </ul>
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          {/* ✅ NEW: Client / Case / Session Tree */}
+          <div>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Clients
+            </p>
+
+            <ClientNode />
+          </div>
+
+          {/* Existing Tools */}
+          <div>
+            <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Tools
+            </p>
+
+            <ul className="space-y-1">
+              <li>
+                <button
+                  onClick={() => onTabChange("vignette")}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    activeTab === "vignette"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  Vignette Generator
+                </button>
+              </li>
+
+              <li>
+                <button
+                  onClick={() => onTabChange("summaries")}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    activeTab === "summaries"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <ScrollText className="h-4 w-4" />
+                  Session Summaries
+                </button>
+              </li>
+            </ul>
+          </div>
         </nav>
       )}
 
-      {/* Client Navigation */}
+      {/* CLIENT MODE */}
       {viewMode === "client" && (
         <nav className="flex-1 px-3 py-4">
           <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -120,10 +147,11 @@ export function DashboardSidebar({
         </nav>
       )}
 
+      {/* Footer */}
       <div className="border-t border-sidebar-border p-4">
         <div className="rounded-lg bg-muted/50 px-4 py-3">
           <p className="text-xs text-muted-foreground">
-            {viewMode === "clinician" 
+            {viewMode === "clinician"
               ? "AI-assisted documentation for ethical, HIPAA-compliant practice."
               : "Review materials assigned by your care provider."}
           </p>
