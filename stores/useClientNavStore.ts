@@ -21,98 +21,148 @@ export type Client = {
 
 type ClientNavState = {
   client: Client | null
+  loading: boolean
 
-  load: (clientId: string) => void
-  createCase: () => void
-  createSession: (caseId: string) => void
-  deleteCase: (caseId: string) => void
-  deleteSession: (caseId: string, sessionId: string) => void
+  load: () => Promise<void>
+  createCase: () => Promise<void>
+  createSession: (caseId: string) => Promise<void>
+  deleteCase: (caseId: string) => Promise<void>
+  deleteSession: (caseId: string, sessionId: string) => Promise<void>
 }
 
-export const useClientNavStore = create<ClientNavState>((set) => ({
-  client: {
-    id: 'demo-client',
-    name: 'Demo Client',
-    cases: [
-      {
-        id: 'demo-case',
-        name: 'Initial Case',
-        sessions: [
-          {
-            id: 'demo-session',
-            name: 'Session 1',
-          },
-        ],
-      },
-    ],
+/* ✅ 👉 CHANGE THIS to your worker URL */
+const API = 'https://clinical-ai-backend.neuvoteam.workers.dev'
+
+export const useClientNavStore = create<ClientNavState>((set, get) => ({
+  client: null,
+  loading: true,
+
+  /* =========================
+     ✅ LOAD CLIENT TREE
+     ========================= */
+  load: async () => {
+    set({ loading: true })
+
+    try {
+      const res = await fetch(`${API}/clients`)
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data?.error || 'Load failed')
+
+      set({ client: data, loading: false })
+    } catch (err) {
+      console.error('Load error:', err)
+      set({ loading: false })
+    }
   },
 
-  load: () => {},
+  /* =========================
+     ✅ CREATE CASE
+     ========================= */
+  createCase: async () => {
+    const client = get().client
+    if (!client) return
 
-  createCase: () =>
-    set((state) => {
-      if (!state.client) return state
+    try {
+      const res = await fetch(`${API}/cases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: client.id }),
+      })
 
-      return {
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error)
+
+      // ✅ optimistic update
+      set({
         client: {
-          ...state.client,
-          cases: [
-            ...state.client.cases,
-            {
-              id: crypto.randomUUID(),
-              name: `Case ${state.client.cases.length + 1}`,
-              sessions: [],
-            },
-          ],
+          ...client,
+          cases: [...client.cases, { ...data, sessions: [] }],
         },
-      }
-    }),
+      })
+    } catch (err) {
+      console.error('Create case error:', err)
+    }
+  },
 
-  createSession: (caseId) =>
-    set((state) => {
-      if (!state.client) return state
+  /* =========================
+     ✅ CREATE SESSION
+     ========================= */
+  createSession: async (caseId) => {
+    const client = get().client
+    if (!client) return
 
-      return {
+    try {
+      const res = await fetch(`${API}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseId }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error)
+
+      set({
         client: {
-          ...state.client,
-          cases: state.client.cases.map((c) =>
+          ...client,
+          cases: client.cases.map((c) =>
             c.id === caseId
               ? {
                   ...c,
-                  sessions: [
-                    ...c.sessions,
-                    {
-                      id: crypto.randomUUID(),
-                      name: `Session ${c.sessions.length + 1}`,
-                    },
-                  ],
+                  sessions: [...c.sessions, data],
                 }
               : c
           ),
         },
-      }
-    }),
+      })
+    } catch (err) {
+      console.error('Create session error:', err)
+    }
+  },
 
-  deleteCase: (caseId) =>
-    set((state) => {
-      if (!state.client) return state
+  /* =========================
+     ✅ DELETE CASE
+     ========================= */
+  deleteCase: async (caseId) => {
+    const client = get().client
+    if (!client) return
 
-      return {
+    try {
+      const res = await fetch(`${API}/cases/${caseId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) throw new Error('Delete failed')
+
+      set({
         client: {
-          ...state.client,
-          cases: state.client.cases.filter((c) => c.id !== caseId),
+          ...client,
+          cases: client.cases.filter((c) => c.id !== caseId),
         },
-      }
-    }),
+      })
+    } catch (err) {
+      console.error('Delete case error:', err)
+    }
+  },
 
-  deleteSession: (caseId, sessionId) =>
-    set((state) => {
-      if (!state.client) return state
+  /* =========================
+     ✅ DELETE SESSION
+     ========================= */
+  deleteSession: async (caseId, sessionId) => {
+    const client = get().client
+    if (!client) return
 
-      return {
+    try {
+      const res = await fetch(`${API}/sessions/${sessionId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) throw new Error('Delete failed')
+
+      set({
         client: {
-          ...state.client,
-          cases: state.client.cases.map((c) =>
+          ...client,
+          cases: client.cases.map((c) =>
             c.id === caseId
               ? {
                   ...c,
@@ -121,6 +171,9 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
               : c
           ),
         },
-      }
-    }),
+      })
+    } catch (err) {
+      console.error('Delete session error:', err)
+    }
+  },
 }))

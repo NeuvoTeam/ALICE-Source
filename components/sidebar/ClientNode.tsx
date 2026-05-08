@@ -6,7 +6,11 @@ import { CaseNode } from './CaseNode'
 import { useClientNavStore } from '@/stores/useClientNavStore'
 
 export function ClientNode() {
-  const { client, createCase } = useClientNavStore()
+  const { client, loading, createCase, load } = useClientNavStore()
+
+  React.useEffect(() => {
+    load()
+  }, [])
 
   if (!client) {
     return (
