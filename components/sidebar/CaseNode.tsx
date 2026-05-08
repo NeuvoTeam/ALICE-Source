@@ -1,8 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus, Trash } from 'lucide-react'
 import { SessionNode } from './SessionNode'
+import { useClientNavStore } from '@/stores/useClientNavStore'
 
 type Session = {
   id: string
@@ -15,41 +16,67 @@ type Case = {
   sessions: Session[]
 }
 
-/**
- * IMPORTANT:
- * This must be a NAMED EXPORT:
- *   export function CaseNode() { ... }
- */
 export function CaseNode({ caseData }: { caseData: Case }) {
   const [open, setOpen] = React.useState(true)
 
+  const { createSession, deleteCase } = useClientNavStore()
+
   return (
     <div className="space-y-1">
-      {/* Case row */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent/50"
-      >
-        <ChevronRight
-          className={`h-4 w-4 transition-transform ${
-            open ? 'rotate-90' : ''
-          }`}
-        />
-        <span className="truncate">{caseData.name}</span>
-      </button>
+      {/* Case Row */}
+      <div className="group flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-sidebar-accent/50"
+        >
+          <ChevronRight
+            className={`h-4 w-4 transition-transform ${
+              open ? 'rotate-90' : ''
+            }`}
+          />
+          <span className="truncate">{caseData.name}</span>
+        </button>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              createSession(caseData.id)
+            }}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (confirm('Delete this case and all sessions?')) {
+                deleteCase(caseData.id)
+              }
+            }}
+          >
+            <Trash className="h-4 w-4 hover:text-red-500" />
+          </button>
+        </div>
+      </div>
 
       {/* Sessions */}
       {open && (
         <div className="ml-6 space-y-1">
           {caseData.sessions.length === 0 && (
-            <div className="px-3 py-1 text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground px-3">
               No sessions
             </div>
           )}
 
           {caseData.sessions.map((s) => (
-            <SessionNode key={s.id} session={s} />
+            <SessionNode
+              key={s.id}
+              session={s}
+              caseId={caseData.id}
+            />
           ))}
         </div>
       )}

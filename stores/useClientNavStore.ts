@@ -2,10 +2,6 @@
 
 import { create } from 'zustand'
 
-/* =====================
-   Types
-   ===================== */
-
 export type Session = {
   id: string
   name: string
@@ -29,11 +25,9 @@ type ClientNavState = {
   load: (clientId: string) => void
   createCase: () => void
   createSession: (caseId: string) => void
+  deleteCase: (caseId: string) => void
+  deleteSession: (caseId: string, sessionId: string) => void
 }
-
-/* =====================
-   Store
-   ===================== */
 
 export const useClientNavStore = create<ClientNavState>((set) => ({
   client: {
@@ -55,12 +49,9 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
 
   load: () => {},
 
-  /* ✅ FIXED: Proper immutable update */
   createCase: () =>
     set((state) => {
       if (!state.client) return state
-
-      const nextIndex = state.client.cases.length + 1
 
       return {
         client: {
@@ -69,7 +60,7 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
             ...state.client.cases,
             {
               id: crypto.randomUUID(),
-              name: `Case ${nextIndex}`,
+              name: `Case ${state.client.cases.length + 1}`,
               sessions: [],
             },
           ],
@@ -77,7 +68,6 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
       }
     }),
 
-  /* ✅ FIXED: Correct nested update */
   createSession: (caseId) =>
     set((state) => {
       if (!state.client) return state
@@ -85,22 +75,51 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
       return {
         client: {
           ...state.client,
-          cases: state.client.cases.map((c) => {
-            if (c.id !== caseId) return c
+          cases: state.client.cases.map((c) =>
+            c.id === caseId
+              ? {
+                  ...c,
+                  sessions: [
+                    ...c.sessions,
+                    {
+                      id: crypto.randomUUID(),
+                      name: `Session ${c.sessions.length + 1}`,
+                    },
+                  ],
+                }
+              : c
+          ),
+        },
+      }
+    }),
 
-            const nextIndex = c.sessions.length + 1
+  deleteCase: (caseId) =>
+    set((state) => {
+      if (!state.client) return state
 
-            return {
-              ...c,
-              sessions: [
-                ...c.sessions,
-                {
-                  id: crypto.randomUUID(),
-                  name: `Session ${nextIndex}`,
-                },
-              ],
-            }
-          }),
+      return {
+        client: {
+          ...state.client,
+          cases: state.client.cases.filter((c) => c.id !== caseId),
+        },
+      }
+    }),
+
+  deleteSession: (caseId, sessionId) =>
+    set((state) => {
+      if (!state.client) return state
+
+      return {
+        client: {
+          ...state.client,
+          cases: state.client.cases.map((c) =>
+            c.id === caseId
+              ? {
+                  ...c,
+                  sessions: c.sessions.filter((s) => s.id !== sessionId),
+                }
+              : c
+          ),
         },
       }
     }),
