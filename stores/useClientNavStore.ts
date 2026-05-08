@@ -35,13 +35,6 @@ type ClientNavState = {
    Store
    ===================== */
 
-/**
- * ✅ IMPORTANT
- * This MUST be a NAMED EXPORT
- * because we import it like:
- *
- *   import { useClientNavStore } from '@/stores/useClientNavStore'
- */
 export const useClientNavStore = create<ClientNavState>((set) => ({
   client: {
     id: 'demo-client',
@@ -62,25 +55,29 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
 
   load: () => {},
 
+  /* ✅ FIXED: Proper immutable update */
   createCase: () =>
-    set((state) =>
-      state.client
-        ? {
-            client: {
-              ...state.client,
-              cases: [
-                ...state.client.cases,
-                {
-                  id: crypto.randomUUID(),
-                  name: 'New Case',
-                  sessions: [],
-                },
-              ],
-            },
-          }
-        : state
-    ),
+    set((state) => {
+      if (!state.client) return state
 
+      const nextIndex = state.client.cases.length + 1
+
+      return {
+        client: {
+          ...state.client,
+          cases: [
+            ...state.client.cases,
+            {
+              id: crypto.randomUUID(),
+              name: `Case ${nextIndex}`,
+              sessions: [],
+            },
+          ],
+        },
+      }
+    }),
+
+  /* ✅ FIXED: Correct nested update */
   createSession: (caseId) =>
     set((state) => {
       if (!state.client) return state
@@ -88,20 +85,22 @@ export const useClientNavStore = create<ClientNavState>((set) => ({
       return {
         client: {
           ...state.client,
-          cases: state.client.cases.map((c) =>
-            c.id === caseId
-              ? {
-                  ...c,
-                  sessions: [
-                    ...c.sessions,
-                    {
-                      id: crypto.randomUUID(),
-                      name: 'New Session',
-                    },
-                  ],
-                }
-              : c
-          ),
+          cases: state.client.cases.map((c) => {
+            if (c.id !== caseId) return c
+
+            const nextIndex = c.sessions.length + 1
+
+            return {
+              ...c,
+              sessions: [
+                ...c.sessions,
+                {
+                  id: crypto.randomUUID(),
+                  name: `Session ${nextIndex}`,
+                },
+              ],
+            }
+          }),
         },
       }
     }),
