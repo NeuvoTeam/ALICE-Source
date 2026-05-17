@@ -1,3 +1,6 @@
 name = "alice-mcp"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+services = [
+  { binding = "BACKEND", service = "clinical-ai-backend" }
+]
