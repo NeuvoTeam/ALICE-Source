@@ -166,7 +166,7 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
       const imgData = canvas.toDataURL("image/png")
       const pdf = new jsPDF("p", "mm", "a4")
       pdf.addImage(imgData, "PNG", 10, 10, 190, (canvas.height * 190) / canvas.width)
-      pdf.save(`bastion-worksheet-${clientId}.pdf`)
+      pdf.save(`ALICE-worksheet-${clientId}.pdf`)
     } finally {
       setIsExporting(false)
     }
@@ -227,7 +227,7 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
             <div className="p-2.5 bg-primary/10 rounded-2xl">
               <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
-            <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">Bastion Clinical</CardTitle>
+            <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">ALICE Clinical</CardTitle>
           </div>
           <div className="px-3 py-1 bg-white border rounded-full text-[10px] font-bold text-zinc-400">PHASE {step}</div>
         </div>

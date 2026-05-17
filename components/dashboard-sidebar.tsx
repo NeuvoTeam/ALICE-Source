@@ -35,7 +35,7 @@ export function DashboardSidebar({
         </div>
         <div>
           <h1 className="text-lg font-semibold text-sidebar-foreground">
-            MindCare
+            ALICE
           </h1>
           <p className="text-xs text-muted-foreground">
             Clinical Portal

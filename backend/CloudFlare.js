@@ -1,66 +1,228 @@
 // @ts-nocheck
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.1-8b-instant";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+const MODEL = "llama-3.1-8b-instant"
 
 export default {
   async fetch(request, env) {
 
     const cors = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    };
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer",
+    }
 
-    // ✅ CORS
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: cors });
+      return new Response(null, { headers: cors })
     }
 
-    const url = new URL(request.url);
-    const path = url.pathname;
+    const url = new URL(request.url)
+    const path = url.pathname
+    const method = request.method
 
-    // ✅ GET: latest session
-    if (request.method === "GET" && path === "/latest-session") {
-      return json({
-        sessionNotes: "",
-        lastUpdated: null,
-      }, 200, cors);
-    }
+    // ✅ Normalize base URL (prevents // issues)
+    const baseUrl = env.SUPABASE_URL.endsWith("/")
+      ? env.SUPABASE_URL.slice(0, -1)
+      : env.SUPABASE_URL
 
-    if (request.method !== "POST") {
-      return json({ error: "Method not allowed" }, 405, cors);
+    const SUPABASE_URL = `${baseUrl}/rest/v1`
+
+    const HEADERS = {
+      "Content-Type": "application/json",
+      "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Prefer": "return=representation"
     }
 
     try {
-      const body = await request.json().catch(() => null);
 
-      if (!body || !body.sessionNotes) {
-        return json({ error: "Missing sessionNotes" }, 400, cors);
+      /* =========================
+         ✅ CLIENT TREE
+         ========================= */
+      if (method === "GET" && path === "/clients") {
+        const res = await fetch(
+          `${SUPABASE_URL}/clients?select=id,name,case_formulations(id,name,sessions(id,name))&limit=1`,
+          { headers: HEADERS }
+        )
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const data = await res.json()
+
+        if (!data?.length) {
+          return respond({ error: "No client found" }, cors, 404)
+        }
+
+        return respond({
+          id: data[0].id,
+          name: data[0].name,
+          cases: data[0].case_formulations || [],
+        }, cors)
       }
 
-      if (path === "/analyze/session") {
-        return await handleAnalyze(body.sessionNotes, env, cors);
+      /* =========================
+         ✅ CREATE CASE
+         ========================= */
+      if (method === "POST" && path === "/cases") {
+        const body = await safeJson(request)
+
+        if (!body?.clientId) {
+          return respond({ error: "Missing clientId" }, cors, 400)
+        }
+
+        const res = await fetch(`${SUPABASE_URL}/case_formulations`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            client_id: body.clientId,
+            name: `Case ${Date.now()}`,
+          }),
+        })
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const data = await res.json()
+        return respond(data?.[0] || data, cors)
       }
 
-      if (path === "/generate/vignette") {
-        const modality = body.verifiedModality || body.modality || "cbt";
-        return await handleGenerate(body.sessionNotes, modality, env, cors);
+      /* =========================
+         ✅ CREATE SESSION
+         ========================= */
+      if (method === "POST" && path === "/sessions") {
+        const body = await safeJson(request)
+
+        if (!body?.caseId) {
+          return respond({ error: "Missing caseId" }, cors, 400)
+        }
+
+        const res = await fetch(`${SUPABASE_URL}/sessions`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            case_id: body.caseId,
+            name: `Session ${Date.now()}`,
+          }),
+        })
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const data = await res.json()
+        return respond(data?.[0] || data, cors)
       }
 
-      return json({ error: "Route not found" }, 404, cors);
+      /* =========================
+         ✅ DELETE CASE
+         ========================= */
+      if (method === "DELETE" && path.startsWith("/cases/")) {
+        const id = path.split("/")[2]
+
+        if (!id) {
+          return respond({ error: "Missing caseId" }, cors, 400)
+        }
+
+        const res = await fetch(
+          `${SUPABASE_URL}/case_formulations?id=eq.${id}`,
+          { method: "DELETE", headers: HEADERS }
+        )
+
+        if (!res.ok && res.status !== 204) {
+          throw new Error(await res.text())
+        }
+
+        return respond({ success: true }, cors)
+      }
+
+      /* =========================
+         ✅ DELETE SESSION
+         ========================= */
+      if (method === "DELETE" && path.startsWith("/sessions/")) {
+        const id = path.split("/")[2]
+
+        if (!id) {
+          return respond({ error: "Missing sessionId" }, cors, 400)
+        }
+
+        const res = await fetch(
+          `${SUPABASE_URL}/sessions?id=eq.${id}`,
+          { method: "DELETE", headers: HEADERS }
+        )
+
+        if (!res.ok && res.status !== 204) {
+          throw new Error(await res.text())
+        }
+
+        return respond({ success: true }, cors)
+      }
+
+      /* =========================
+         ✅ RESTORED ROUTE (IMPORTANT)
+         ========================= */
+      if (method === "GET" && path === "/latest-session") {
+        return respond({
+          sessionNotes: "",
+          lastUpdated: null,
+        }, cors)
+      }
+      /*=========================
+          ✅ /client/:id (single client tree)
+      =========================*/
+      if (method === "GET" && path.startsWith("/client/")) {
+        const id = path.split("/")[2]
+
+        const res = await fetch(
+          `${SUPABASE_URL}/clients?id=eq.${id}&select=id,name,case_formulations(id,name,sessions(id,name))`,
+          { headers: HEADERS }
+        )
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const data = await res.json()
+
+        if (!data?.length) {
+          return respond({ error: "Client not found" }, cors, 404)
+        }
+
+        return respond({
+          id: data[0].id,
+          name: data[0].name,
+          cases: data[0].case_formulations || [],
+        }, cors)
+      }
+
+
+
+      /* =========================
+         ✅ AI ROUTES
+         ========================= */
+      if (method === "POST") {
+        const body = await safeJson(request)
+
+        if (!body || !body.sessionNotes) {
+          return respond({ error: "Missing sessionNotes" }, cors, 400)
+        }
+
+        if (path === "/analyze/session") {
+          return await handleAnalyze(body.sessionNotes, env, cors)
+        }
+
+        if (path === "/generate/vignette") {
+          const modality = body.verifiedModality || body.modality || "cbt"
+          return await handleGenerate(body.sessionNotes, modality, env, cors)
+        }
+      }
+
+      return respond({ error: "Route not found" }, cors, 404)
 
     } catch (err) {
-      return json({ error: err.message }, 500, cors);
+      console.error("Worker error:", err)
+      return respond({ error: err.message || "Server error" }, cors, 500)
     }
   }
-};
+}
 
-
-
-// ===============================
-// ✅ ANALYZE (STRONG + SAFE)
-// ===============================
+/* ===============================
+   ✅ ANALYZE (UNCHANGED SAFE)
+   =============================== */
 async function handleAnalyze(input, env, cors) {
 
   const messages = [
@@ -92,25 +254,22 @@ Rules:
 `
     },
     { role: "user", content: input }
-  ];
+  ]
 
-  const raw = await callGroq(messages, env, 0.3);
+  const raw = await callGroq(messages, env, 0.3)
+  const cleaned = stripMarkdown(raw)
+  const parsed = extractJsonObject(cleaned)
 
-  const cleaned = stripMarkdown(raw);
-  const parsed = extractJsonObject(cleaned);
-
-  return json({
+  return respond({
     rationale: parsed?.rationale || "Clinical synthesis unavailable.",
     inferredModality: (parsed?.inferredModality || "CBT").toLowerCase(),
     riskFlags: parsed?.riskFlags || [],
-  }, 200, cors);
+  }, cors)
 }
 
-
-
-// ===============================
-// ✅ GENERATE (HIGH QUALITY)
-// ===============================
+/* ===============================
+   ✅ GENERATE (UNCHANGED SAFE)
+   =============================== */
 async function handleGenerate(input, modality, env, cors) {
 
   const messages = [
@@ -151,25 +310,22 @@ Case:
 ${input}
 `
     }
-  ];
+  ]
 
-  const raw = await callGroq(messages, env, 0.6);
+  const raw = await callGroq(messages, env, 0.6)
+  const cleaned = stripMarkdown(raw)
+  const parsed = extractJsonObject(cleaned)
 
-  const cleaned = stripMarkdown(raw);
-  const parsed = extractJsonObject(cleaned);
-
-  return json({
+  return respond({
     scenario: parsed?.scenario || "Scenario unavailable.",
     quiz: parsed?.quiz || [],
     homework: parsed?.homework || [],
-  }, 200, cors);
+  }, cors)
 }
 
-
-
-// ===============================
-// ✅ GROQ CALL (SAFE)
-// ===============================
+/* ===============================
+   ✅ GROQ CALL (SAFE + DEBUG)
+   =============================== */
 async function callGroq(messages, env, temperature = 0.4) {
   try {
     const res = await fetch(GROQ_API_URL, {
@@ -183,69 +339,76 @@ async function callGroq(messages, env, temperature = 0.4) {
         messages,
         temperature,
       }),
-    });
+    })
 
-    const text = await res.text();
+    const text = await res.text()
 
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return null;
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`GROQ ERROR: ${text}`)
     }
 
-    return parsed?.choices?.[0]?.message?.content || null;
+    let parsed
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return null
+    }
+
+    return parsed?.choices?.[0]?.message?.content || null
 
   } catch (err) {
-    console.error("Groq error:", err);
-    return null;
+    console.error("Groq error:", err)
+    return null
   }
 }
 
-
-
-// ===============================
-// ✅ CLEAN MARKDOWN
-// ===============================
+/* ===============================
+   ✅ CLEAN MARKDOWN
+   =============================== */
 function stripMarkdown(text) {
-  if (!text) return "";
+  if (!text) return ""
   return text
     .replace(/```json[\s\S]*?```/gi, "")
     .replace(/```[\s\S]*?```/g, "")
-    .trim();
+    .trim()
 }
 
-
-
-// ===============================
-// ✅ SAFE JSON EXTRACTOR (KEY)
-// ===============================
+/* ===============================
+   ✅ SAFE JSON EXTRACTOR
+   =============================== */
 function extractJsonObject(text) {
-  if (!text) return null;
+  if (!text) return null
 
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
+  const start = text.indexOf("{")
+  const end = text.lastIndexOf("}")
 
-  if (start === -1 || end === -1 || end <= start) return null;
+  if (start === -1 || end === -1 || end <= start) return null
 
   try {
-    return JSON.parse(text.slice(start, end + 1));
+    return JSON.parse(text.slice(start, end + 1))
   } catch {
-    return null;
+    return null
   }
 }
 
-
-
-// ===============================
-// ✅ RESPONSE HELPER
-// ===============================
-function json(data, status, cors) {
+/* ===============================
+   ✅ HELPERS
+   =============================== */
+function respond(data, cors, status = 200) {
   return new Response(JSON.stringify(data), {
-    status: status || 200,
+    status,
     headers: {
-      "Content-Type": "application/json",
       ...cors,
+      "Content-Type": "application/json",
     },
-  });
+  })
+}
+
+async function safeJson(request) {
+  try {
+    return await request.json()
+  } catch {
+    return null
+  }
 }
