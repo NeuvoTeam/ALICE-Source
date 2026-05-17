@@ -48,13 +48,13 @@ export default {
       });
     }
 
-    // ✅ API: GET CLIENTS (with UUID-safe filtering)
+    // ✅ API: GET CLIENTS (with normalization)
     if (url.pathname.startsWith("/api/clients")) {
       const clientId = url.searchParams.get("id");
 
       let query = `${env.SUPABASE_URL}/rest/v1/clients`;
 
-      // ✅ only filter if valid UUID
+      // ✅ Only filter if valid UUID
       if (clientId && isValidUUID(clientId)) {
         query += `?id=eq.${clientId}`;
       }
@@ -68,12 +68,20 @@ export default {
 
       const data = await res.json();
 
-      return new Response(JSON.stringify(data), {
+      // ✅ ✅ NORMALIZATION (CORRECT LOCATION)
+      const normalized = data.map((client: any) => ({
+        id: client.id,
+        name: client.full_name ?? client.name ?? "Unnamed Client",
+        created_at: client.created_at,
+        clinician_id: client.clinician_id
+      }));
+
+      return new Response(JSON.stringify(normalized), {
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // ✅ API: CREATE NOTE
+    // ✅ API: CREATE NOTE (no normalization — single object)
     if (url.pathname === "/api/notes" && req.method === "POST") {
       try {
         const body = await req.json();
@@ -96,21 +104,17 @@ export default {
 
         const data = await res.json();
 
-        // ✅ Normalize output (clean API layer)
-        const normalized = data.map((client: any) => ({
-          id: client.id,
-          name: client.full_name ?? client.name ?? "Unnamed Client",
-          created_at: client.created_at,
-          clinician_id: client.clinician_id
-        }));
-
-        return new Response(JSON.stringify(normalized), {
+        return new Response(JSON.stringify(data), {
           headers: { "Content-Type": "application/json" }
         });
+
       } catch (err) {
         return new Response(JSON.stringify({
           error: "Invalid request body"
-        }), { status: 400 });
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
       }
     }
 
