@@ -73,7 +73,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       set({
         clients: data.map((c: any) => ({
           id: c.id,
-          name: c.name,
+          name: c.name || "Unnamed Client",
           cases: [],
         })),
       })
@@ -153,7 +153,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
         const clients = data.map((c: any) => ({
         id: c.id,
-        name: c.name,
+        name: c.name || "Unnamed Client",
         cases: [],
       }))
 

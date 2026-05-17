@@ -1,11 +1,11 @@
 // @ts-nocheck
-
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 const MODEL = "llama-3.1-8b-instant"
 
 export default {
   async fetch(request, env) {
 
+    
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
@@ -18,7 +18,9 @@ export default {
 
     const url = new URL(request.url)
     const path = url.pathname
+    const cleanPath = path.replace(/\/+$/, "")
     const method = request.method
+    console.log("REQUEST PATH:", path)
 
     // ✅ Normalize base URL (prevents // issues)
     const baseUrl = env.SUPABASE_URL.endsWith("/")
@@ -36,34 +38,41 @@ export default {
 
     try {
 
-      /* =========================
-         ✅ CLIENT TREE
-         ========================= */
-      if (method === "GET" && path === "/clients") {
-        const res = await fetch(
-          `${SUPABASE_URL}/clients?select=id,name,case_formulations(id,name,sessions(id,name))&limit=1`,
-          { headers: HEADERS }
-        )
-
-        if (!res.ok) throw new Error(await res.text())
-
-        const data = await res.json()
-
-        if (!data?.length) {
-          return respond({ error: "No client found" }, cors, 404)
-        }
-
-        return respond({
-          id: data[0].id,
-          name: data[0].name,
-          cases: data[0].case_formulations || [],
-        }, cors)
-      }
+/* =========================
+   ✅ GET ALL CLIENTS (FIXED)
+   ========================= */
+   if (method === "GET" && cleanPath === "/clients") {
+    const res = await fetch(
+      `${SUPABASE_URL}/clients?select=id,name`,
+      { headers: HEADERS }
+    )
+  
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text)
+    }
+  
+    let data
+    try {
+      data = await res.json()
+    } catch {
+      return respond([], cors)
+    }
+  
+    return respond(
+      (Array.isArray(data) ? data : []).map(c => ({
+        id: c.id,
+        name: c.name || `Client ${c.id.slice(0, 6)}`
+      })),
+      cors
+    )
+    
+  }
 
       /* =========================
          ✅ CREATE CASE
          ========================= */
-      if (method === "POST" && path === "/cases") {
+      if (method === "POST" && cleanPath === "/cases") {
         const body = await safeJson(request)
 
         if (!body?.clientId) {
@@ -88,7 +97,7 @@ export default {
       /* =========================
          ✅ CREATE SESSION
          ========================= */
-      if (method === "POST" && path === "/sessions") {
+      if (method === "POST" && cleanPath === "/sessions") {
         const body = await safeJson(request)
 
         if (!body?.caseId) {
@@ -113,7 +122,7 @@ export default {
       /* =========================
          ✅ DELETE CASE
          ========================= */
-      if (method === "DELETE" && path.startsWith("/cases/")) {
+      if (method === "DELETE" && cleanPath.startsWith("/cases/")) {
         const id = path.split("/")[2]
 
         if (!id) {
@@ -135,7 +144,7 @@ export default {
       /* =========================
          ✅ DELETE SESSION
          ========================= */
-      if (method === "DELETE" && path.startsWith("/sessions/")) {
+      if (method === "DELETE" && cleanPath.startsWith("/sessions/")) {
         const id = path.split("/")[2]
 
         if (!id) {
@@ -157,7 +166,7 @@ export default {
       /* =========================
          ✅ RESTORED ROUTE (IMPORTANT)
          ========================= */
-      if (method === "GET" && path === "/latest-session") {
+      if (method === "GET" && cleanPath === "/latest-session") {
         return respond({
           sessionNotes: "",
           lastUpdated: null,
@@ -166,7 +175,7 @@ export default {
       /*=========================
           ✅ /client/:id (single client tree)
       =========================*/
-      if (method === "GET" && path.startsWith("/client/")) {
+      if (method === "GET" && cleanPath.startsWith("/client/")) {
         const id = path.split("/")[2]
 
         const res = await fetch(
