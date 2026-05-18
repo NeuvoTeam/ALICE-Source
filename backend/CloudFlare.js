@@ -20,7 +20,7 @@ export default {
     const path = url.pathname
     const cleanPath = path.replace(/\/+$/, "")
     const method = request.method
-    console.log("REQUEST PATH:", path)
+    console.log("REQUEST", method, cleanPath)
 
     // ✅ Normalize base URL (prevents // issues)
     const baseUrl = env.SUPABASE_URL.endsWith("/")
@@ -217,6 +217,81 @@ export default {
       }
 
       /* =========================
+          ✅ RENAME CLIENT
+          ========================= */
+        if (method === "PATCH" && cleanPath.startsWith("/clients/")) {
+          const id = path.split("/")[2]
+          const body = await safeJson(request)
+
+          if (!body?.name) {
+            return respond({ error: "Missing name" }, cors, 400)
+          }
+
+          const res = await fetch(
+            `${SUPABASE_URL}/clients?id=eq.${id}`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify({ name: body.name }),
+            }
+          )
+
+          if (!res.ok) throw new Error(await res.text())
+
+          return respond({ success: true }, cors)
+        }
+
+        /* =========================
+          ✅ RENAME CASE
+          ========================= */
+        if (method === "PATCH" && cleanPath.startsWith("/cases/")) {
+          const id = path.split("/")[2]
+          const body = await safeJson(request)
+
+          if (!body?.name) {
+            return respond({ error: "Missing name" }, cors, 400)
+          }
+
+          const res = await fetch(
+            `${SUPABASE_URL}/case_formulations?id=eq.${id}`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify({ name: body.name }),
+            }
+          )
+
+          if (!res.ok) throw new Error(await res.text())
+
+          return respond({ success: true }, cors)
+        }
+
+        /* =========================
+          ✅ RENAME SESSION
+          ========================= */
+        if (method === "PATCH" && cleanPath.startsWith("/sessions/")) {
+          const id = path.split("/")[2]
+          const body = await safeJson(request)
+
+          if (!body?.name) {
+            return respond({ error: "Missing name" }, cors, 400)
+          }
+
+          const res = await fetch(
+            `${SUPABASE_URL}/sessions?id=eq.${id}`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify({ name: body.name }),
+            }
+          )
+
+          if (!res.ok) throw new Error(await res.text())
+
+          return respond({ success: true }, cors)
+        }
+
+      /* =========================
          ✅ RESTORED ROUTE (IMPORTANT)
          ========================= */
       if (method === "GET" && cleanPath === "/latest-session") {
@@ -229,7 +304,7 @@ export default {
           ✅ /client/:id (single client tree)
       =========================*/
       if (method === "GET" && cleanPath.startsWith("/client/")) {
-        const id = path.split("/")[2]
+        const id = cleanPath.split("/")[2]
 
         const res = await fetch(
           `${SUPABASE_URL}/clients?id=eq.${id}&select=id,name,case_formulations(id,name,sessions(id,name))`,

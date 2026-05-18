@@ -30,11 +30,13 @@ type ClientNavState = {
 
   loadClients: () => Promise<void>
   selectClient: (clientId: string) => Promise<void>
-  createClient: (name: string) => Promise<void>
+  createClient: (name?: string) => Promise<void>
 
   load: () => Promise<void>
+
   createCase: () => Promise<void>
   createSession: (caseId: string) => Promise<void>
+
   deleteCase: (caseId: string) => Promise<void>
   deleteSession: (caseId: string, sessionId: string) => Promise<void>
 
@@ -55,16 +57,25 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   loading: false,
 
   /* =========================
+     ✅ NORMALIZER
+     ========================= */
+  normalizeClients: (data: any[]) =>
+    data.map((c: any) => ({
+      id: c.id,
+      name: c.name || 'Unnamed Client',
+      cases: [],
+    })),
+
+  /* =========================
      ✅ LOAD CLIENT LIST
      ========================= */
   loadClients: async () => {
     try {
       const res = await fetch(`${API}/clients`)
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+
       if (!res.ok) throw new Error(data?.error)
 
-      // ✅ Normalize (important fix)
-      
       if (!Array.isArray(data)) {
         console.error('Unexpected clients response:', data)
         return
@@ -73,7 +84,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       set({
         clients: data.map((c: any) => ({
           id: c.id,
-          name: c.name || "Unnamed Client",
+          name: c.name || 'Unnamed Client',
           cases: [],
         })),
       })
@@ -84,12 +95,13 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   },
 
   /* =========================
-     ✅ SELECT CLIENT
+     ✅ SELECT CLIENT (FULL TREE)
      ========================= */
   selectClient: async (clientId: string) => {
     try {
       const res = await fetch(`${API}/client/${clientId}`)
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+
       if (!res.ok) throw new Error(data?.error)
 
       set({
@@ -105,7 +117,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   /* =========================
      ✅ CREATE CLIENT
      ========================= */
-  createClient: async (name: string) => {
+  createClient: async (name?: string) => {
     try {
       const res = await fetch(`${API}/clients`, {
         method: 'POST',
@@ -113,20 +125,22 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ name }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error)
 
       const newClient: Client = {
         id: data.id,
-        name: data.name,
+        name: data.name || 'Unnamed Client',
         cases: [],
       }
 
+      // ✅ Add to list immediately
       set({
         clients: [...get().clients, newClient],
-        selectedClientId: newClient.id,
-        client: newClient,
       })
+
+      // ✅ Load full tree (important improvement)
+      await get().selectClient(newClient.id)
 
     } catch (err) {
       console.error('Create client error:', err)
@@ -141,19 +155,19 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
     try {
       const res = await fetch(`${API}/clients`)
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+
       if (!res.ok) throw new Error(data?.error)
 
-      
-        if (!Array.isArray(data)) {
-          console.error('Unexpected clients response:', data)
-          set({ loading: false })
-          return
-        }
+      if (!Array.isArray(data)) {
+        console.error('Unexpected clients response:', data)
+        set({ loading: false })
+        return
+      }
 
-        const clients = data.map((c: any) => ({
+      const clients = data.map((c: any) => ({
         id: c.id,
-        name: c.name || "Unnamed Client",
+        name: c.name || 'Unnamed Client',
         cases: [],
       }))
 
@@ -165,7 +179,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       const firstId = clients[0].id
 
       const clientRes = await fetch(`${API}/client/${firstId}`)
-      const clientData = await clientRes.json()
+      const clientData = await clientRes.json().catch(() => null)
 
       set({
         clients,
@@ -194,7 +208,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ clientId: client.id }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error)
 
       set({
@@ -223,7 +237,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ caseId }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error)
 
       set({
