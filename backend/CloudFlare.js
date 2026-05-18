@@ -72,52 +72,74 @@ export default {
       /* =========================
          ✅ CREATE CASE
          ========================= */
-      if (method === "POST" && cleanPath === "/cases") {
-        const body = await safeJson(request)
-
-        if (!body?.clientId) {
-          return respond({ error: "Missing clientId" }, cors, 400)
+         if (method === "POST" && cleanPath === "/cases") {
+          const body = await safeJson(request)
+        
+          if (!body?.clientId) {
+            return respond({ error: "Missing clientId" }, cors, 400)
+          }
+        
+          // ✅ Count existing cases for this client
+          const countRes = await fetch(
+            `${SUPABASE_URL}/case_formulations?client_id=eq.${body.clientId}&select=id`,
+            { headers: HEADERS }
+          )
+        
+          const existing = await countRes.json()
+          const nextNumber = (Array.isArray(existing) ? existing.length : 0) + 1
+        
+          const name = body?.name || `Case ${nextNumber}`
+        
+          const res = await fetch(`${SUPABASE_URL}/case_formulations`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              client_id: body.clientId,
+              name,
+            }),
+          })
+        
+          if (!res.ok) throw new Error(await res.text())
+        
+          const data = await res.json()
+          return respond(data?.[0] || data, cors)
         }
-
-        const res = await fetch(`${SUPABASE_URL}/case_formulations`, {
-          method: "POST",
-          headers: HEADERS,
-          body: JSON.stringify({
-            client_id: body.clientId,
-            name: `Case ${Date.now()}`,
-          }),
-        })
-
-        if (!res.ok) throw new Error(await res.text())
-
-        const data = await res.json()
-        return respond(data?.[0] || data, cors)
-      }
 
       /* =========================
          ✅ CREATE SESSION
          ========================= */
-      if (method === "POST" && cleanPath === "/sessions") {
-        const body = await safeJson(request)
-
-        if (!body?.caseId) {
-          return respond({ error: "Missing caseId" }, cors, 400)
+         if (method === "POST" && cleanPath === "/sessions") {
+          const body = await safeJson(request)
+        
+          if (!body?.caseId) {
+            return respond({ error: "Missing caseId" }, cors, 400)
+          }
+        
+          // ✅ Count existing sessions for this case
+          const countRes = await fetch(
+            `${SUPABASE_URL}/sessions?case_id=eq.${body.caseId}&select=id`,
+            { headers: HEADERS }
+          )
+        
+          const existing = await countRes.json()
+          const nextNumber = (Array.isArray(existing) ? existing.length : 0) + 1
+        
+          const name = body?.name || `Session ${nextNumber}`
+        
+          const res = await fetch(`${SUPABASE_URL}/sessions`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              case_id: body.caseId,
+              name,
+            }),
+          })
+        
+          if (!res.ok) throw new Error(await res.text())
+        
+          const data = await res.json()
+          return respond(data?.[0] || data, cors)
         }
-
-        const res = await fetch(`${SUPABASE_URL}/sessions`, {
-          method: "POST",
-          headers: HEADERS,
-          body: JSON.stringify({
-            case_id: body.caseId,
-            name: `Session ${Date.now()}`,
-          }),
-        })
-
-        if (!res.ok) throw new Error(await res.text())
-
-        const data = await res.json()
-        return respond(data?.[0] || data, cors)
-      }
 
       /* =========================
          ✅ DELETE CASE
