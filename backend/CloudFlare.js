@@ -68,6 +68,37 @@ export default {
     )
     
   }
+  
+        /* =========================
+        ✅ CREATE CLIENT
+        ========================= */
+      if (method === "POST" && cleanPath === "/clients") {
+        const body = await safeJson(request)
+
+        // ✅ Use provided name OR fallback
+        const name =
+          body?.name && body.name.trim()
+            ? body.name.trim()
+            : `Client ${Date.now()}`
+
+        const res = await fetch(`${SUPABASE_URL}/clients`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            name,
+          }),
+        })
+
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text)
+        }
+
+        const data = await res.json()
+
+        return respond(data?.[0] || data, cors)
+      }
+
 
       /* =========================
          ✅ CREATE CASE
