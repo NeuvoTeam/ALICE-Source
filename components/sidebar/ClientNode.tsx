@@ -4,9 +4,10 @@ import * as React from 'react'
 import { Plus } from 'lucide-react'
 import { CaseNode } from './CaseNode'
 import { useClientNavStore } from '@/stores/useClientNavStore'
+import EditableName from './EditableName'
 
 export function ClientNode() {
-  const { client, loading, createCase, load } = useClientNavStore()
+  const { client, loading, createCase, load, renameClient } = useClientNavStore()
 
   React.useEffect(() => {
     load()
@@ -24,9 +25,11 @@ export function ClientNode() {
     <div className="space-y-1">
       {/* Client header */}
       <div className="flex items-center justify-between px-3 py-1">
-        <span className="text-sm font-medium text-sidebar-foreground">
-          {client.name}
-        </span>
+        
+        <EditableName
+          value={client.name}
+          onSave={renameClient}
+        />
 
         <button
           type="button"
@@ -52,4 +55,3 @@ export function ClientNode() {
     </div>
   )
 }
-``

@@ -3,6 +3,7 @@
 import { Trash } from 'lucide-react'
 import { useClientNavStore } from '@/stores/useClientNavStore'
 import { useRouter } from 'next/navigation'
+import EditableName from './EditableName'
 
 type Session = {
   id: string
@@ -16,7 +17,7 @@ export function SessionNode({
   session: Session
   caseId: string
 }) {
-  const { deleteSession } = useClientNavStore()
+  const { deleteSession, renameSession } = useClientNavStore()
   const router = useRouter()
 
   return (
@@ -26,7 +27,19 @@ export function SessionNode({
       }
       className="group flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
     >
-      <span className="truncate">{session.name}</span>
+      
+      {/* ✅ prevent navigation when editing */}
+      <div
+        className="flex-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <EditableName
+          value={session.name}
+          onSave={(newName) =>
+            renameSession(caseId, session.id, newName)
+          }
+        />
+      </div>
 
       <button
         onClick={(e) => {

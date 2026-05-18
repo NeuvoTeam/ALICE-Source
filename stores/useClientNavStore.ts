@@ -3,12 +3,9 @@
 import { create } from 'zustand'
 
 /* =========================
-   ✅ TYPES
-   ========================= */
-export type Session = {
-  id: string
-  name: string
-}
+   TYPES
+========================= */
+export type Session = { id: string; name: string }
 
 export type Case = {
   id: string
@@ -26,7 +23,9 @@ type ClientNavState = {
   client: Client | null
   clients: Client[]
   selectedClientId: string | null
+
   loading: boolean
+  error: string | null
 
   loadClients: () => Promise<void>
   selectClient: (clientId: string) => Promise<void>
@@ -42,44 +41,64 @@ type ClientNavState = {
 
   renameClient: (name: string) => Promise<void>
   renameCase: (caseId: string, name: string) => Promise<void>
+  renameSession: (caseId: string, sessionId: string, name: string) => Promise<void>
+
+  loadLatestSession: () => Promise<void>
+
+  analyzeSession: (notes: string) => Promise<any>
+  generateVignette: (notes: string, modality?: string) => Promise<any>
 }
 
+/* =========================
+   SAFE FETCH
+========================= */
 const API = 'https://clinical-ai-backend.neuvoteam.workers.dev'
 
+async function safeFetch(url: string, options?: RequestInit) {
+  const res = await fetch(url, options)
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) throw new Error(data?.error || 'Request failed')
+
+  return data
+}
+
 /* =========================
-   ✅ STORE
-   ========================= */
+   NORMALIZER (STABLE)
+========================= */
+function normalizeClientTree(client: any): Client {
+  return {
+    id: client.id,
+    name: client.name || 'Unnamed Client',
+    cases: (client.cases || []).map((c: any) => ({
+      id: c.id,
+      name: c.name || 'Unnamed Case', // ✅ FIXED
+      sessions: (c.sessions || []).map((s: any) => ({
+        id: s.id,
+        name: s.name || 'Unnamed Session', // ✅ FIXED
+      })),
+    })),
+  }
+}
+
+/* =========================
+   STORE
+========================= */
 export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
   client: null,
   clients: [],
   selectedClientId: null,
+
   loading: false,
+  error: null,
 
-  /* =========================
-     ✅ NORMALIZER
-     ========================= */
-  normalizeClients: (data: any[]) =>
-    data.map((c: any) => ({
-      id: c.id,
-      name: c.name || 'Unnamed Client',
-      cases: [],
-    })),
-
-  /* =========================
-     ✅ LOAD CLIENT LIST
-     ========================= */
+  /* ========================= */
   loadClients: async () => {
     try {
-      const res = await fetch(`${API}/clients`)
-      const data = await res.json().catch(() => null)
+      set({ error: null })
 
-      if (!res.ok) throw new Error(data?.error)
-
-      if (!Array.isArray(data)) {
-        console.error('Unexpected clients response:', data)
-        return
-      }
+      const data = await safeFetch(`${API}/clients`)
 
       set({
         clients: data.map((c: any) => ({
@@ -89,284 +108,248 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         })),
       })
 
-    } catch (err) {
-      console.error('Load clients error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ SELECT CLIENT (FULL TREE)
-     ========================= */
+  /* ========================= */
   selectClient: async (clientId: string) => {
     try {
-      const res = await fetch(`${API}/client/${clientId}`)
-      const data = await res.json().catch(() => null)
+      set({ error: null })
 
-      if (!res.ok) throw new Error(data?.error)
+      const data = await safeFetch(`${API}/client/${clientId}`)
 
       set({
         selectedClientId: clientId,
-        client: data,
+        client: normalizeClientTree(data),
       })
 
-    } catch (err) {
-      console.error('Select client error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ CREATE CLIENT
-     ========================= */
+  /* ========================= */
   createClient: async (name?: string) => {
     try {
-      const res = await fetch(`${API}/clients`, {
+      const data = await safeFetch(`${API}/clients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
 
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error)
-
-      const newClient: Client = {
-        id: data.id,
-        name: data.name || 'Unnamed Client',
-        cases: [],
-      }
-
-      // ✅ Add to list immediately
       set({
-        clients: [...get().clients, newClient],
+        clients: [...get().clients, {
+          id: data.id,
+          name: data.name || 'Unnamed Client',
+          cases: [],
+        }],
       })
 
-      // ✅ Load full tree (important improvement)
-      await get().selectClient(newClient.id)
+      await get().selectClient(data.id)
 
-    } catch (err) {
-      console.error('Create client error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ INITIAL LOAD
-     ========================= */
+  /* ========================= */
   load: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
 
     try {
-      const res = await fetch(`${API}/clients`)
-      const data = await res.json().catch(() => null)
+      const clients = await safeFetch(`${API}/clients`)
 
-      if (!res.ok) throw new Error(data?.error)
-
-      if (!Array.isArray(data)) {
-        console.error('Unexpected clients response:', data)
-        set({ loading: false })
-        return
-      }
-
-      const clients = data.map((c: any) => ({
-        id: c.id,
-        name: c.name || 'Unnamed Client',
-        cases: [],
-      }))
-
-      if (clients.length === 0) {
-        set({ clients, loading: false })
+      if (!clients.length) {
+        set({ clients: [], loading: false })
         return
       }
 
       const firstId = clients[0].id
-
-      const clientRes = await fetch(`${API}/client/${firstId}`)
-      const clientData = await clientRes.json().catch(() => null)
+      const clientData = await safeFetch(`${API}/client/${firstId}`)
 
       set({
         clients,
         selectedClientId: firstId,
-        client: clientData,
+        client: normalizeClientTree(clientData),
         loading: false,
       })
 
-    } catch (err) {
-      console.error('Load error:', err)
-      set({ loading: false })
+    } catch (err: any) {
+      set({ error: err.message, loading: false })
     }
   },
 
-  /* =========================
-     ✅ CREATE CASE
-     ========================= */
+  /* ========================= */
   createCase: async () => {
     const client = get().client
     if (!client) return
 
     try {
-      const res = await fetch(`${API}/cases`, {
+      await safeFetch(`${API}/cases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId: client.id }),
       })
 
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error)
+      await get().selectClient(client.id) // ✅ consistency
 
-      set({
-        client: {
-          ...client,
-          cases: [...client.cases, { ...data, sessions: [] }],
-        },
-      })
-
-    } catch (err) {
-      console.error('Create case error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ CREATE SESSION
-     ========================= */
   createSession: async (caseId: string) => {
     const client = get().client
     if (!client) return
 
     try {
-      const res = await fetch(`${API}/sessions`, {
+      await safeFetch(`${API}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caseId }),
       })
 
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error)
+      await get().selectClient(client.id)
 
-      set({
-        client: {
-          ...client,
-          cases: client.cases.map((c) =>
-            c.id === caseId
-              ? { ...c, sessions: [...c.sessions, data] }
-              : c
-          ),
-        },
-      })
-
-    } catch (err) {
-      console.error('Create session error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ DELETE CASE
-     ========================= */
   deleteCase: async (caseId: string) => {
     const client = get().client
     if (!client) return
 
     try {
-      const res = await fetch(`${API}/cases/${caseId}`, {
-        method: 'DELETE',
-      })
+      await safeFetch(`${API}/cases/${caseId}`, { method: 'DELETE' })
+      await get().selectClient(client.id)
 
-      if (!res.ok) throw new Error('Delete failed')
-
-      set({
-        client: {
-          ...client,
-          cases: client.cases.filter((c) => c.id !== caseId),
-        },
-      })
-
-    } catch (err) {
-      console.error('Delete case error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ DELETE SESSION
-     ========================= */
   deleteSession: async (caseId: string, sessionId: string) => {
     const client = get().client
     if (!client) return
 
     try {
-      const res = await fetch(`${API}/sessions/${sessionId}`, {
-        method: 'DELETE',
-      })
+      await safeFetch(`${API}/sessions/${sessionId}`, { method: 'DELETE' })
+      await get().selectClient(client.id)
 
-      if (!res.ok) throw new Error('Delete failed')
-
-      set({
-        client: {
-          ...client,
-          cases: client.cases.map((c) =>
-            c.id === caseId
-              ? {
-                  ...c,
-                  sessions: c.sessions.filter((s) => s.id !== sessionId),
-                }
-              : c
-          ),
-        },
-      })
-
-    } catch (err) {
-      console.error('Delete session error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
 
-  /* =========================
-     ✅ RENAME CLIENT
-     ========================= */
   renameClient: async (name: string) => {
     const client = get().client
     if (!client) return
-
+  
+    // ✅ 1. Optimistic UI update
+    set({
+      client: { ...client, name },
+      clients: get().clients.map((c) =>
+        c.id === client.id ? { ...c, name } : c
+      ),
+    })
+  
     try {
-      await fetch(`${API}/clients/${client.id}`, {
+      // ✅ 2. Persist to backend
+      await safeFetch(`${API}/clients/${client.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
-
-      set({
-        client: { ...client, name },
-        clients: get().clients.map((c) =>
-          c.id === client.id ? { ...c, name } : c
-        ),
-      })
-
-    } catch (err) {
-      console.error('Rename client error:', err)
+  
+    } catch (err: any) {
+      // ❌ Optional: rollback if needed
+      set({ error: err.message })
     }
   },
+  
 
-  /* =========================
-     ✅ RENAME CASE
-     ========================= */
   renameCase: async (caseId: string, name: string) => {
     const client = get().client
     if (!client) return
-
+  
+    set({
+      client: {
+        ...client,
+        cases: client.cases.map((c) =>
+          c.id === caseId ? { ...c, name } : c
+        ),
+      },
+    })
+  
     try {
-      await fetch(`${API}/cases/${caseId}`, {
+      await safeFetch(`${API}/cases/${caseId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
-
-      set({
-        client: {
-          ...client,
-          cases: client.cases.map((c) =>
-            c.id === caseId ? { ...c, name } : c
-          ),
-        },
-      })
-
-    } catch (err) {
-      console.error('Rename case error:', err)
+    } catch (err: any) {
+      set({ error: err.message })
     }
   },
+
+  renameSession: async (
+    caseId: string,
+    sessionId: string,
+    name: string
+  ) => {
+    const client = get().client
+    if (!client) return
+  
+    set({
+      client: {
+        ...client,
+        cases: client.cases.map((c) =>
+          c.id === caseId
+            ? {
+                ...c,
+                sessions: c.sessions.map((s) =>
+                  s.id === sessionId ? { ...s, name } : s
+                ),
+              }
+            : c
+        ),
+      },
+    })
+  
+    try {
+      await safeFetch(`${API}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+    } catch (err: any) {
+      set({ error: err.message })
+    }
+  },
+
+  loadLatestSession: async () => {
+    try {
+      return await safeFetch(`${API}/latest-session`)
+    } catch (err: any) {
+      set({ error: err.message })
+    }
+  },
+
+  analyzeSession: (notes) =>
+    safeFetch(`${API}/analyze/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionNotes: notes }),
+    }),
+
+  generateVignette: (notes, modality) =>
+    safeFetch(`${API}/generate/vignette`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionNotes: notes, modality }),
+    }),
 
 }))

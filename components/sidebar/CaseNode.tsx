@@ -4,6 +4,7 @@ import * as React from 'react'
 import { ChevronRight, Plus, Trash } from 'lucide-react'
 import { SessionNode } from './SessionNode'
 import { useClientNavStore } from '@/stores/useClientNavStore'
+import EditableName from './EditableName'
 
 type Session = {
   id: string
@@ -19,12 +20,13 @@ type Case = {
 export function CaseNode({ caseData }: { caseData: Case }) {
   const [open, setOpen] = React.useState(true)
 
-  const { createSession, deleteCase } = useClientNavStore()
+  const { createSession, deleteCase, renameCase } = useClientNavStore()
 
   return (
     <div className="space-y-1">
       {/* Case Row */}
       <div className="group flex items-center justify-between">
+        
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -35,7 +37,18 @@ export function CaseNode({ caseData }: { caseData: Case }) {
               open ? 'rotate-90' : ''
             }`}
           />
-          <span className="truncate">{caseData.name}</span>
+
+          {/* ✅ prevent toggle when editing */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1"
+          >
+            <EditableName
+              value={caseData.name}
+              onSave={(newName) => renameCase(caseData.id, newName)}
+            />
+          </div>
+
         </button>
 
         {/* Actions */}
