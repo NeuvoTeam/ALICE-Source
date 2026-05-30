@@ -1,15 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useClientNavStore } from "@/stores/useClientNavStore";
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { MainContent } from "@/components/main-content"
 import { ClientView } from "@/components/client-view"
 import ClientLanding from "@/components/ClientLanding"
-
-type Client = {
-  id: number;
-  name: string;
-};
+import { Client } from "@/types";
 
 type ViewMode = "clinician" | "client"
 type ClinicianTab = "vignette" | "summaries"
@@ -17,14 +14,23 @@ type ClinicianTab = "vignette" | "summaries"
 export default function Dashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>("clinician")
   const [activeTab, setActiveTab] = useState<ClinicianTab>("vignette")
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const storeClient = useClientNavStore((s) => s.client);
+  const selectClient = useClientNavStore((s) => s.selectClient);
+  const setClientInStore = useClientNavStore((s) => s.selectClient);
+  const clearClient = useClientNavStore((s) => s.clearClient);
 
-  // ✅ If NO client selected → show landing page
-  if (!selectedClient) {
-    return <ClientLanding onSelectClient={setSelectedClient} />
+  // ✅ Show client picker first
+  if (!storeClient) {
+    return (
+      <ClientLanding 
+        onSelectClient={(client) => {
+          selectClient(client.id);
+        }} 
+      />
+    )
   }
+  
 
-  // ✅ If client selected → show your dashboard
   return (
     <div className="flex h-screen">
       <DashboardSidebar 
@@ -33,10 +39,16 @@ export default function Dashboard() {
         onViewModeChange={setViewMode}
         onTabChange={setActiveTab}
       />
+
       {viewMode === "clinician" ? (
-        <MainContent activeTab={activeTab} />
+        <MainContent 
+          key={storeClient.id}
+          activeTab={activeTab}
+          client={storeClient}
+          onChangeClient={clearClient}
+        />
       ) : (
-        <ClientView />
+        <ClientView client={storeClient} />
       )}
     </div>
   )

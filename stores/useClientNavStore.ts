@@ -30,6 +30,7 @@ type ClientNavState = {
   loadClients: () => Promise<void>
   selectClient: (clientId: string) => Promise<void>
   createClient: (name?: string) => Promise<void>
+  clearClient: () => void
 
   load: () => Promise<void>
 
@@ -116,9 +117,13 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   /* ========================= */
   selectClient: async (clientId: string) => {
     try {
+      console.log("✅ selectClient called with:", clientId); 
+
       set({ error: null })
 
       const data = await safeFetch(`${API}/client/${clientId}`)
+
+      console.log("✅ API client data:", data);
 
       set({
         selectedClientId: clientId,
@@ -166,13 +171,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         return
       }
 
-      const firstId = clients[0].id
-      const clientData = await safeFetch(`${API}/client/${firstId}`)
-
       set({
         clients,
-        selectedClientId: firstId,
-        client: normalizeClientTree(clientData),
         loading: false,
       })
 
@@ -352,4 +352,10 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       body: JSON.stringify({ sessionNotes: notes, modality }),
     }),
 
+    clearClient: () => {
+      set({
+        client: null,
+        selectedClientId: null,
+      })},
+    
 }))

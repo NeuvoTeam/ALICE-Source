@@ -9,11 +9,8 @@ import EditableName from './EditableName'
 export function ClientNode() {
   const { client, loading, createCase, load, renameClient } = useClientNavStore()
 
-  React.useEffect(() => {
-    load()
-  }, [])
-
   if (!client) {
+    console.log("STORE CLIENT:", client);
     return (
       <div className="px-3 py-2 text-sm text-muted-foreground">
         No client selected

@@ -1,72 +1,63 @@
-import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+"use client"
 
-type Client = {
-    id: number;
-    name: string;
-};
+import { useEffect, useState } from "react"
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
+import { Client } from "@/types";
 
 export default function ClientLanding({
-    onSelectClient,
-  }: {
-    onSelectClient: (client: Client) => void;
-  }) {
-    const [clients, setClients] = useState<Client[]>([
-        { id: 1, name: "Jane Smith" },
-        { id: 2, name: "John Doe" },
-        { id: 3, name: "Client A" },
-      ]);
-  
-  const [search, setSearch] = useState("");
+  onSelectClient,
+}: {
+  onSelectClient: (client: Client) => void;
+}) {
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredClients = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
-  
-  const handleSelect = (client: Client) => {
-    onSelectClient(client);
-  };
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/clients`)
+        
+        if (!res.ok) {
+          throw new Error("Failed to fetch clients")
+        }
 
-  const handleAddClient = () => {
-    const newName = prompt("Enter new client name:");
-    if (!newName) return;
+        const data = await res.json()
 
-    setClients([
-      ...clients,
-      { id: Date.now(), name: newName }
-    ]);
-  };
+        console.log("✅ Clients from Worker:", data) // ✅ debug
+
+        setClients(data)
+      } catch (err) {
+        console.error("❌ Client fetch failed:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchClients()
+  }, [])
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Select a Client</h1>
+    <div className="p-6 max-w-lg mx-auto space-y-4">
+      <h1 className="text-xl font-bold">Select Client</h1>
 
-      <Input
-        placeholder="Search clients..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-4"
-      />
-
-      <div className="grid gap-3">
-        {filteredClients.map((client) => (
-          <Card
+      {loading ? (
+        <p>Loading clients...</p>
+      ) : clients.length === 0 ? (
+        <p className="text-gray-500">No clients found</p>
+      ) : (
+        clients.map((client) => (
+          <div
             key={client.id}
-            className="cursor-pointer hover:bg-gray-50"
-            onClick={() => handleSelect(client)}
+            onClick={() => {
+                console.log("CLICKED CLIENT:", client);
+                onSelectClient(client);
+            }}
+            className="p-3 border rounded cursor-pointer hover:bg-gray-100"
           >
-            <CardContent className="p-4 text-lg">
-              {client.name}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Button onClick={handleAddClient} className="mt-4 w-full">
-        + New Client
-      </Button>
+            {client.name}
+          </div>
+        ))
+      )}
     </div>
-  );
+  )
 }
