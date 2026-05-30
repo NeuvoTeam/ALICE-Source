@@ -24,7 +24,7 @@ const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
 import { History, LayoutDashboard, Settings, Loader2, AlertCircle } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 
-export function MainContent() {
+export function MainContent({ activeTab }: { activeTab: "vignette" | "summaries" }) {
   const [savedVignettes, setSavedVignettes] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
