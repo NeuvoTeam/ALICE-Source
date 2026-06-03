@@ -86,6 +86,7 @@ export default {
           headers: HEADERS,
           body: JSON.stringify({
             name,
+            full_name: name,
           }),
         })
 
