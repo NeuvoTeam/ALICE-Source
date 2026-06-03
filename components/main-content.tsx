@@ -1,136 +1,227 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card"
 import dynamic from "next/dynamic"
-import type { ClinicalWorkspace } from "@/hooks/use-clinical-workspace"
-import { SessionHistoryPanel } from "@/components/session-history-panel"
-import { buildVignetteRestoreFromSession } from "@/lib/vignette-restore"
+import { History, LayoutDashboard, Settings, Loader2, AlertCircle } from "lucide-react"
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
+import { Client } from "@/types"
+import { useClientNavStore } from "@/stores/useClientNavStore"
 
-const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
+// ✅ Load generator safely (client only)
+const VignetteGenerator = dynamic(() => import("./vignette-generator"), { 
   ssr: false,
   loading: () => (
-    <div className="flex h-64 items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
-  ),
+  )
 })
-import { History, LayoutDashboard, Settings } from "lucide-react"
 
-type ClinicianTab = "vignette" | "summaries"
+type Vignette = any;
 
 export function MainContent({
-  activeTab = "vignette",
-  workspace,
+  activeTab,
+  client,
+  onChangeClient,
 }: {
-  activeTab?: ClinicianTab
-  workspace: ClinicalWorkspace
+  activeTab: "vignette" | "summaries";
+  client: Client;
+  onChangeClient: () => void;
 }) {
-  const {
-    clientIdForApi,
-    sessionContextKey,
-    sessionNotes,
-    selectedSession,
-    persistSessionNotes,
-    persistSessionAnalysis,
-    persistSessionWorksheet,
-  } = workspace
+  const [savedVignettes, setSavedVignettes] = useState<Vignette[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState("generate")
+  const CLIENT_ID = client.id.toString()
+  const selectedCaseId = useClientNavStore((s) => s.selectedCaseId)
+  const selectedSessionId = useClientNavStore((s) => s.selectedSessionId)
+  const selectedSession = useClientNavStore((s) => {
+    if (!s.client || !s.selectedCaseId || !s.selectedSessionId) return null
+    const caseData = s.client.cases.find((c) => c.id === s.selectedCaseId)
+    return caseData?.sessions.find((sess) => sess.id === s.selectedSessionId) ?? null
+  })
 
-  const API_BASE = process.env.NEXT_PUBLIC_CLINICAL_AI_API_BASE
+  const fetchVignettes = async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      const sessionQuery = selectedSessionId
+        ? `sessionId=${selectedSessionId}`
+        : `clientId=${client.id}`
+      const res = await fetch(`${API_BASE}/sessions?clientId${client.id}`)
+      const text = await res.text()
 
-  const vignetteRestore = useMemo(
-    () => buildVignetteRestoreFromSession(selectedSession, sessionNotes),
-    [selectedSession, sessionNotes],
-  )
+      if (text.includes("error code: 1016")) {
+        setError("Cloudflare Engine is warming up. Please wait 30 seconds.")
+        return
+      }
 
-  const historyPanel = <SessionHistoryPanel workspace={workspace} />
+      if (text.startsWith("[") || text.startsWith("{")) {
+        const data = JSON.parse(text)
+        if (Array.isArray(data)) {
+          setSavedVignettes(data)
+        } else if (data) {
+          setSavedVignettes([data])
+        } else {
+          setSavedVignettes([])
+        }
+
+      }
+    } catch (err) {
+      console.error("Failed to fetch vignettes:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVignettes()
+  }, [client.id, selectedSessionId])
+
+  const handleLoadSession = (entry: any) => {
+    console.log("Loading session:", entry)
+
+    // store values so generator can pick them up
+    localStorage.setItem("loadedNotes", entry.sessionNotes || "")
+    localStorage.setItem("loadedMethodology", entry.modality || "")
+    localStorage.setItem("loadedVignette", entry.vignette || "")
+
+    // optional: attach session ID so generator fetches correct one
+    if (entry.caseId && entry.sessionId) {
+      useClientNavStore.getState().selectSession(entry.caseId, entry.sessionId)
+    }
+    console.log("Selected session:", useClientNavStore.getState().selectedSessionId)
+
+    setTab("generate")
+  }
 
   return (
-    <main className="container mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <div className="flex flex-col items-start justify-between gap-4 border-b pb-8 md:flex-row md:items-center">
+    <main className="container mx-auto py-10 px-4 max-w-6xl space-y-8">
+
+      {/* ✅ FIXED HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-8">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-zinc-900">
-            Clinical <span className="text-primary">Dashboard</span>
+            {client.name} <span className="text-primary">Dashboard</span>
           </h1>
-          <p className="font-medium text-zinc-500">
+          <p className="text-zinc-500 font-medium">
             Professional Session Analysis & Vignette Generation
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border bg-zinc-100 px-4 py-2">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-          <span className="text-xs font-bold tracking-widest text-zinc-600 uppercase">
-            System Active
-          </span>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full border">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs font-bold text-zinc-600 uppercase tracking-widest">
+              System Active
+            </span>
+          </div>
+
+          <button
+            onClick={onChangeClient}
+            className="px-4 py-2 text-sm font-medium border rounded-lg hover:bg-gray-100 transition"
+          >
+            Change Client
+          </button>
         </div>
       </div>
 
-      {activeTab === "summaries" ? (
-        historyPanel
-      ) : (
-        <Tabs defaultValue="generate" className="w-full space-y-6">
-          <TabsList className="grid h-12 w-full max-w-md grid-cols-3 rounded-xl bg-zinc-100 p-1">
-            <TabsTrigger
-              value="generate"
-              className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"
-            >
-              <LayoutDashboard className="mr-2 h-4 w-4" /> New Case
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"
-            >
-              <History className="mr-2 h-4 w-4" /> History
-            </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"
-            >
-              <Settings className="mr-2 h-4 w-4" /> Config
-            </TabsTrigger>
-          </TabsList>
+      {/* ✅ ERROR */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-sm">
+          <AlertCircle className="h-5 w-5" />
+          <p className="font-semibold">{error}</p>
+        </div>
+      )}
 
-          <TabsContent value="generate" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-md h-12 p-1 bg-zinc-100 rounded-xl">
+          <TabsTrigger value="generate">
+            <LayoutDashboard className="h-4 w-4 mr-2" /> Session Details
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="h-4 w-4 mr-2" /> History
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="h-4 w-4 mr-2" /> Config
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="generate">
+          {selectedCaseId && selectedSessionId ? (
             <VignetteGenerator
-              key={sessionContextKey || "ctx"}
-              clientId={clientIdForApi}
-              initialSessionNotes={sessionNotes}
-              vignetteRestore={vignetteRestore}
-              onSessionNotesChange={persistSessionNotes}
-              onAnalysisComplete={persistSessionAnalysis}
-              onWorksheetGenerated={persistSessionWorksheet}
+              key={selectedSessionId}
+              clientId={CLIENT_ID}
+              caseId={selectedCaseId}
+              sessionId={selectedSessionId}
+              sessionName={selectedSession?.name}
             />
-          </TabsContent>
-
-          <TabsContent value="history">{historyPanel}</TabsContent>
-
-          <TabsContent value="settings">
-            <Card className="rounded-3xl border-2">
-              <CardHeader>
-                <CardTitle>Engine Configuration</CardTitle>
-                <CardDescription>
-                  Verify your Cloudflare Worker and Heidi API connection.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl border bg-zinc-50 p-4 font-mono text-xs break-all">
-                  <span className="text-zinc-400">ENDPOINT:</span> {API_BASE || "NOT_SET"}
-                </div>
-                <div className="rounded-xl border bg-zinc-50 p-4 font-mono text-xs">
-                  <span className="text-zinc-400">CLIENT_ID (selected folder):</span>{" "}
-                  {clientIdForApi || "—"}
-                </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Select a session in the sidebar to add notes and generate a vignette.
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Clinical History</CardTitle>
+              <CardDescription>Previous work for this client</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Loader2 className="animate-spin" />
+              ) : savedVignettes.length === 0 ? (
+                <p>No data yet</p>
+              ) : (
+                <div className="space-y-3">
+                {Array.isArray(savedVignettes) && savedVignettes.map((entry, i) => (
+                  console.log("ENTRY:", entry),
+                  <div
+                    key={i}
+                    onClick={() => handleLoadSession(entry)}
+                    className="p-3 border rounded-lg cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="text-sm font-semibold">
+                    {entry.created_at || entry.updatedAt
+                      ? new Date(entry.created_at || entry.updatedAt).toLocaleString()
+                      : "No date available"}
+
+                      
+                    </div>
+                  </div>
+                ))}
+              </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Config</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs">API: {API_BASE}</p>
+              <p className="text-xs">Client: {CLIENT_ID}</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
     </main>
   )
 }

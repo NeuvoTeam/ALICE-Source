@@ -1,0 +1,8 @@
+{
+    "mcpServers": [
+      {
+        "name": "alice",
+        "url": "https://alice-mcp.YOUR-SUBDOMAIN.workers.dev"
+      }
+    ]
+  }
