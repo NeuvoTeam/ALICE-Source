@@ -64,7 +64,10 @@ function getAvatarStyles(name: string) {
 export default function ClientLanding({
   onSelectClient,
 }: {
-  onSelectClient: (client: Client) => void | Promise<void>
+  onSelectClient: (
+    client: Client,
+    options?: { bootstrap?: boolean }
+  ) => void | Promise<void>
 }) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -143,8 +146,7 @@ export default function ClientLanding({
       setIsDialogOpen(false)
       setNewClientName("")
 
-      // Select the client immediately to redirect to their dashboard
-      onSelectClient(createdClient)
+      onSelectClient(createdClient, { bootstrap: true })
     } catch (err: any) {
       console.error("❌ Failed to create client:", err)
       toast({
@@ -328,10 +330,7 @@ export default function ClientLanding({
                   return (
                     <div
                       key={client.id}
-                      onClick={() => {
-                        console.log("CLICKED CLIENT:", client)
-                        onSelectClient(client)
-                      }}
+                      onClick={() => onSelectClient(client)}
                       className="group flex items-center justify-between p-3.5 hover:bg-muted/65 cursor-pointer transition-all duration-200"
                     >
                       <div className="flex items-center gap-3">

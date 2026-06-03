@@ -2,6 +2,10 @@
 
 import { create } from 'zustand'
 import { CLINICAL_AI_API_BASE as API } from '@/lib/clinical-ai-api'
+import {
+  resolveDefaultSession,
+  setLastSession,
+} from '@/lib/last-session-access'
 
 /* =========================
    TYPES
@@ -44,7 +48,10 @@ type ClientNavState = {
   error: string | null
 
   loadClients: () => Promise<void>
-  selectClient: (clientId: string) => Promise<void>
+  selectClient: (
+    clientId: string,
+    options?: { bootstrap?: boolean }
+  ) => Promise<void>
   selectSession: (caseId: string, sessionId: string) => Promise<void>
   createClient: (name?: string) => Promise<void>
   clearClient: () => void
@@ -125,6 +132,22 @@ function normalizeClientTree(client: any): Client {
   }
 }
 
+async function bootstrapNewClientWorkspace(clientId: string) {
+  const caseData = await safeFetch(`${API}/cases`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId }),
+  })
+
+  const sessionData = await safeFetch(`${API}/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ caseId: caseData.id }),
+  })
+
+  return { caseId: caseData.id as string, sessionId: sessionData.id as string }
+}
+
 function mergeSessionInClient(
   client: Client,
   caseId: string,
@@ -181,29 +204,43 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   },
 
   /* ========================= */
-  selectClient: async (clientId: string) => {
+  selectClient: async (clientId, options) => {
     try {
-      console.log("✅ selectClient called with:", clientId); 
-
       set({ error: null })
 
       const data = await safeFetch(`${API}/client/${clientId}`)
-
-      console.log("✅ API client data:", data);
+      const client = normalizeClientTree(data)
 
       set({
         selectedClientId: clientId,
-        client: normalizeClientTree(data),
+        client,
         selectedCaseId: null,
         selectedSessionId: null,
       })
 
+      if (options?.bootstrap) {
+        const { caseId, sessionId } = await bootstrapNewClientWorkspace(clientId)
+        const refreshed = await safeFetch(`${API}/client/${clientId}`)
+        set({ client: normalizeClientTree(refreshed) })
+        await get().selectSession(caseId, sessionId)
+        return
+      }
+
+      const target = resolveDefaultSession(client, clientId)
+      if (target) {
+        await get().selectSession(target.caseId, target.sessionId)
+      }
     } catch (err: any) {
       set({ error: err.message })
     }
   },
 
   selectSession: async (caseId, sessionId) => {
+    const clientId = get().selectedClientId
+    if (clientId) {
+      setLastSession(clientId, caseId, sessionId)
+    }
+
     set({ selectedCaseId: caseId, selectedSessionId: sessionId })
 
     try {
@@ -241,7 +278,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         }],
       })
 
-      await get().selectClient(data.id)
+      await get().selectClient(data.id, { bootstrap: true })
 
     } catch (err: any) {
       set({ error: err.message })
@@ -306,7 +343,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       const caseData = updated?.cases.find((c) => c.id === caseId)
       const newest = caseData?.sessions[caseData.sessions.length - 1]
       if (newest) {
-        set({ selectedCaseId: caseId, selectedSessionId: newest.id })
+        await get().selectSession(caseId, newest.id)
       }
 
     } catch (err: any) {

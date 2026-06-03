@@ -23,8 +23,8 @@ export default function Dashboard() {
   if (!storeClient) {
     return (
       <ClientLanding 
-        onSelectClient={async (client) => {
-          await selectClient(client.id)
+        onSelectClient={async (client, options) => {
+          await selectClient(client.id, options)
           const { client: loaded, error } = useClientNavStore.getState()
           if (!loaded) {
             toast({
