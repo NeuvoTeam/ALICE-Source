@@ -39,7 +39,7 @@ export function MainContent({
   const [savedVignettes, setSavedVignettes] = useState<Vignette[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  const [tab, setTab] = useState("generate")
   const CLIENT_ID = client.id.toString()
   const selectedCaseId = useClientNavStore((s) => s.selectedCaseId)
   const selectedSessionId = useClientNavStore((s) => s.selectedSessionId)
@@ -57,7 +57,7 @@ export function MainContent({
       const sessionQuery = selectedSessionId
         ? `sessionId=${selectedSessionId}`
         : `clientId=${client.id}`
-      const res = await fetch(`${API_BASE}/latest-session?${sessionQuery}`)
+      const res = await fetch(`${API_BASE}/sessions?clientId${client.id}`)
       const text = await res.text()
 
       if (text.includes("error code: 1016")) {
@@ -67,7 +67,14 @@ export function MainContent({
 
       if (text.startsWith("[") || text.startsWith("{")) {
         const data = JSON.parse(text)
-        setSavedVignettes(data)
+        if (Array.isArray(data)) {
+          setSavedVignettes(data)
+        } else if (data) {
+          setSavedVignettes([data])
+        } else {
+          setSavedVignettes([])
+        }
+
       }
     } catch (err) {
       console.error("Failed to fetch vignettes:", err)
@@ -79,6 +86,23 @@ export function MainContent({
   useEffect(() => {
     fetchVignettes()
   }, [client.id, selectedSessionId])
+
+  const handleLoadSession = (entry: any) => {
+    console.log("Loading session:", entry)
+
+    // store values so generator can pick them up
+    localStorage.setItem("loadedNotes", entry.sessionNotes || "")
+    localStorage.setItem("loadedMethodology", entry.modality || "")
+    localStorage.setItem("loadedVignette", entry.vignette || "")
+
+    // optional: attach session ID so generator fetches correct one
+    if (entry.caseId && entry.sessionId) {
+      useClientNavStore.getState().selectSession(entry.caseId, entry.sessionId)
+    }
+    console.log("Selected session:", useClientNavStore.getState().selectedSessionId)
+
+    setTab("generate")
+  }
 
   return (
     <main className="container mx-auto py-10 px-4 max-w-6xl space-y-8">
@@ -119,10 +143,10 @@ export function MainContent({
         </div>
       )}
 
-      <Tabs defaultValue="generate" className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 max-w-md h-12 p-1 bg-zinc-100 rounded-xl">
           <TabsTrigger value="generate">
-            <LayoutDashboard className="h-4 w-4 mr-2" /> New Case
+            <LayoutDashboard className="h-4 w-4 mr-2" /> Session Details
           </TabsTrigger>
           <TabsTrigger value="history">
             <History className="h-4 w-4 mr-2" /> History
@@ -162,7 +186,24 @@ export function MainContent({
               ) : savedVignettes.length === 0 ? (
                 <p>No data yet</p>
               ) : (
-                <div>{savedVignettes.length} entries found</div>
+                <div className="space-y-3">
+                {Array.isArray(savedVignettes) && savedVignettes.map((entry, i) => (
+                  console.log("ENTRY:", entry),
+                  <div
+                    key={i}
+                    onClick={() => handleLoadSession(entry)}
+                    className="p-3 border rounded-lg cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="text-sm font-semibold">
+                    {entry.created_at || entry.updatedAt
+                      ? new Date(entry.created_at || entry.updatedAt).toLocaleString()
+                      : "No date available"}
+
+                      
+                    </div>
+                  </div>
+                ))}
+              </div>
               )}
             </CardContent>
           </Card>

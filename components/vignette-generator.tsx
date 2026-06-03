@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 
+
 type StepId = 1 | 2 | 3
 
 interface AnalysisResult {

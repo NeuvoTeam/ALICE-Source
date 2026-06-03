@@ -163,6 +163,7 @@ export default {
             headers: HEADERS,
             body: JSON.stringify({
               case_id: body.caseId,
+              client_id: body.clientId,
               name,
             }),
           })
@@ -284,9 +285,12 @@ export default {
           }
 
           const row = await patchSessionRow(id, patch, SUPABASE_URL, HEADERS)
+          
           if (!row) {
             return respond({ error: "Session not found" }, cors, 404)
           }
+
+          await saveSessionVersion(id, patch, SUPABASE_URL, HEADERS)
 
           return respond(formatSessionRow(row), cors)
         }
@@ -308,6 +312,39 @@ export default {
 
         return respond(formatSessionRow(row), cors)
       }
+
+      /* =========================
+        ✅ GET ALL SESSIONS (HISTORY)
+        ========================= */
+        if (method === "GET" && cleanPath === "/sessions") {
+          const clientId = url.searchParams.get("clientId")
+          const sessionId = url.searchParams.get("sessionId")
+
+          let query = `${SUPABASE_URL}/sessions?select=${SESSION_FULL_SELECT}&order=created_at.desc`
+
+          if (clientId) {
+            query += `&client_id=eq.${clientId}`
+          }
+
+          if (sessionId) {
+            query += `&id=eq.${sessionId}`
+          }
+
+          const res = await fetch(query, { headers: HEADERS })
+
+          if (!res.ok) {
+            throw new Error(await res.text())
+          }
+
+          const data = await res.json()
+
+          // ✅ format all rows
+          const formatted = Array.isArray(data)
+            ? data.map(formatSessionRow)
+            : []
+
+          return respond(formatted, cors)
+        }
 
       /* =========================
          ✅ RESTORED ROUTE (IMPORTANT)
@@ -374,6 +411,10 @@ export default {
               session_notes: body.sessionNotes,
               analysis: analysis,
             }, env)
+            await saveSessionVersion(body.sessionId, {
+              session_notes: body.sessionNotes,
+              analysis: analysis,
+            }, SUPABASE_URL, HEADERS)
           }
           return respond(analysis, cors)
         }
@@ -389,6 +430,13 @@ export default {
               quiz: generated.quiz,
               modality,
             }, env)
+            await saveSessionVersion(body.sessionId, {
+              session_notes: body.sessionNotes,
+              vignette: generated.scenario,
+              homework: generated.homework,
+              quiz: generated.quiz,
+              modality,
+            }, SUPABASE_URL, HEADERS)
           }
           return respond(generated, cors)
         }
@@ -408,7 +456,7 @@ export default {
    =============================== */
 const SESSION_BASIC_SELECT = "id,name,case_id"
 const SESSION_FULL_SELECT =
-  "id,name,case_id,session_notes,vignette,homework,quiz,analysis,modality,updated_at"
+  "id,name,case_id,session_notes,vignette,homework,quiz,analysis,modality,created_at,updated_at"
 
 function isMissingColumnError(text) {
   return (
@@ -543,6 +591,7 @@ function formatSessionRow(row) {
     quiz: Array.isArray(row.quiz) ? row.quiz : [],
     analysis: row.analysis || null,
     modality: row.modality || null,
+    created_at: row.created_at || null,
     lastUpdated: row.updated_at || null,
   }
 }
@@ -744,6 +793,34 @@ function extractJsonObject(text) {
     return null
   }
 }
+
+/* ===============================
+   ✅ VERSION SAVE FUNCTION
+   =============================== */
+   async function saveSessionVersion(sessionId, fields, supabaseUrl, headers) {
+    if (!fields || Object.keys(fields).length === 0) return
+    try {
+      const payload = {
+        session_id: sessionId,
+        session_notes: fields.session_notes || null,
+        vignette: fields.vignette || null,
+        homework: fields.homework || [],
+        quiz: fields.quiz || [],
+        modality: fields.modality || null,
+        analysis: fields.analysis || null,
+        created_at: new Date().toISOString(),
+      }
+  
+      await fetch(`${supabaseUrl}/session_versions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      console.error("Session version save failed:", err)
+    }
+  }
+  
 
 /* ===============================
    ✅ HELPERS
