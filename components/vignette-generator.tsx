@@ -1,6 +1,7 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -120,12 +121,25 @@ function stripClonedDocumentStyles(documentClone: Document) {
     .forEach((node) => node.remove())
 }
 
-export default function VignetteGenerator({ clientId }: { clientId: string }) {
+export default function VignetteGenerator({
+  clientId,
+  caseId,
+  sessionId,
+  sessionName,
+}: {
+  clientId: string
+  caseId: string
+  sessionId: string
+  sessionName?: string
+}) {
+  const saveSessionContent = useClientNavStore((s) => s.saveSessionContent)
+
   const [step, setStep] = useState<StepId>(1)
   const [sessionInput, setSessionInput] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [modality, setModality] = useState("cbt")
@@ -136,6 +150,50 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
   })
 
   const worksheetRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const session = useClientNavStore
+      .getState()
+      .client?.cases.find((c) => c.id === caseId)
+      ?.sessions.find((sess) => sess.id === sessionId)
+
+    if (!session) {
+      setStep(1)
+      setSessionInput("")
+      setAnalysis(null)
+      setModality("cbt")
+      setContent({ scenario: "", quiz: [], homework: [] })
+      return
+    }
+
+    setSessionInput(session.sessionNotes || "")
+    setModality(session.modality || session.analysis?.inferredModality || "cbt")
+    setAnalysis(session.analysis as AnalysisResult | null)
+
+    if (session.vignette) {
+      setContent({
+        scenario: session.vignette,
+        quiz: session.quiz || [],
+        homework: session.homework || [],
+      })
+      setStep(3)
+    } else if (session.analysis) {
+      setStep(2)
+      setContent({ scenario: "", quiz: [], homework: [] })
+    } else {
+      setStep(1)
+      setContent({ scenario: "", quiz: [], homework: [] })
+    }
+  }, [sessionId, caseId])
+
+  const persistNotes = async (notes: string) => {
+    setIsSaving(true)
+    try {
+      await saveSessionContent(caseId, sessionId, { sessionNotes: notes })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleHeidiImport = async () => {
     try {
@@ -179,12 +237,30 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
       const res = await fetch(`${API_BASE}/analyze/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionNotes: sessionInput, clientId }),
+        body: JSON.stringify({
+          sessionNotes: sessionInput,
+          clientId,
+          sessionId,
+        }),
       })
       const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Analysis failed")
+
       setAnalysis(data)
-      if (data.inferredModality) setModality(data.inferredModality.toLowerCase())
+      const nextModality = data.inferredModality
+        ? data.inferredModality.toLowerCase()
+        : modality
+      if (data.inferredModality) setModality(nextModality)
       setStep(2)
+
+      await saveSessionContent(caseId, sessionId, {
+        sessionNotes: sessionInput,
+        analysis: data,
+        modality: nextModality,
+      })
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : "Failed to analyze session")
     } finally {
       setIsAnalyzing(false)
     }
@@ -196,24 +272,38 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
       const res = await fetch(`${API_BASE}/generate/vignette`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionNotes: sessionInput, verifiedModality: modality, clientId }),
+        body: JSON.stringify({
+          sessionNotes: sessionInput,
+          verifiedModality: modality,
+          clientId,
+          sessionId,
+        }),
       })
       const data = await res.json()
-      
-      setContent({
-        scenario: data.scenario || "The client presented with symptoms consistent with the selected modality. The session focused on the intersection of cognitive distortions and physiological arousal. We practiced identifying 'hot thoughts' and applying grounding techniques to reduce emotional intensity. Moving forward, the clinical objective is to reinforce adaptive coping mechanisms identified today.",
-        quiz: data.quiz || [
-          "What was the primary physiological trigger identified today?",
-          "Can you describe the core skill we practiced to manage this?",
-          "How will you recognize the need to apply this skill this week?"
-        ],
-        homework: data.homework || [
-          `Complete one ${modality.toUpperCase()} digital entry daily.`,
-          "Identify one situation to apply the target skill.",
-          "Rate your distress before and after skill usage."
-        ]
-      })
+      if (!res.ok) throw new Error(data?.error || "Generation failed")
+
+      const nextContent = {
+        scenario:
+          data.scenario ||
+          "The client presented with symptoms consistent with the selected modality.",
+        quiz: data.quiz || [],
+        homework: data.homework || [],
+      }
+
+      setContent(nextContent)
       setStep(3)
+
+      await saveSessionContent(caseId, sessionId, {
+        sessionNotes: sessionInput,
+        vignette: nextContent.scenario,
+        quiz: nextContent.quiz,
+        homework: nextContent.homework,
+        modality,
+        analysis: analysis ?? undefined,
+      })
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : "Failed to generate vignette")
     } finally {
       setIsGenerating(false)
     }
@@ -229,7 +319,17 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
             </div>
             <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">ALICE Clinical</CardTitle>
           </div>
-          <div className="px-3 py-1 bg-white border rounded-full text-[10px] font-bold text-zinc-400">PHASE {step}</div>
+          <div className="flex flex-col items-end gap-1">
+            {sessionName && (
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                {sessionName}
+              </span>
+            )}
+            <div className="px-3 py-1 bg-white border rounded-full text-[10px] font-bold text-zinc-400">
+              PHASE {step}
+              {isSaving ? " · saving…" : ""}
+            </div>
+          </div>
         </div>
         <Progress value={step * 33.3} className="h-1.5 mt-6 bg-zinc-100" />
       </CardHeader>
@@ -241,6 +341,9 @@ export default function VignetteGenerator({ clientId }: { clientId: string }) {
               <Textarea 
                 value={sessionInput} 
                 onChange={(e) => setSessionInput(e.target.value)}
+                onBlur={() => {
+                  if (sessionInput.trim()) persistNotes(sessionInput)
+                }}
                 placeholder="Paste Heidi notes here..."
                 className="min-h-[220px] text-base p-6 bg-zinc-50 border-2 rounded-[2rem] focus:border-primary/20"
               />

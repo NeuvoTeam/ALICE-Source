@@ -12,7 +12,8 @@ import {
 import dynamic from "next/dynamic"
 import { History, LayoutDashboard, Settings, Loader2, AlertCircle } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
-import { Client } from "@/types";
+import { Client } from "@/types"
+import { useClientNavStore } from "@/stores/useClientNavStore"
 
 // ✅ Load generator safely (client only)
 const VignetteGenerator = dynamic(() => import("./vignette-generator"), { 
@@ -39,15 +40,24 @@ export function MainContent({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ✅ Use selected client
   const CLIENT_ID = client.id.toString()
+  const selectedCaseId = useClientNavStore((s) => s.selectedCaseId)
+  const selectedSessionId = useClientNavStore((s) => s.selectedSessionId)
+  const selectedSession = useClientNavStore((s) => {
+    if (!s.client || !s.selectedCaseId || !s.selectedSessionId) return null
+    const caseData = s.client.cases.find((c) => c.id === s.selectedCaseId)
+    return caseData?.sessions.find((sess) => sess.id === s.selectedSessionId) ?? null
+  })
 
   const fetchVignettes = async () => {
     setIsLoading(true)
     setError(null)
     
     try {
-      const res = await fetch(`${API_BASE}/latest-session?clientId=${client.id}`)
+      const sessionQuery = selectedSessionId
+        ? `sessionId=${selectedSessionId}`
+        : `clientId=${client.id}`
+      const res = await fetch(`${API_BASE}/latest-session?${sessionQuery}`)
       const text = await res.text()
 
       if (text.includes("error code: 1016")) {
@@ -68,7 +78,7 @@ export function MainContent({
 
   useEffect(() => {
     fetchVignettes()
-  }, [client.id])
+  }, [client.id, selectedSessionId])
 
   return (
     <main className="container mx-auto py-10 px-4 max-w-6xl space-y-8">
@@ -123,7 +133,21 @@ export function MainContent({
         </TabsList>
 
         <TabsContent value="generate">
-          <VignetteGenerator clientId={CLIENT_ID} />
+          {selectedCaseId && selectedSessionId ? (
+            <VignetteGenerator
+              key={selectedSessionId}
+              clientId={CLIENT_ID}
+              caseId={selectedCaseId}
+              sessionId={selectedSessionId}
+              sessionName={selectedSession?.name}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Select a session in the sidebar to add notes and generate a vignette.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="history">

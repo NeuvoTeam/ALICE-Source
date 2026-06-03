@@ -38,7 +38,10 @@ export default function EditableName({ value, onSave }: Props) {
           {/* ✅ Larger click target + subtle hover */}
           <div
             className="p-1 rounded hover:bg-sidebar-accent/50 cursor-pointer opacity-0 group-hover:opacity-100 transition"
-            onClick={() => setIsEditing(true)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsEditing(true)
+            }}
           >
             <Pencil className="h-3 w-3 opacity-70 hover:opacity-100" />
           </div>
@@ -47,7 +50,10 @@ export default function EditableName({ value, onSave }: Props) {
 
       {/* ===================== EDIT MODE ===================== */}
       {isEditing && (
-        <>
+        <div
+          className="flex items-center gap-1 min-w-0"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -85,7 +91,7 @@ export default function EditableName({ value, onSave }: Props) {
           >
             <X className="h-3 w-3 opacity-70 hover:opacity-100" />
           </div>
-        </>
+        </div>
       )}
     </div>
   )

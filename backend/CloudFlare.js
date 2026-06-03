@@ -268,38 +268,66 @@ export default {
         }
 
         /* =========================
-          ✅ RENAME SESSION
+          ✅ UPDATE SESSION (name + clinical content)
           ========================= */
         if (method === "PATCH" && cleanPath.startsWith("/sessions/")) {
-          const id = path.split("/")[2]
+          const id = cleanPath.split("/")[2]
           const body = await safeJson(request)
 
-          if (!body?.name) {
-            return respond({ error: "Missing name" }, cors, 400)
+          if (!id) {
+            return respond({ error: "Missing sessionId" }, cors, 400)
           }
 
-          const res = await fetch(
-            `${SUPABASE_URL}/sessions?id=eq.${id}`,
-            {
-              method: "PATCH",
-              headers: HEADERS,
-              body: JSON.stringify({ name: body.name }),
-            }
-          )
+          const patch = buildSessionPatch(body)
+          if (!Object.keys(patch).length) {
+            return respond({ error: "No fields to update" }, cors, 400)
+          }
 
-          if (!res.ok) throw new Error(await res.text())
+          const row = await patchSessionRow(id, patch, SUPABASE_URL, HEADERS)
+          if (!row) {
+            return respond({ error: "Session not found" }, cors, 404)
+          }
 
-          return respond({ success: true }, cors)
+          return respond(formatSessionRow(row), cors)
         }
+
+      /* =========================
+         ✅ GET SESSION
+         ========================= */
+      if (method === "GET" && cleanPath.startsWith("/sessions/")) {
+        const id = cleanPath.split("/")[2]
+
+        if (!id) {
+          return respond({ error: "Missing sessionId" }, cors, 400)
+        }
+
+        const row = await fetchSessionRow(id, SUPABASE_URL, HEADERS)
+        if (!row) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+
+        return respond(formatSessionRow(row), cors)
+      }
 
       /* =========================
          ✅ RESTORED ROUTE (IMPORTANT)
          ========================= */
       if (method === "GET" && cleanPath === "/latest-session") {
-        return respond({
-          sessionNotes: "",
-          lastUpdated: null,
-        }, cors)
+        const sessionId = url.searchParams.get("sessionId")
+
+        if (!sessionId) {
+          return respond({
+            sessionNotes: "",
+            lastUpdated: null,
+          }, cors)
+        }
+
+        const row = await fetchSessionRow(sessionId, SUPABASE_URL, HEADERS)
+        if (!row) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+
+        return respond(formatSessionRow(row), cors)
       }
       /*=========================
           ✅ /client/:id (single client tree)
@@ -339,13 +367,30 @@ export default {
           return respond({ error: "Missing sessionNotes" }, cors, 400)
         }
 
-        if (path === "/analyze/session") {
-          return await handleAnalyze(body.sessionNotes, env, cors)
+        if (cleanPath === "/analyze/session") {
+          const analysis = await handleAnalyze(body.sessionNotes, env, cors, false)
+          if (body.sessionId) {
+            await persistSessionFields(body.sessionId, {
+              session_notes: body.sessionNotes,
+              analysis: analysis,
+            }, env)
+          }
+          return respond(analysis, cors)
         }
 
-        if (path === "/generate/vignette") {
+        if (cleanPath === "/generate/vignette") {
           const modality = body.verifiedModality || body.modality || "cbt"
-          return await handleGenerate(body.sessionNotes, modality, env, cors)
+          const generated = await handleGenerate(body.sessionNotes, modality, env, cors, false)
+          if (body.sessionId) {
+            await persistSessionFields(body.sessionId, {
+              session_notes: body.sessionNotes,
+              vignette: generated.scenario,
+              homework: generated.homework,
+              quiz: generated.quiz,
+              modality,
+            }, env)
+          }
+          return respond(generated, cors)
         }
       }
 
@@ -361,7 +406,169 @@ export default {
 /* ===============================
    ✅ ANALYZE (UNCHANGED SAFE)
    =============================== */
-async function handleAnalyze(input, env, cors) {
+const SESSION_BASIC_SELECT = "id,name,case_id"
+const SESSION_FULL_SELECT =
+  "id,name,case_id,session_notes,vignette,homework,quiz,analysis,modality,updated_at"
+
+function isMissingColumnError(text) {
+  return (
+    typeof text === "string" &&
+    (text.includes("42703") || text.includes("does not exist"))
+  )
+}
+
+async function supabaseJson(url, options) {
+  const res = await fetch(url, options)
+  const text = await res.text()
+  return { res, text }
+}
+
+async function fetchSessionRow(sessionId, supabaseUrl, headers) {
+  let { res, text } = await supabaseJson(
+    `${supabaseUrl}/sessions?id=eq.${sessionId}&select=${SESSION_FULL_SELECT}`,
+    { headers }
+  )
+
+  if (!res.ok && isMissingColumnError(text)) {
+    ;({ res, text } = await supabaseJson(
+      `${supabaseUrl}/sessions?id=eq.${sessionId}&select=${SESSION_BASIC_SELECT}`,
+      { headers }
+    ))
+  }
+
+  if (!res.ok) throw new Error(text)
+
+  const data = JSON.parse(text)
+  return data?.[0] || null
+}
+
+async function patchSessionRow(sessionId, patch, supabaseUrl, headers) {
+  const clinicalKeys = [
+    "session_notes",
+    "vignette",
+    "homework",
+    "quiz",
+    "analysis",
+    "modality",
+  ]
+  const clinicalPatch = {}
+  const safePatch = {}
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (clinicalKeys.includes(key)) clinicalPatch[key] = value
+    else safePatch[key] = value
+  }
+
+  let latest = null
+
+  if (Object.keys(safePatch).length) {
+    const { res, text } = await supabaseJson(
+      `${supabaseUrl}/sessions?id=eq.${sessionId}`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(safePatch),
+      }
+    )
+    if (!res.ok) throw new Error(text)
+    const data = JSON.parse(text)
+    latest = data?.[0] || null
+  }
+
+  if (!Object.keys(clinicalPatch).length) {
+    return latest || (await fetchSessionRow(sessionId, supabaseUrl, headers))
+  }
+
+  const { res, text } = await supabaseJson(
+    `${supabaseUrl}/sessions?id=eq.${sessionId}`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(clinicalPatch),
+    }
+  )
+
+  if (!res.ok) {
+    if (isMissingColumnError(text)) {
+      console.warn("Clinical session columns missing; run Supabase migration.")
+      return latest || (await fetchSessionRow(sessionId, supabaseUrl, headers))
+    }
+    throw new Error(text)
+  }
+
+  const data = JSON.parse(text)
+  return data?.[0] || latest
+}
+
+function buildSessionPatch(body) {
+  if (!body || typeof body !== "object") return {}
+
+  const patch = {}
+
+  if (typeof body.name === "string" && body.name.trim()) {
+    patch.name = body.name.trim()
+  }
+  if (body.sessionNotes !== undefined) {
+    patch.session_notes = body.sessionNotes
+  }
+  if (body.vignette !== undefined) {
+    patch.vignette = body.vignette
+  }
+  if (body.homework !== undefined) {
+    patch.homework = body.homework
+  }
+  if (body.quiz !== undefined) {
+    patch.quiz = body.quiz
+  }
+  if (body.analysis !== undefined) {
+    patch.analysis = body.analysis
+  }
+  if (body.modality !== undefined) {
+    patch.modality = body.modality
+  }
+
+  return patch
+}
+
+function formatSessionRow(row) {
+  if (!row) return null
+
+  return {
+    id: row.id,
+    name: row.name,
+    caseId: row.case_id,
+    sessionNotes: row.session_notes || "",
+    vignette: row.vignette || "",
+    homework: Array.isArray(row.homework) ? row.homework : [],
+    quiz: Array.isArray(row.quiz) ? row.quiz : [],
+    analysis: row.analysis || null,
+    modality: row.modality || null,
+    lastUpdated: row.updated_at || null,
+  }
+}
+
+async function persistSessionFields(sessionId, fields, env) {
+  const baseUrl = env.SUPABASE_URL.endsWith("/")
+    ? env.SUPABASE_URL.slice(0, -1)
+    : env.SUPABASE_URL
+
+  const SUPABASE_URL = `${baseUrl}/rest/v1`
+
+  const HEADERS = {
+    "Content-Type": "application/json",
+    "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+    "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    "Prefer": "return=representation",
+  }
+
+  try {
+    await patchSessionRow(sessionId, fields, SUPABASE_URL, HEADERS)
+  } catch (err) {
+    console.error("Failed to persist session:", err)
+  }
+}
+
+async function handleAnalyze(input, env, cors, wrapResponse = true) {
 
   const messages = [
     {
@@ -398,17 +605,21 @@ Rules:
   const cleaned = stripMarkdown(raw)
   const parsed = extractJsonObject(cleaned)
 
-  return respond({
+  const payload = {
     rationale: parsed?.rationale || "Clinical synthesis unavailable.",
     inferredModality: (parsed?.inferredModality || "CBT").toLowerCase(),
     riskFlags: parsed?.riskFlags || [],
-  }, cors)
+  }
+
+  if (!wrapResponse) return payload
+
+  return respond(payload, cors)
 }
 
 /* ===============================
    ✅ GENERATE (UNCHANGED SAFE)
    =============================== */
-async function handleGenerate(input, modality, env, cors) {
+async function handleGenerate(input, modality, env, cors, wrapResponse = true) {
 
   const messages = [
     {
@@ -454,11 +665,15 @@ ${input}
   const cleaned = stripMarkdown(raw)
   const parsed = extractJsonObject(cleaned)
 
-  return respond({
+  const payload = {
     scenario: parsed?.scenario || "Scenario unavailable.",
     quiz: parsed?.quiz || [],
     homework: parsed?.homework || [],
-  }, cors)
+  }
+
+  if (!wrapResponse) return payload
+
+  return respond(payload, cors)
 }
 
 /* ===============================

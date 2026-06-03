@@ -2,8 +2,8 @@
 
 import { Trash } from 'lucide-react'
 import { useClientNavStore } from '@/stores/useClientNavStore'
-import { useRouter } from 'next/navigation'
 import EditableName from './EditableName'
+import { cn } from '@/lib/utils'
 
 type Session = {
   id: string
@@ -17,22 +17,27 @@ export function SessionNode({
   session: Session
   caseId: string
 }) {
-  const { deleteSession, renameSession } = useClientNavStore()
-  const router = useRouter()
+  const { deleteSession, renameSession, selectSession, selectedSessionId } =
+    useClientNavStore()
+  const isSelected = selectedSessionId === session.id
 
   return (
     <div
-      onClick={() =>
-        router.push(`/cases/${caseId}/sessions/${session.id}`)
-      }
-      className="group flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+      role="button"
+      tabIndex={0}
+      onClick={() => void selectSession(caseId, session.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          void selectSession(caseId, session.id)
+        }
+      }}
+      className={cn(
+        'group flex cursor-pointer items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
+        isSelected && 'bg-sidebar-accent text-foreground font-medium'
+      )}
     >
-      
-      {/* ✅ prevent navigation when editing */}
-      <div
-        className="flex-1"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="min-w-0 flex-1">
         <EditableName
           value={session.name}
           onSave={(newName) =>
@@ -42,6 +47,7 @@ export function SessionNode({
       </div>
 
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation()
           if (confirm('Delete this session?')) {

@@ -64,7 +64,7 @@ function getAvatarStyles(name: string) {
 export default function ClientLanding({
   onSelectClient,
 }: {
-  onSelectClient: (client: Client) => void
+  onSelectClient: (client: Client) => void | Promise<void>
 }) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
