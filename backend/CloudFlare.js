@@ -296,6 +296,31 @@ export default {
         }
 
       /* =========================
+      ✅ CLIENT HOMEWORK ROUTE (MERGED)
+      ========================= */
+    if (method === "GET" && cleanPath.startsWith("/client-homework/")) {
+      const sessionId = cleanPath.split("/")[2]
+
+      if (!sessionId || sessionId.length < 10) {
+        return respond({ error: "Invalid session ID" }, cors, 400)
+      }
+
+      const row = await fetchSessionRow(sessionId, SUPABASE_URL, HEADERS)
+
+      if (!row) {
+        return respond({ error: "Session not found" }, cors, 404)
+      }
+
+      return respond({
+        sessionId: row.id,
+        title: row.name,
+        homework: Array.isArray(row.homework) ? row.homework : [],
+        quiz: Array.isArray(row.quiz) ? row.quiz : [],
+        vignette: row.vignette || "",
+      }, cors)
+    }
+
+/* =========================
          ✅ GET SESSION
          ========================= */
       if (method === "GET" && cleanPath.startsWith("/sessions/")) {
