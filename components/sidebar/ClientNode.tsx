@@ -1,32 +1,30 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { Plus } from 'lucide-react'
-import { CaseNode } from './CaseNode'
-import { useClientNavStore } from '@/stores/useClientNavStore'
-import EditableName from './EditableName'
+import * as React from "react";
+import { Plus } from "lucide-react";
+import { CaseNode } from "./CaseNode";
+import { useClientNavStore } from "@/stores/useClientNavStore";
+import EditableName from "./EditableName";
 
 export function ClientNode() {
-  const { client, loading, createCase, load, renameClient } = useClientNavStore()
+  const { client, createCase, renameClient } = useClientNavStore();
 
+  // ✅ Safe fallback
   if (!client) {
-    console.log("STORE CLIENT:", client);
     return (
       <div className="px-3 py-2 text-sm text-muted-foreground">
         No client selected
       </div>
-    )
+    );
   }
+
+  const cases = client.cases || []; // ✅ CRITICAL FIX
 
   return (
     <div className="space-y-1">
       {/* Client header */}
       <div className="flex items-center justify-between px-3 py-1">
-        
-        <EditableName
-          value={client.name}
-          onSave={renameClient}
-        />
+        <EditableName value={client.name} onSave={renameClient} />
 
         <button
           type="button"
@@ -39,16 +37,21 @@ export function ClientNode() {
 
       {/* Cases list */}
       <div className="ml-2 space-y-1">
-        {client.cases.length === 0 && (
+
+        {/* ✅ SAFE EMPTY CHECK */}
+        {cases.length === 0 && (
           <div className="px-3 py-1 text-xs text-muted-foreground">
             No cases yet
           </div>
         )}
 
-        {client.cases.map((c) => (
+        {/* ✅ SAFE MAP */}
+        {cases.map((c) => (
           <CaseNode key={c.id} caseData={c} />
         ))}
+
       </div>
     </div>
-  )
+  );
 }
+``
