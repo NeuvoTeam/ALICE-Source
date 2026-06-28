@@ -17,9 +17,12 @@ export default function ClientLanding({
       try {
         const res = await fetch(`${API_BASE}/clients`);
         const data = await res.json();
-        setClients(data);
+
+        // ✅ ensure it's always an array
+        setClients(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Fetch failed:", err);
+        setClients([]);
       } finally {
         setLoading(false);
       }
@@ -37,26 +40,32 @@ export default function ClientLanding({
         <p>Loading...</p>
       ) : (
         <div>
-          {clients.map((client) => (
-            <div
-              key={client.id}
-              onClick={() => onSelectClient(client)}
-              style={{
-                padding: 15,
-                border: "1px solid #ddd",
-                marginBottom: 10,
-                cursor: "pointer",
-              }}
-            >
-              <strong>{client.name}</strong>
-              <div style={{ fontSize: 12, color: "#666" }}>
-                {client.id}
-              </div>
+          {clients.length === 0 ? (
+            <div style={{ color: "#666" }}>
+              No clients available
             </div>
-          ))}
+          ) : (
+            clients.map((client) => (
+              <div
+                key={client.id}
+                onClick={() => onSelectClient(client)}
+                style={{
+                  padding: 15,
+                  border: "1px solid #ddd",
+                  marginBottom: 10,
+                  cursor: "pointer",
+                  borderRadius: 6,
+                }}
+              >
+                <strong>{client.name}</strong>
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  {client.id}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
   );
 }
-``
