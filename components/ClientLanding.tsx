@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api";
-import { Client } from "@/types";
+
+type Client = {
+  id: string;
+  name: string;
+};
+
+const API_BASE = "http://127.0.0.1:8787";
 
 export default function ClientLanding({
   onSelectClient,
@@ -13,21 +18,22 @@ export default function ClientLanding({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchClients() {
+    const fetchClients = async () => {
       try {
-        const res = await fetch(`${API_BASE}/clients`);
+        const res = await fetch("http://127.0.0.1:8787/clients");
         const data = await res.json();
-
-        // ✅ ensure it's always an array
+  
         setClients(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error("Fetch failed:", err);
+        console.error("❌ Failed to fetch clients:", err);
         setClients([]);
       } finally {
         setLoading(false);
       }
-    }
-
+    };
+  
+    fetchClients();
+  }, []);
     fetchClients();
   }, []);
 

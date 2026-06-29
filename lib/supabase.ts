@@ -1,18 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
+/**
+ * 🚨 FRONTEND MUST NOT CONNECT TO SUPABASE DIRECTLY
+ * ✅ All data access goes through Cloudflare Worker
+ * ✅ This file is intentionally blocked
+ */
 
-// ✅ Read from environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// ✅ Create a SINGLE shared client
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
+export const supabase = new Proxy(
+  {},
   {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
+    get() {
+      throw new Error(
+        "❌ Direct Supabase usage in frontend is disabled. Use Cloudflare API instead."
+      );
     },
   }
 );
-console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);

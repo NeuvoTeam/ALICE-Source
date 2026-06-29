@@ -1,44 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useParams } from "next/navigation";
+
+const API_BASE = "http://localhost:8787";
 
 export default function HomeworkPage() {
   const { sessionId } = useParams();
-  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
-    const init = async () => {
+    const load = async () => {
       if (!sessionId) return;
 
-      // ✅ 1. Check login
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push(`/client-login?redirect=/homework/${sessionId}`);
-        return;
-      }
-
       try {
-        // ✅ 2. Try to fetch real data (if backend is running)
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE}/sessions/${sessionId}`
-        );
-
-        if (!res.ok) {
-          throw new Error("API not available");
-        }
-
+        // ✅ Always go through Cloudflare Worker
+        const res = await fetch(`${API_BASE}/sessions/${sessionId}`);
         const data = await res.json();
 
-        if (!data) {
-          throw new Error("No session data");
+        if (!res.ok || !data) {
+          throw new Error("API failed");
         }
 
         setSession(data);
@@ -46,7 +29,7 @@ export default function HomeworkPage() {
       } catch (err) {
         console.warn("Using fallback homework data");
 
-        // ✅ 3. Fallback data (works even when backend is OFF)
+        // ✅ Fallback (only if Worker fails)
         setSession({
           vignette:
             "Client experiencing anxiety around work stress and avoidance patterns.",
@@ -64,10 +47,10 @@ export default function HomeworkPage() {
       setLoading(false);
     };
 
-    init();
-  }, [sessionId, router]);
+    load();
+  }, [sessionId]);
 
-  // ✅ LOADING STATE
+  // ✅ LOADING
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -76,7 +59,7 @@ export default function HomeworkPage() {
     );
   }
 
-  // ✅ SAFETY FALLBACK (should rarely hit now)
+  // ✅ SAFETY
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
@@ -89,7 +72,7 @@ export default function HomeworkPage() {
     <div className="min-h-screen bg-gray-50 flex justify-center">
       <div className="w-full max-w-2xl px-6 py-10 space-y-6">
 
-        {/* ✅ HEADER */}
+        {/* HEADER */}
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">
             Your Homework
@@ -99,10 +82,10 @@ export default function HomeworkPage() {
           </p>
         </div>
 
-        {/* ✅ CONTENT */}
+        {/* CONTENT */}
         <div className="space-y-5">
 
-          {/* ✅ SUMMARY */}
+          {/* SUMMARY */}
           {session.vignette && (
             <div className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition">
               <h2 className="text-sm font-semibold text-gray-700 mb-2">
@@ -114,7 +97,7 @@ export default function HomeworkPage() {
             </div>
           )}
 
-          {/* ✅ QUESTIONS */}
+          {/* QUESTIONS */}
           {Array.isArray(session.quiz) && session.quiz.length > 0 && (
             <div className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition">
               <h2 className="text-sm font-semibold text-gray-700 mb-3">
@@ -134,7 +117,7 @@ export default function HomeworkPage() {
             </div>
           )}
 
-          {/* ✅ TASKS */}
+          {/* TASKS */}
           {Array.isArray(session.homework) && session.homework.length > 0 && (
             <div className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition">
               <h2 className="text-sm font-semibold text-gray-700 mb-3">
@@ -157,7 +140,7 @@ export default function HomeworkPage() {
 
         </div>
 
-        {/* ✅ FOOTER */}
+        {/* FOOTER */}
         <div className="pt-6 text-center text-xs text-gray-400">
           Provided by your clinician
         </div>
@@ -166,4 +149,3 @@ export default function HomeworkPage() {
     </div>
   );
 }
-``
