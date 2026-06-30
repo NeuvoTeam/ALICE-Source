@@ -7,8 +7,6 @@ type Client = {
   name: string;
 };
 
-const API_BASE = "http://127.0.0.1:8787";
-
 export default function ClientLanding({
   onSelectClient,
 }: {
@@ -20,20 +18,23 @@ export default function ClientLanding({
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8787/clients");
+        const res = await fetch("http://127.0.0.1:8787/clients", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
         const data = await res.json();
-  
+
         setClients(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error("❌ Failed to fetch clients:", err);
+        console.error("Failed to fetch clients:", err);
         setClients([]);
       } finally {
         setLoading(false);
       }
     };
-  
-    fetchClients();
-  }, []);
+
     fetchClients();
   }, []);
 

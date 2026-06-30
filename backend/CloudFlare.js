@@ -43,65 +43,71 @@ export default {
    ========================= */
    if (method === "GET" && cleanPath === "/clients") {
     const res = await fetch(
-      `${SUPABASE_URL}/clients?select=id,full_name`,
+      `${SUPABASE_URL}/clients?select=id,first_name,last_name`,
       { headers: HEADERS }
-    )
+    );
+  
+    const text = await res.text();
+    console.log("SUPABASE RAW RESPONSE:", text);
   
     if (!res.ok) {
-      const text = await res.text()
-      throw new Error(text)
+      console.error("SUPABASE ERROR:", text);
+      throw new Error(text);
     }
   
-    let data
+    let data;
     try {
-      data = await res.json()
+      data = JSON.parse(text);
     } catch {
-      return respond([], cors)
+      return respond([], cors);
     }
   
     return respond(
       (Array.isArray(data) ? data : []).map(c => ({
         id: c.id,
-        name: c.full_name || `Client ${c.id.slice(0, 6)}`
+        name:
+          [c.first_name, c.last_name]
+            .filter(Boolean)
+            .join(" ")
+          || `Client ${c.id.slice(0, 6)}`
       })),
       cors
-    )
-    
+    );
   }
-  
         /* =========================
         ✅ CREATE CLIENT
         ========================= */
-      if (method === "POST" && cleanPath === "/clients") {
-        const body = await safeJson(request)
+        if (method === "GET" && cleanPath === "/clients") {
 
-        // ✅ Use provided name OR fallback
-        const name =
-          body?.name && body.name.trim()
-            ? body.name.trim()
-            : `Client ${Date.now()}`
-
-        const res = await fetch(`${SUPABASE_URL}/clients`, {
-          method: "POST",
-          headers: HEADERS,
-          body: JSON.stringify({
-            first_name,
-            middle_name, 
-            last_name,
-          }),
-        })
-
-        if (!res.ok) {
-          const text = await res.text()
-          throw new Error(text)
+          const res = await fetch(
+            `${SUPABASE_URL}/clients?select=id,first_name,last_name`,
+            { headers: HEADERS }
+          );
+        
+          const text = await res.text();   // ✅ THIS LINE WAS MISSING
+        
+          if (!res.ok) {
+            return respond({ error: text }, cors, 500);
+          }
+        
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch {
+            return respond([], cors);
+          }
+        
+          return respond(
+            (Array.isArray(data) ? data : []).map(c => ({
+              id: c.id,
+              name:
+                [c.first_name, c.last_name].filter(Boolean).join(" ")
+                || `Client ${c.id.slice(0, 6)}`
+            })),
+            cors
+          );
         }
-
-        const data = await res.json()
-
-        return respond(data?.[0] || data, cors)
-      }
-
-
+        ``
       /* =========================
          ✅ CREATE CASE
          ========================= */
