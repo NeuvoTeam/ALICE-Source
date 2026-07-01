@@ -18,15 +18,30 @@ export default function ClientLanding({
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8787/clients", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json"
+        const res = await fetch(
+          "https://clinical-ai-backend.neuvoteam.workers.dev/clients",
+          {
+            method: "GET",
           }
-        });
+        );
+
+        // ✅ Robust error handling (important for debugging worker issues)
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+
         const data = await res.json();
 
-        setClients(Array.isArray(data) ? data : []);
+        console.log("Clients API response:", data);
+
+        // ✅ Handles both:
+        // 1) direct array
+        // 2) { data: [...] }
+        const parsed =
+          Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+
+        setClients(parsed);
       } catch (err) {
         console.error("Failed to fetch clients:", err);
         setClients([]);
@@ -62,7 +77,14 @@ export default function ClientLanding({
                   marginBottom: 10,
                   cursor: "pointer",
                   borderRadius: 6,
+                  transition: "background 0.2s ease",
                 }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#f9f9f9")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
               >
                 <strong>{client.name}</strong>
                 <div style={{ fontSize: 12, color: "#666" }}>
