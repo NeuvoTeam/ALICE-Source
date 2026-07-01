@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-const API_BASE = "http://localhost:8787";
+const API_BASE = "clinical-ai-backend.neuvoteam.workers.dev";
 
 export default function HomeworkPage() {
   const { sessionId } = useParams();

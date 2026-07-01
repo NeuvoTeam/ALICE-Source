@@ -403,30 +403,53 @@ export default {
         return respond(formatSessionRow(row), cors)
       }
       /*=========================
-          ✅ /client/:id (single client tree)
-      =========================*/
-      if (method === "GET" && cleanPath.startsWith("/client/")) {
-        const id = cleanPath.split("/")[2]
+  ✅ /client/:id (single client tree)
+=========================*/
+if (method === "GET" && cleanPath.startsWith("/client/")) {
+  try {
+    const id = cleanPath.split("/")[2];
 
-        const res = await fetch(
-          `${SUPABASE_URL}/clients?id=eq.${id}&select=id,full_name,case_formulations(id,name,sessions(id,name))`,
-          { headers: HEADERS }
-        )
+    if (!id) {
+      return respond({ error: "Missing client id" }, cors, 400);
+    }
 
-        if (!res.ok) throw new Error(await res.text())
+    const res = await fetch(
+      `${SUPABASE_URL}/clients?id=eq.${id}&select=id,full_name,case_formulations(id,name,sessions(id,name))`,
+      { headers: HEADERS }
+    );
 
-        const data = await res.json()
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Supabase error: ${text}`);
+    }
 
-        if (!data?.length) {
-          return respond({ error: "Client not found" }, cors, 404)
-        }
+    const data = await res.json();
 
-        return respond({
-          id: data[0].id,
-          name: data[0].full_name,
-          cases: data[0].case_formulations || [],
-        }, cors)
-      }
+    if (!data || data.length === 0) {
+      return respond({ error: "Client not found" }, cors, 404);
+    }
+
+    const client = data[0];
+
+    return respond(
+      {
+        id: client.id,
+        name: client.full_name,
+        cases: client.case_formulations || [],
+      },
+      cors
+    );
+  } catch (err) {
+    console.error("Worker /client/:id error:", err);
+
+    return respond(
+      { error: "Internal server error", details: err.message },
+      cors,
+      500
+    );
+  }
+}
+
 
 
 
