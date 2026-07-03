@@ -1,6 +1,9 @@
 'use client'
 
 import { create } from 'zustand'
+
+import type { PracticePackage } from '@/lib/practice-package'
+
 import { CLINICAL_AI_API_BASE as API } from '@/lib/clinical-ai-api'
 import {
   resolveDefaultSession,
@@ -13,15 +16,23 @@ import {
 export type Session = {
   id: string
   name: string
+
   sessionNotes?: string
+
   vignette?: string
+
   homework?: string[]
+
   quiz?: string[]
+
+  practicePackage?: PracticePackage | null
+
   analysis?: {
     rationale?: string
     inferredModality?: string
     riskFlags?: unknown[]
   } | null
+
   modality?: string | null
 }
 
@@ -74,7 +85,13 @@ type ClientNavState = {
     payload: Partial<
       Pick<
         Session,
-        'sessionNotes' | 'vignette' | 'homework' | 'quiz' | 'analysis' | 'modality'
+        'sessionNotes'
+| 'vignette'
+| 'homework'
+| 'quiz'
+| 'practicePackage'
+| 'analysis'
+| 'modality'
       >
     >
   ) => Promise<void>
@@ -85,13 +102,19 @@ type ClientNavState = {
     notes: string,
     sessionId?: string
   ) => Promise<any>
+
   generateVignette: (
     notes: string,
     modality?: string,
     sessionId?: string
   ) => Promise<any>
-}
-
+  
+  generatePracticePackage: (
+    notes: string,
+    modality?: string,
+    sessionId?: string
+  ) => Promise<any>
+  }
 /* =========================
    SAFE FETCH
 ========================= */
@@ -119,12 +142,38 @@ function normalizeSession(s: any): Session {
   return {
     id: s.id,
     name: s.name || 'Unnamed Session',
-    sessionNotes: s.sessionNotes ?? s.session_notes ?? '',
-    vignette: s.vignette ?? '',
-    homework: Array.isArray(s.homework) ? s.homework : [],
-    quiz: Array.isArray(s.quiz) ? s.quiz : [],
-    analysis: s.analysis ?? null,
-    modality: s.modality ?? null,
+
+    sessionNotes:
+      s.sessionNotes ??
+      s.session_notes ??
+      '',
+
+    vignette:
+      s.vignette ??
+      '',
+
+    homework:
+      Array.isArray(s.homework)
+        ? s.homework
+        : [],
+
+    quiz:
+      Array.isArray(s.quiz)
+        ? s.quiz
+        : [],
+
+    practicePackage:
+      s.practicePackage ??
+      s.practice_package ??
+      null,
+
+    analysis:
+      s.analysis ??
+      null,
+
+    modality:
+      s.modality ??
+      null,
   }
 }
 
@@ -490,6 +539,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       if (payload.vignette !== undefined) body.vignette = payload.vignette
       if (payload.homework !== undefined) body.homework = payload.homework
       if (payload.quiz !== undefined) body.quiz = payload.quiz
+      if (payload.practicePackage !== undefined)
+        body.practicePackage =
+          payload.practicePackage
       if (payload.analysis !== undefined) body.analysis = payload.analysis
       if (payload.modality !== undefined) body.modality = payload.modality
 
@@ -526,13 +578,22 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
     safeFetch(`${API}/analyze/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionNotes: notes, sessionId }),
+      body: JSON.stringify({
+        sessionNotes: notes,
+        sessionId,
+      }),
     }),
-
-  generateVignette: (notes, modality, sessionId) =>
+  
+  generateVignette: (
+    notes,
+    modality,
+    sessionId
+  ) =>
     safeFetch(`${API}/generate/vignette`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         sessionNotes: notes,
         verifiedModality: modality,
@@ -540,8 +601,28 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         sessionId,
       }),
     }),
-
-    clearClient: () => {
+  
+  generatePracticePackage: (
+    notes,
+    modality,
+    sessionId
+  ) =>
+    safeFetch(
+      `${API}/generate/practice-package`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionNotes: notes,
+          modality,
+          sessionId,
+        }),
+      }
+    ),
+  
+  clearClient: () => {
       set({
         client: null,
         selectedClientId: null,
