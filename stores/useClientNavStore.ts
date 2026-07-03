@@ -96,6 +96,7 @@ type ClientNavState = {
    SAFE FETCH
 ========================= */
 async function safeFetch(url: string, options?: RequestInit) {
+
   const res = await fetch(url, options)
   const data = await res.json().catch(() => null)
 

@@ -7,7 +7,7 @@ type Client = {
   name: string;
 };
 
-// ✅ FORCE absolute URL
+// ✅ HARDCODE FULL URL (no URL constructor)
 const API_BASE = "https://clinical-ai-backend.neuvoteam.workers.dev";
 
 export default function ClientLanding({
@@ -22,15 +22,19 @@ export default function ClientLanding({
   const [clickedId, setClickedId] = useState<string | null>(null);
 
   /* =========================
-     ✅ FETCH SINGLE CLIENT
+     ✅ FETCH SINGLE CLIENT (FORCED RAW FETCH)
   ========================= */
   const fetchClient = async (id: string) => {
     try {
-      const url = new URL(`/client/${id}`, API_BASE).toString(); // ✅ FORCE ABSOLUTE
+      const url = `${API_BASE}/client/${id}`;
 
-      console.log("🚀 Fetching client:", url);
+      console.log("🚀 Fetching client RAW:", url);
 
-      const res = await fetch(url);
+      const res = await window.fetch(url, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store", // ✅ prevents rewrite/cache issues
+      });
 
       if (!res.ok) {
         const text = await res.text();
@@ -48,16 +52,20 @@ export default function ClientLanding({
   };
 
   /* =========================
-     ✅ FETCH CLIENT LIST
+     ✅ FETCH CLIENT LIST (FORCED RAW FETCH)
   ========================= */
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const url = new URL("/clients", API_BASE).toString(); // ✅ FORCE ABSOLUTE
+        const url = `${API_BASE}/clients`;
 
-        console.log("📡 Fetching clients:", url);
+        console.log("📡 Fetching clients RAW:", url);
 
-        const res = await fetch(url);
+        const res = await window.fetch(url, {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+        });
 
         if (!res.ok) {
           const text = await res.text();
@@ -126,7 +134,7 @@ export default function ClientLanding({
                 marginBottom: 10,
                 border:
                   clickedId === client.id
-                    ? "2px solid #3b82f6"
+                    ? "2px solid #2563eb"
                     : "2px solid #ddd",
                 borderRadius: 6,
                 cursor: "pointer",
