@@ -96,13 +96,20 @@ type ClientNavState = {
    SAFE FETCH
 ========================= */
 async function safeFetch(url: string, options?: RequestInit) {
+  console.log("🌐 SAFE FETCH:", url);
 
-  const res = await fetch(url, options)
-  const data = await res.json().catch(() => null)
+  const res = await fetch(url, options);
 
-  if (!res.ok) throw new Error(data?.error || 'Request failed')
+  const data = await res.json().catch(() => null);
 
-  return data
+  if (!res.ok) {
+    console.error("❌ FAILED URL:", url);
+    console.error("❌ RESPONSE:", data);
+
+    throw new Error(data?.error || "Request failed");
+  }
+
+  return data;
 }
 
 /* =========================
