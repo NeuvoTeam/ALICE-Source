@@ -411,103 +411,109 @@ export default function VignetteGenerator({
                   </section>
 
                   {/* Section 2: Role Play Scenario */}
-                  <section>
-                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-                      2. Role Play Scenario
-                    </h4>
-                    {practicePackage.scenario ? (
-                      <div className="space-y-3">
-                        <div>
-                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                            Title:
-                          </span>
-                          <span className="font-bold text-zinc-800">{practicePackage.scenario.title}</span>
+                  {false && (
+                    <section>
+                      <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+                        2. Role Play Scenario
+                      </h4>
+                      {practicePackage.scenario ? (
+                        <div className="space-y-3">
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                              Title:
+                            </span>
+                            <span className="font-bold text-zinc-800">{practicePackage.scenario.title}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                              Difficulty:
+                            </span>
+                            <span className="text-zinc-700">{practicePackage.scenario.difficulty}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                              Situation:
+                            </span>
+                            <span className="text-zinc-700">{practicePackage.scenario.situation}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                              Objectives:
+                            </span>
+                            {practicePackage.scenario.objectives &&
+                            practicePackage.scenario.objectives.length > 0 ? (
+                              <ul className="list-disc ml-6 text-zinc-800">
+                                {practicePackage.scenario.objectives.map((obj, i) => (
+                                  <li key={i} className="text-xs">{obj}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-zinc-500 italic">None</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                              Coach Tips:
+                            </span>
+                            {practicePackage.scenario.coachTips &&
+                            practicePackage.scenario.coachTips.length > 0 ? (
+                              <ul className="list-disc ml-6 text-zinc-800">
+                                {practicePackage.scenario.coachTips.map((tip, i) => (
+                                  <li key={i} className="text-xs">{tip}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-zinc-500 italic">None</span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                            Difficulty:
-                          </span>
-                          <span className="text-zinc-700">{practicePackage.scenario.difficulty}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                            Situation:
-                          </span>
-                          <span className="text-zinc-700">{practicePackage.scenario.situation}</span>
-                        </div>
-                        <div>
-                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                            Objectives:
-                          </span>
-                          {practicePackage.scenario.objectives &&
-                          practicePackage.scenario.objectives.length > 0 ? (
-                            <ul className="list-disc ml-6 text-zinc-800">
-                              {practicePackage.scenario.objectives.map((obj, i) => (
-                                <li key={i} className="text-xs">{obj}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-zinc-500 italic">None</span>
-                          )}
-                        </div>
-                        <div>
-                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                            Coach Tips:
-                          </span>
-                          {practicePackage.scenario.coachTips &&
-                          practicePackage.scenario.coachTips.length > 0 ? (
-                            <ul className="list-disc ml-6 text-zinc-800">
-                              {practicePackage.scenario.coachTips.map((tip, i) => (
-                                <li key={i} className="text-xs">{tip}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-zinc-500 italic">None</span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-zinc-400 italic">No role play scenario provided.</div>
-                    )}
-                  </section>
+                      ) : (
+                        <div className="text-sm text-zinc-400 italic">No role play scenario provided.</div>
+                      )}
+                    </section>
+                  )}
+             
 
                   {/* Section 3: Quiz */}
-                  <section>
-                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-                      3. Quiz
-                    </h4>
-                    {practicePackage.quiz && practicePackage.quiz.length > 0 ? (
-                      <div className="space-y-6">
-                        {practicePackage.quiz.map((qz, i) => (
-                          <div
-                            key={i}
-                            className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 space-y-1"
-                          >
-                            <div>
-                              <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                                Q{i + 1}:
-                              </span>
-                              <span className="text-zinc-700 font-medium">{qz.question}</span>
+                  {false && (
+                    <section>
+                      <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+                        3. Quiz
+                      </h4>
+                      {practicePackage.quiz && practicePackage.quiz.length > 0 ? (
+                        <div className="space-y-6">
+                          {practicePackage.quiz.map((qz, i) => (
+                            <div
+                              key={i}
+                              className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 space-y-1"
+                            >
+                              <div>
+                                <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                                  Q{i + 1}:
+                                </span>
+                                <span className="text-zinc-700 font-medium">{qz.question}</span>
+                              </div>
+                              <div>
+                                <span className="font-bold uppercase text-[10px] text-green-700 mr-2">
+                                  Answer:
+                                </span>
+                                <span className="text-zinc-700">{qz.answer}</span>
+                              </div>
+                              <div>
+                                <span className="font-bold uppercase text-[10px] text-blue-600 mr-2">
+                                  Rationale:
+                                </span>
+                                <span className="text-zinc-700">{qz.rationale}</span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-bold uppercase text-[10px] text-green-700 mr-2">
-                                Answer:
-                              </span>
-                              <span className="text-zinc-700">{qz.answer}</span>
-                            </div>
-                            <div>
-                              <span className="font-bold uppercase text-[10px] text-blue-600 mr-2">
-                                Rationale:
-                              </span>
-                              <span className="text-zinc-700">{qz.rationale}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-zinc-400 italic">No quiz provided.</div>
-                    )}
-                  </section>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-zinc-400 italic">No quiz provided.</div>
+                      )}
+                    </section>
+                  )}
+             
                 </div>
               )}
             </div>
