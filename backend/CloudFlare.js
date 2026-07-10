@@ -43,71 +43,65 @@ export default {
    ========================= */
    if (method === "GET" && cleanPath === "/clients") {
     const res = await fetch(
-      `${SUPABASE_URL}/clients?select=id,first_name,last_name`,
+      `${SUPABASE_URL}/clients?select=id,full_name`,
       { headers: HEADERS }
-    );
-  
-    const text = await res.text();
-    console.log("SUPABASE RAW RESPONSE:", text);
+    )
   
     if (!res.ok) {
-      console.error("SUPABASE ERROR:", text);
-      throw new Error(text);
+      const text = await res.text()
+      throw new Error(text)
     }
   
-    let data;
+    let data
     try {
-      data = JSON.parse(text);
+      data = await res.json()
     } catch {
-      return respond([], cors);
+      return respond([], cors)
     }
   
     return respond(
       (Array.isArray(data) ? data : []).map(c => ({
         id: c.id,
-        name:
-          [c.first_name, c.last_name]
-            .filter(Boolean)
-            .join(" ")
-          || `Client ${c.id.slice(0, 6)}`
+        name: c.full_name || `Client ${c.id.slice(0, 6)}`
       })),
       cors
-    );
+    )
+    
   }
+  
         /* =========================
         ✅ CREATE CLIENT
         ========================= */
-        if (method === "GET" && cleanPath === "/clients") {
+      if (method === "POST" && cleanPath === "/clients") {
+        const body = await safeJson(request)
 
-          const res = await fetch(
-            `${SUPABASE_URL}/clients?select=id,first_name,last_name`,
-            { headers: HEADERS }
-          );
-        
-          const text = await res.text();   // ✅ THIS LINE WAS MISSING
-        
-          if (!res.ok) {
-            return respond({ error: text }, cors, 500);
-          }
-        
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch {
-            return respond([], cors);
-          }
-        
-          return respond(
-            (Array.isArray(data) ? data : []).map(c => ({
-              id: c.id,
-              name:
-                [c.first_name, c.last_name].filter(Boolean).join(" ")
-                || `Client ${c.id.slice(0, 6)}`
-            })),
-            cors
-          );
+        // ✅ Use provided name OR fallback
+        const name =
+          body?.name && body.name.trim()
+            ? body.name.trim()
+            : `Client ${Date.now()}`
+
+        const res = await fetch(`${SUPABASE_URL}/clients`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            first_name,
+            middle_name, 
+            last_name,
+          }),
+        })
+
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text)
         }
-        ``
+
+        const data = await res.json()
+
+        return respond(data?.[0] || data, cors)
+      }
+
+
       /* =========================
          ✅ CREATE CASE
          ========================= */
@@ -403,119 +397,200 @@ export default {
         return respond(formatSessionRow(row), cors)
       }
       /*=========================
-  ✅ /client/:id (single client tree)
-=========================*/
-if (method === "GET" && cleanPath.startsWith("/client/")) {
-  try {
-    const id = cleanPath.split("/")[2];
+          ✅ /client/:id (single client tree)
+      =========================*/
+      if (method === "GET" && cleanPath.startsWith("/client/")) {
+        const id = cleanPath.split("/")[2]
 
-    if (!id) {
-      return respond({ error: "Missing client id" }, cors, 400);
-    }
+        const res = await fetch(
+          `${SUPABASE_URL}/clients?id=eq.${id}&select=id,full_name,case_formulations(id,name,sessions(id,name))`,
+          { headers: HEADERS }
+        )
 
-    const res = await fetch(
-      `${SUPABASE_URL}/clients?id=eq.${id}&select=id,full_name,case_formulations(id,name,sessions(id,name))`,
-      { headers: HEADERS }
-    );
+        if (!res.ok) throw new Error(await res.text())
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Supabase error: ${text}`);
-    }
+        const data = await res.json()
 
-    const data = await res.json();
+        if (!data?.length) {
+          return respond({ error: "Client not found" }, cors, 404)
+        }
 
-    if (!data || data.length === 0) {
-      return respond({ error: "Client not found" }, cors, 404);
-    }
-
-    const client = data[0];
-
-    return respond(
-      {
-        id: client.id,
-        name: client.full_name,
-        cases: client.case_formulations || [],
-      },
-      cors
-    );
-  } catch (err) {
-    console.error("Worker /client/:id error:", err);
-
-    return respond(
-      { error: "Internal server error", details: err.message },
-      cors,
-      500
-    );
-  }
-}
-
+        return respond({
+          id: data[0].id,
+          name: data[0].full_name,
+          cases: data[0].case_formulations || [],
+        }, cors)
+      }
 
 
 
       /* =========================
-         ✅ AI ROUTES
-         ========================= */
-      if (method === "POST") {
-        const body = await safeJson(request)
+   ✅ AI ROUTES
+   ========================= */
+if (method === "POST") {
+  const body = await safeJson(request)
 
-        if (!body || !body.sessionNotes) {
-          return respond({ error: "Missing sessionNotes" }, cors, 400)
-        }
+  if (!body || !body.sessionNotes) {
+    return respond(
+      { error: "Missing sessionNotes" },
+      cors,
+      400
+    )
+  }
 
-        if (cleanPath === "/analyze/session") {
-          const analysis = await handleAnalyze(body.sessionNotes, env, cors, false)
-          if (body.sessionId) {
-            await persistSessionFields(body.sessionId, {
-              session_notes: body.sessionNotes,
-              analysis: analysis,
-            }, env)
-            await saveSessionVersion(body.sessionId, {
-              session_notes: body.sessionNotes,
-              analysis: analysis,
-            }, SUPABASE_URL, HEADERS)
-          }
-          return respond(analysis, cors)
-        }
+  /* =========================
+     ANALYZE SESSION
+     ========================= */
+  if (cleanPath === "/analyze/session") {
+    const analysis = await handleAnalyze(
+      body.sessionNotes,
+      env,
+      cors,
+      false
+    )
 
-        if (cleanPath === "/generate/vignette") {
-          const modality = body.verifiedModality || body.modality || "cbt"
-          const generated = await handleGenerate(body.sessionNotes, modality, env, cors, false)
-          if (body.sessionId) {
-            await persistSessionFields(body.sessionId, {
-              session_notes: body.sessionNotes,
-              vignette: generated.scenario,
-              homework: generated.homework,
-              quiz: generated.quiz,
-              modality,
-            }, env)
-            await saveSessionVersion(body.sessionId, {
-              session_notes: body.sessionNotes,
-              vignette: generated.scenario,
-              homework: generated.homework,
-              quiz: generated.quiz,
-              modality,
-            }, SUPABASE_URL, HEADERS)
-          }
-          return respond(generated, cors)
-        }
-      }
+    if (body.sessionId) {
+      await persistSessionFields(
+        body.sessionId,
+        {
+          session_notes: body.sessionNotes,
+          analysis,
+        },
+        env
+      )
 
-      return respond({ error: "Route not found" }, cors, 404)
-
-    } catch (err) {
-      console.error("Worker error:", err)
-      return respond({ error: err.message || "Server error" }, cors, 500)
+      await saveSessionVersion(
+        body.sessionId,
+        {
+          session_notes: body.sessionNotes,
+          analysis,
+        },
+        SUPABASE_URL,
+        HEADERS
+      )
     }
+
+    return respond(analysis, cors)
+  }
+
+  /* =========================
+     GENERATE VIGNETTE
+     ========================= */
+  if (cleanPath === "/generate/vignette") {
+    const modality =
+      body.verifiedModality ||
+      body.modality ||
+      "cbt"
+
+    const generated = await handleGenerate(
+      body.sessionNotes,
+      modality,
+      env,
+      cors,
+      false
+    )
+
+    if (body.sessionId) {
+      await persistSessionFields(
+        body.sessionId,
+        {
+          session_notes: body.sessionNotes,
+          vignette: generated.scenario,
+          homework: generated.homework,
+          quiz: generated.quiz,
+          modality,
+        },
+        env
+      )
+
+      await saveSessionVersion(
+        body.sessionId,
+        {
+          session_notes: body.sessionNotes,
+          vignette: generated.scenario,
+          homework: generated.homework,
+          quiz: generated.quiz,
+          modality,
+        },
+        SUPABASE_URL,
+        HEADERS
+      )
+    }
+
+    return respond(generated, cors)
+  }
+
+  /* =========================
+     GENERATE PRACTICE PACKAGE
+     ========================= */
+  if (cleanPath === "/generate/practice-package") {
+    const modality =
+      body.verifiedModality ||
+      body.modality ||
+      "cbt"
+
+    const generated =
+      await handleGeneratePracticePackage(
+        body.sessionNotes,
+        modality,
+        env,
+        cors,
+        false
+      )
+
+    if (body.sessionId) {
+      await persistSessionFields(
+        body.sessionId,
+        {
+          practice_package: generated,
+        },
+        env
+      )
+
+      await saveSessionVersion(
+        body.sessionId,
+        {
+          practice_package: generated,
+        },
+        SUPABASE_URL,
+        HEADERS
+      )
+    }
+
+    return respond(generated, cors)
   }
 }
 
+return respond(
+  { error: "Route not found" },
+  cors,
+  404
+)
+
+} catch (err) {
+  console.error(
+    "Worker error:",
+    err
+  )
+
+  return respond(
+    {
+      error:
+        err.message ||
+        "Server error"
+    },
+    cors,
+    500
+  )
+}
+}
+}
 /* ===============================
    ✅ ANALYZE (UNCHANGED SAFE)
    =============================== */
 const SESSION_BASIC_SELECT = "id,name,case_id"
 const SESSION_FULL_SELECT =
-  "id,name,case_id,session_notes,vignette,homework,quiz,analysis,modality,created_at,updated_at"
+  "id,name,case_id,session_notes,vignette,homework,quiz,practice_package,analysis,modality,created_at,updated_at"
 
 function isMissingColumnError(text) {
   return (
@@ -555,6 +630,7 @@ async function patchSessionRow(sessionId, patch, supabaseUrl, headers) {
     "vignette",
     "homework",
     "quiz",
+    "practice_package",
     "analysis",
     "modality",
   ]
@@ -627,6 +703,10 @@ function buildSessionPatch(body) {
   if (body.quiz !== undefined) {
     patch.quiz = body.quiz
   }
+  if (body.practicePackage !== undefined) {
+  patch.practice_package =
+    body.practicePackage
+  }
   if (body.analysis !== undefined) {
     patch.analysis = body.analysis
   }
@@ -641,18 +721,31 @@ function formatSessionRow(row) {
   if (!row) return null
 
   return {
-    id: row.id,
-    name: row.name,
-    caseId: row.case_id,
-    sessionNotes: row.session_notes || "",
-    vignette: row.vignette || "",
-    homework: Array.isArray(row.homework) ? row.homework : [],
-    quiz: Array.isArray(row.quiz) ? row.quiz : [],
-    analysis: row.analysis || null,
-    modality: row.modality || null,
-    created_at: row.created_at || null,
-    lastUpdated: row.updated_at || null,
-  }
+  id: row.id,
+  name: row.name,
+  caseId: row.case_id,
+  sessionNotes: row.session_notes || "",
+  vignette: row.vignette || "",
+
+  homework: Array.isArray(row.homework)
+    ? row.homework
+    : [],
+
+  quiz: Array.isArray(row.quiz)
+    ? row.quiz
+    : [],
+
+  practicePackage:
+    row.practice_package || null,
+
+  analysis: row.analysis || null,
+
+  modality: row.modality || null,
+
+  created_at: row.created_at || null,
+
+  lastUpdated: row.updated_at || null,
+}
 }
 
 async function persistSessionFields(sessionId, fields, env) {
@@ -783,7 +876,106 @@ ${input}
 
   return respond(payload, cors)
 }
+async function handleGeneratePracticePackage(
+  input,
+  modality,
+  env,
+  cors,
+  wrapResponse = true
+) {
+  const messages = [
+    {
+      role: "system",
+      content: `
+You are a senior clinical psychologist.
 
+Return ONLY JSON.
+
+{
+  "homework": [
+    "task",
+    "task",
+    "task"
+  ],
+
+  "scenario": {
+    "title": "title",
+    "difficulty": "easy",
+    "situation": "role-play situation",
+
+    "objectives": [
+      "objective",
+      "objective"
+    ],
+
+    "coachTips": [
+      "tip",
+      "tip"
+    ]
+  },
+
+  "quiz": [
+    {
+      "question": "question",
+      "answer": "answer",
+      "rationale": "rationale"
+    }
+  ]
+}
+
+Rules:
+- Homework must be actionable and measurable.
+- Scenario should support therapeutic role-play.
+- Quiz should reinforce key therapeutic insights.
+- Match the specified modality.
+- Return JSON only.
+`
+    },
+    {
+      role: "user",
+      content: `
+Modality: ${modality}
+
+Session Notes:
+
+${input}
+`
+    }
+  ]
+
+  const raw = await callGroq(
+    messages,
+    env,
+    0.5
+  )
+
+  const cleaned = stripMarkdown(raw)
+  const parsed = extractJsonObject(cleaned)
+
+  const payload = {
+    homework:
+      parsed?.homework || [],
+
+    scenario:
+      parsed?.scenario || {
+        title: "Practice Scenario",
+        difficulty: "medium",
+        situation:
+          "Practice applying therapy skills.",
+        objectives: [],
+        coachTips: [],
+      },
+
+    quiz:
+      parsed?.quiz || [],
+  }
+
+  if (!wrapResponse) {
+    return payload
+  }
+
+  return respond(payload, cors)
+}
 /* ===============================
    ✅ GROQ CALL (SAFE + DEBUG)
    =============================== */
@@ -856,29 +1048,47 @@ function extractJsonObject(text) {
 /* ===============================
    ✅ VERSION SAVE FUNCTION
    =============================== */
-   async function saveSessionVersion(sessionId, fields, supabaseUrl, headers) {
-    if (!fields || Object.keys(fields).length === 0) return
-    try {
-      const payload = {
-        session_id: sessionId,
-        session_notes: fields.session_notes || null,
-        vignette: fields.vignette || null,
-        homework: fields.homework || [],
-        quiz: fields.quiz || [],
-        modality: fields.modality || null,
-        analysis: fields.analysis || null,
-        created_at: new Date().toISOString(),
-      }
-  
-      await fetch(`${supabaseUrl}/session_versions`, {
+async function saveSessionVersion(
+  sessionId,
+  fields,
+  supabaseUrl,
+  headers
+) {
+  if (!fields || Object.keys(fields).length === 0) {
+    return
+  }
+
+  try {
+    const payload = {
+      session_id: sessionId,
+      session_notes: fields.session_notes || null,
+      vignette: fields.vignette || null,
+      homework: fields.homework || [],
+      quiz: fields.quiz || [],
+
+      practice_package:
+        fields.practice_package || null,
+
+      modality: fields.modality || null,
+      analysis: fields.analysis || null,
+      created_at: new Date().toISOString(),
+    }
+
+    await fetch(
+      `${supabaseUrl}/session_versions`,
+      {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
-      })
-    } catch (err) {
-      console.error("Session version save failed:", err)
-    }
+      }
+    )
+  } catch (err) {
+    console.error(
+      "Session version save failed:",
+      err
+    )
   }
+}
   
 
 /* ===============================
