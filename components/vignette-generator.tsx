@@ -4,26 +4,17 @@ import { useEffect, useRef, useState } from "react"
 import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
-import { 
-  CheckCircle2, 
-  Download, 
-  FileCheck, 
-  Loader2, 
-  Sparkles, 
+import {
+  CheckCircle2,
+  Download,
+  Loader2,
+  Sparkles,
   ClipboardPaste,
-  AlertTriangle,
-  FileText,
-  HelpCircle,
-  PencilLine,
   BrainCircuit,
-  Activity,
-  ShieldCheck
 } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
-
 
 type StepId = 1 | 2 | 3
 
@@ -34,11 +25,21 @@ interface AnalysisResult {
   rationale: string
 }
 
-const MODALITIES = [
-  { value: "cbt", label: "Cognitive Behavioral Therapy (CBT)" },
-  { value: "dbt", label: "Dialectical Behavior Therapy (DBT)" },
-  { value: "act", label: "Acceptance & Commitment Therapy (ACT)" },
-]
+interface PracticePackage {
+  homework: string[]
+  scenario: {
+    title: string
+    difficulty: string
+    situation: string
+    objectives: string[]
+    coachTips: string[]
+  }
+  quiz: {
+    question: string
+    answer: string
+    rationale: string
+  }[]
+}
 
 const MODERN_COLOR_SYNTAX_RE = /\b(lab|oklch|oklab|lch)\(|color-mix\(/i
 
@@ -58,7 +59,11 @@ function getColorScratchEl(): HTMLDivElement {
 /**
  * Chromium often serializes computed colors as lab()/oklch(); html2canvas's parser rejects those.
  */
-function coerceStyleValueForHtml2Canvas(prop: string, value: string, priority: string): string {
+function coerceStyleValueForHtml2Canvas(
+  prop: string,
+  value: string,
+  priority: string
+): string {
   if (!value || !MODERN_COLOR_SYNTAX_RE.test(value)) return value
   const scratch = getColorScratchEl()
   const reset =
@@ -137,18 +142,12 @@ export default function VignetteGenerator({
 
   const [step, setStep] = useState<StepId>(1)
   const [sessionInput, setSessionInput] = useState("")
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
+
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
-  const [modality, setModality] = useState("cbt")
-  const [content, setContent] = useState({ 
-    scenario: "", 
-    quiz: [] as string[], 
-    homework: [] as string[] 
-  })
+  const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
 
   const worksheetRef = useRef<HTMLDivElement>(null)
 
@@ -162,28 +161,20 @@ export default function VignetteGenerator({
       setStep(1)
       setSessionInput("")
       setAnalysis(null)
-      setModality("cbt")
-      setContent({ scenario: "", quiz: [], homework: [] })
+      setPracticePackage(null)
       return
     }
 
     setSessionInput(session.sessionNotes || "")
-    setModality(session.modality || session.analysis?.inferredModality || "cbt")
     setAnalysis(session.analysis as AnalysisResult | null)
 
-    if (session.vignette) {
-      setContent({
-        scenario: session.vignette,
-        quiz: session.quiz || [],
-        homework: session.homework || [],
-      })
+    // Try to load practice package if in session (from GET /sessions/:id)
+    if (session.practicePackage) {
+      setPracticePackage(session.practicePackage)
       setStep(3)
-    } else if (session.analysis) {
-      setStep(2)
-      setContent({ scenario: "", quiz: [], homework: [] })
     } else {
+      setPracticePackage(null)
       setStep(1)
-      setContent({ scenario: "", quiz: [], homework: [] })
     }
   }, [sessionId, caseId])
 
@@ -225,17 +216,18 @@ export default function VignetteGenerator({
       const imgData = canvas.toDataURL("image/png")
       const pdf = new jsPDF("p", "mm", "a4")
       pdf.addImage(imgData, "PNG", 10, 10, 190, (canvas.height * 190) / canvas.width)
-      pdf.save(`ALICE-worksheet-${clientId}.pdf`)
+      pdf.save(`ALICE-practice-package-${clientId}.pdf`)
     } finally {
       setIsExporting(false)
     }
   }
 
-  const handleAnalyze = async () => {
+  const handleAnalyzeAndGenerate = async () => {
     if (!sessionInput) return
-    setIsAnalyzing(true)
+    setIsProcessing(true)
     try {
-      const res = await fetch(`${API_BASE}/analyze/session`, {
+      // 1. Analyze
+      const analyzeRes = await fetch(`${API_BASE}/analyze/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -244,69 +236,38 @@ export default function VignetteGenerator({
           sessionId,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || "Analysis failed")
+      const analyzeData = await analyzeRes.json()
+      if (!analyzeRes.ok) throw new Error(analyzeData?.error || "Analysis failed")
 
-      setAnalysis(data)
-      const nextModality = data.inferredModality
-        ? data.inferredModality.toLowerCase()
-        : modality
-      if (data.inferredModality) setModality(nextModality)
-      setStep(2)
+      setAnalysis(analyzeData)
 
-      await saveSessionContent(caseId, sessionId, {
-        sessionNotes: sessionInput,
-        analysis: data,
-        modality: nextModality,
-      })
-    } catch (err) {
-      console.error(err)
-      alert(err instanceof Error ? err.message : "Failed to analyze session")
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const handleGenerate = async () => {
-    setIsGenerating(true)
-    try {
-      const res = await fetch(`${API_BASE}/generate/vignette`, {
+      // 2. Generate Practice Package
+      const genRes = await fetch(`${API_BASE}/generate/practice-package`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionNotes: sessionInput,
-          verifiedModality: modality,
           clientId,
           sessionId,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || "Generation failed")
+      const genData = await genRes.json()
+      if (!genRes.ok) throw new Error(genData?.error || "Practice package generation failed")
 
-      const nextContent = {
-        scenario:
-          data.scenario ||
-          "The client presented with symptoms consistent with the selected modality.",
-        quiz: data.quiz || [],
-        homework: data.homework || [],
-      }
-
-      setContent(nextContent)
+      setPracticePackage(genData)
       setStep(3)
 
+      // 3. Save practice package to session
       await saveSessionContent(caseId, sessionId, {
         sessionNotes: sessionInput,
-        vignette: nextContent.scenario,
-        quiz: nextContent.quiz,
-        homework: nextContent.homework,
-        modality,
-        analysis: analysis ?? undefined,
+        analysis: analyzeData,
+        practicePackage: genData,
       })
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : "Failed to generate vignette")
+      alert(err instanceof Error ? err.message : "Failed to generate practice package")
     } finally {
-      setIsGenerating(false)
+      setIsProcessing(false)
     }
   }
 
@@ -318,7 +279,9 @@ export default function VignetteGenerator({
             <div className="p-2.5 bg-primary/10 rounded-2xl">
               <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
-            <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">ALICE Clinical</CardTitle>
+            <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">
+              ALICE Clinical
+            </CardTitle>
           </div>
           <div className="flex flex-col items-end gap-1">
             {sessionName && (
@@ -339,8 +302,8 @@ export default function VignetteGenerator({
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             <div className="relative">
-              <Textarea 
-                value={sessionInput} 
+              <Textarea
+                value={sessionInput}
                 onChange={(e) => setSessionInput(e.target.value)}
                 onBlur={() => {
                   if (sessionInput.trim()) persistNotes(sessionInput)
@@ -348,12 +311,21 @@ export default function VignetteGenerator({
                 placeholder="Paste Heidi notes here..."
                 className="min-h-[220px] text-base p-6 bg-zinc-50 border-2 rounded-[2rem] focus:border-primary/20"
               />
-              <Button onClick={handleHeidiImport} variant="outline" size="sm" className="absolute top-4 right-4 rounded-full bg-white shadow-sm">
+              <Button
+                onClick={handleHeidiImport}
+                variant="outline"
+                size="sm"
+                className="absolute top-4 right-4 rounded-full bg-white shadow-sm"
+              >
                 <ClipboardPaste className="h-4 w-4 mr-2" /> Paste from Heidi
               </Button>
             </div>
-            <Button onClick={handleAnalyze} className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg" disabled={!sessionInput || isAnalyzing}>
-              {isAnalyzing ? <Loader2 className="animate-spin mr-2" /> : <Sparkles className="mr-2" />} Analyze Context
+            <Button
+              onClick={() => setStep(2)}
+              className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
+              disabled={!sessionInput || isProcessing}
+            >
+              Next
             </Button>
           </div>
         )}
@@ -361,50 +333,30 @@ export default function VignetteGenerator({
         {step === 2 && (
           <div className="space-y-6 animate-in slide-in-from-right">
             <div className="p-6 rounded-[2rem] bg-blue-50/50 border border-blue-100 text-sm italic font-medium text-blue-900 leading-relaxed">
-              "{analysis?.rationale || "Synthesizing formulation details..."}"
+              {analysis?.rationale
+                ? `"${analysis.rationale}"`
+                : `"Ready to analyze and generate your practice package."`}
             </div>
-            
-            {/* CLINICAL CONFIDENCE SECTION */}
-            <div className="grid grid-cols-2 gap-3">
-              {analysis?.riskFlags.map((flag: any, i: number) => (
-                <div key={i} className="p-3 rounded-2xl border bg-zinc-50 border-zinc-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className={`h-3 w-3 ${flag?.severity === 'high' ? 'text-red-500' : 'text-zinc-400'}`} />
-                      <span className="text-[10px] font-black text-zinc-700 uppercase">
-                        {typeof flag === 'object' ? flag.label : flag}
-                      </span>
-                    </div>
-                    <span className="text-[9px] font-mono font-bold text-zinc-400">
-                      {Math.round((flag?.confidence || 0.85) * 100)}%
-                    </span>
-                  </div>
-                  <div className="h-1 w-full bg-zinc-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full ${flag?.severity === 'high' ? 'bg-red-400' : 'bg-primary'}`}
-                      style={{ width: `${(flag?.confidence || 0.85) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-2">Framework Selection</label>
-              <Select value={modality} onValueChange={setModality}>
-                <SelectTrigger className="h-14 rounded-2xl border-2 font-bold text-zinc-700">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODALITIES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="flex gap-3 pt-4">
-              <Button variant="ghost" onClick={() => setStep(1)} className="flex-1 h-12 rounded-xl">Back</Button>
-              <Button onClick={handleGenerate} className="flex-[2] h-12 rounded-xl text-md font-bold" disabled={isGenerating}>
-                {isGenerating ? <Loader2 className="animate-spin mr-2" /> : "Build Clinical Worksheet"}
+              <Button
+                variant="ghost"
+                onClick={() => setStep(1)}
+                className="flex-1 h-12 rounded-xl"
+                disabled={isProcessing}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleAnalyzeAndGenerate}
+                className="flex-[2] h-12 rounded-xl text-md font-bold"
+                disabled={!sessionInput || isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="animate-spin mr-2" />
+                ) : (
+                  <Sparkles className="mr-2" />
+                )}
+                Analyze & Generate Practice Package
               </Button>
             </div>
           </div>
@@ -418,77 +370,166 @@ export default function VignetteGenerator({
             >
               <div className="flex justify-between items-start border-b pb-8">
                 <div>
-                  <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Clinical Practice</h3>
-                  <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">{modality} Technique Integration</p>
+                  <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
+                    Practice Package
+                  </h3>
+                  <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
+                    ALICE Practice Module
+                  </p>
                 </div>
                 <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
                   <CheckCircle2 className="text-green-600 h-6 w-6" />
                 </div>
               </div>
-              
-              <div className="space-y-8">
-                <section>
-                  <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">I. Case Summary (5-Line Narrative)</h4>
-                  <p className="leading-relaxed text-zinc-800 text-sm font-medium line-clamp-5">{content.scenario}</p>
-                </section>
 
-                <section className="bg-zinc-50/80 p-7 rounded-[2rem] border border-zinc-100">
-                  <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-5 flex items-center gap-2">
-                    <HelpCircle className="h-3 w-3" /> II. Skills Retrieval Quiz
-                  </h4>
-                  <div className="space-y-5">
-                    {content.quiz.map((q, i) => (
-                      <div key={i} className="flex gap-3 items-start border-b border-dashed border-zinc-200 pb-2">
-                        <span className="text-xs font-black text-primary">{i+1}.</span>
-                        <p className="text-xs text-zinc-700 font-bold leading-tight">{q}</p>
+              {!practicePackage ? (
+                <div className="text-center py-10 text-zinc-400 italic text-lg font-bold">
+                  No Practice Package generated.
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Section 1: Homework */}
+                  <section>
+                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+                      1. Homework
+                    </h4>
+                    {practicePackage.homework && practicePackage.homework.length > 0 ? (
+                      <ul className="space-y-3 ml-2">
+                        {practicePackage.homework.map((item, i) => (
+                          <li
+                            key={i}
+                            className="text-xs text-zinc-600 font-medium flex items-start gap-3"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/40 mt-1.5 shrink-0" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-zinc-400 italic">No homework tasks found.</div>
+                    )}
+                  </section>
+
+                  {/* Section 2: Role Play Scenario */}
+                  <section>
+                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+                      2. Role Play Scenario
+                    </h4>
+                    {practicePackage.scenario ? (
+                      <div className="space-y-3">
+                        <div>
+                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                            Title:
+                          </span>
+                          <span className="font-bold text-zinc-800">{practicePackage.scenario.title}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                            Difficulty:
+                          </span>
+                          <span className="text-zinc-700">{practicePackage.scenario.difficulty}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                            Situation:
+                          </span>
+                          <span className="text-zinc-700">{practicePackage.scenario.situation}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                            Objectives:
+                          </span>
+                          {practicePackage.scenario.objectives &&
+                          practicePackage.scenario.objectives.length > 0 ? (
+                            <ul className="list-disc ml-6 text-zinc-800">
+                              {practicePackage.scenario.objectives.map((obj, i) => (
+                                <li key={i} className="text-xs">{obj}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-zinc-500 italic">None</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                            Coach Tips:
+                          </span>
+                          {practicePackage.scenario.coachTips &&
+                          practicePackage.scenario.coachTips.length > 0 ? (
+                            <ul className="list-disc ml-6 text-zinc-800">
+                              {practicePackage.scenario.coachTips.map((tip, i) => (
+                                <li key={i} className="text-xs">{tip}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-zinc-500 italic">None</span>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </section>
+                    ) : (
+                      <div className="text-sm text-zinc-400 italic">No role play scenario provided.</div>
+                    )}
+                  </section>
 
-                <section className="bg-white p-7 border-2 border-primary/10 rounded-[2.5rem]">
-                  <h4 className="text-[10px] font-black text-primary uppercase mb-5 flex items-center gap-2">
-                    <Activity className="h-3 w-3" /> III. Digital {modality.toUpperCase()} Template Preview
-                  </h4>
-                  
-                  {modality === 'cbt' ? (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-zinc-50 rounded-xl border text-[10px] font-bold text-zinc-500">Trigger [Typeform Text Field]</div>
-                      <div className="p-4 bg-zinc-50 rounded-xl border text-[10px] font-bold text-zinc-500">The Hot Thought [Typeform Long Text]</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-[10px] font-black text-green-700">Evidence FOR</div>
-                        <div className="p-4 bg-red-50 rounded-xl border border-red-100 text-[10px] font-black text-red-700">Evidence AGAINST</div>
+                  {/* Section 3: Quiz */}
+                  <section>
+                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+                      3. Quiz
+                    </h4>
+                    {practicePackage.quiz && practicePackage.quiz.length > 0 ? (
+                      <div className="space-y-6">
+                        {practicePackage.quiz.map((qz, i) => (
+                          <div
+                            key={i}
+                            className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 space-y-1"
+                          >
+                            <div>
+                              <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
+                                Q{i + 1}:
+                              </span>
+                              <span className="text-zinc-700 font-medium">{qz.question}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold uppercase text-[10px] text-green-700 mr-2">
+                                Answer:
+                              </span>
+                              <span className="text-zinc-700">{qz.answer}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold uppercase text-[10px] text-blue-600 mr-2">
+                                Rationale:
+                              </span>
+                              <span className="text-zinc-700">{qz.rationale}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-zinc-50 rounded-xl border text-[10px] font-bold text-zinc-500">Urge to Act (0-5 Rating)</div>
-                      <div className="p-4 bg-zinc-50 rounded-xl border text-[10px] font-bold text-zinc-500">Emotion Intensity (0-100%)</div>
-                      <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-[10px] font-black text-blue-700">Target Skill Used [Dropdown]</div>
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <PencilLine className="h-3 w-3" /> IV. Homework Tasks (Dot Points)
-                  </h4>
-                  <ul className="space-y-3 ml-2">
-                    {content.homework.map((item, i) => (
-                      <li key={i} className="text-xs text-zinc-600 font-medium flex items-start gap-3">
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary/40 mt-1.5 shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </div>
+                    ) : (
+                      <div className="text-sm text-zinc-400 italic">No quiz provided.</div>
+                    )}
+                  </section>
+                </div>
+              )}
             </div>
-
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(2)} className="h-12 rounded-2xl">Adjust</Button>
-              <Button onClick={handleDownloadPdf} className="flex-1 bg-zinc-900 text-white h-12 rounded-2xl font-bold" disabled={isExporting}>
-                {isExporting ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />} Export PDF
+              <Button
+                variant="outline"
+                onClick={() => setStep(2)}
+                className="h-12 rounded-2xl"
+              >
+                Adjust
+              </Button>
+              <Button
+                onClick={handleDownloadPdf}
+                className="flex-1 bg-zinc-900 text-white h-12 rounded-2xl font-bold"
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="animate-spin mr-2" />
+                ) : (
+                  <Download className="mr-2" />
+                )}
+                Export PDF
               </Button>
             </div>
           </div>
