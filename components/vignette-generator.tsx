@@ -371,10 +371,10 @@ export default function VignetteGenerator({
               <div className="flex justify-between items-start border-b pb-8">
                 <div>
                   <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
-                    Practice Package
+                    Client Practice Task
                   </h3>
                   <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
-                    ALICE Practice Module
+                    Alice Clinical
                   </p>
                 </div>
                 <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
@@ -390,21 +390,28 @@ export default function VignetteGenerator({
                 <div className="space-y-8">
                   {/* Section 1: Homework */}
                   <section>
-                    <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-                      1. Homework
-                    </h4>
+                  <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
+  Please complete the following tasks before your next session
+</h4>
                     {practicePackage.homework && practicePackage.homework.length > 0 ? (
-                      <ul className="space-y-3 ml-2">
-                        {practicePackage.homework.map((item, i) => (
-                          <li
-                            key={i}
-                            className="text-xs text-zinc-600 font-medium flex items-start gap-3"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary/40 mt-1.5 shrink-0" />
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="space-y-4">
+                      {practicePackage.homework.map((item: any, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-3"
+                        >
+                          <span className="text-lg leading-6 shrink-0">
+                            ☐
+                          </span>
+                    
+                          <span className="text-sm text-zinc-700 font-medium leading-6">
+                            {typeof item === "string"
+                              ? item
+                              : item.task || JSON.stringify(item)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                     ) : (
                       <div className="text-sm text-zinc-400 italic">No homework tasks found.</div>
                     )}
