@@ -18,27 +18,18 @@ export default function ClientLoginPage() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error(error);
-      setError("Invalid email or password");
+    if (!email || !password) {
+      setError("Please enter email and password");
       setLoading(false);
       return;
     }
 
-    // ✅ redirect back to homework
     router.push(redirect);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-
       <div className="w-full max-w-sm bg-white p-6 rounded-xl shadow space-y-4">
-
         <h1 className="text-xl font-semibold text-center">
           Client Login
         </h1>
@@ -72,7 +63,6 @@ export default function ClientLoginPage() {
         >
           {loading ? "Logging in..." : "Login"}
         </button>
-
       </div>
     </div>
   );

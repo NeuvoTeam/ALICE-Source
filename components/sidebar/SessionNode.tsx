@@ -32,7 +32,7 @@ export function SessionNode({
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    const link = `${window.location.origin}/homework/${session.id}`;
+    const link = `${window.location.origin}/practice/${session.id}`;
     await navigator.clipboard.writeText(link);
 
     setCopied(true);
@@ -42,7 +42,7 @@ export function SessionNode({
   // ✅ OPEN
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(`/homework/${session.id}`, "_blank");
+    window.open(`/practice/${session.id}`, "_blank");
   };
 
   return (
