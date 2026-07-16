@@ -36,7 +36,6 @@ export function DashboardSidebar({
         </div>
         <div>
           <p className="font-semibold">ALICE</p>
-          <p className="text-xs text-gray-500">Clinical Portal</p>
         </div>
       </div>
 
