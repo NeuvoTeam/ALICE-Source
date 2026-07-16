@@ -188,7 +188,7 @@ background:
           <h1
   style={{
     margin: 0,
-    fontSize: 38,
+    fontSize: 42,
     fontWeight: 800,
     letterSpacing: "-0.04em",
     color: "#0f172a",
@@ -284,9 +284,15 @@ fontSize: 15,
           fontSize: 22,
         }}
       >
-        Add Client
+        New Client
       </h3>
-
+      <div
+  style={{
+    height: 1,
+    background: "#e5e7eb",
+    marginBottom: 18,
+  }}
+/>
       <div
         style={{
           display: "grid",
