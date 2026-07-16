@@ -256,66 +256,126 @@ fontSize: 15,
         </div>
   
         {showAddClient && (
-          <div
-            style={{
-              border:
-                "1px solid #e5e7eb",
-              borderRadius: 10,
-              padding: "10px 18px",
-              fontWeight: 600,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gap: 8,
-              }}
-            >
-              <input
-                placeholder="First Name"
-                value={firstName}
-                onChange={(e) =>
-                  setFirstName(
-                    e.target.value
-                  )
-                }
-              />
-  
-              <input
-                placeholder="Middle Name"
-                value={middleName}
-                onChange={(e) =>
-                  setMiddleName(
-                    e.target.value
-                  )
-                }
-              />
-  
-              <input
-                placeholder="Last Name"
-                value={lastName}
-                onChange={(e) =>
-                  setLastName(
-                    e.target.value
-                  )
-                }
-              />
-  
-              <button
-                onClick={
-                  handleCreateClient
-                }
-                disabled={creating}
-              >
-                {creating
-                  ? "Creating..."
-                  : "Create Client"}
-              </button>
-            </div>
-          </div>
-        )}
-  
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(15,23,42,0.35)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 999,
+    }}
+  >
+    <div
+      style={{
+        width: 420,
+        background: "#fff",
+        borderRadius: 20,
+        padding: 24,
+        boxShadow:
+          "0 20px 50px rgba(0,0,0,0.15)",
+      }}
+    >
+      <h3
+        style={{
+          marginTop: 0,
+          marginBottom: 16,
+          fontSize: 22,
+        }}
+      >
+        Add Client
+      </h3>
+
+      <div
+        style={{
+          display: "grid",
+          gap: 12,
+        }}
+      >
+        <input
+          placeholder="First Name"
+          value={firstName}
+          onChange={(e) =>
+            setFirstName(e.target.value)
+          }
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #d1d5db",
+          }}
+        />
+
+        <input
+          placeholder="Middle Name"
+          value={middleName}
+          onChange={(e) =>
+            setMiddleName(e.target.value)
+          }
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #d1d5db",
+          }}
+        />
+
+        <input
+          placeholder="Last Name"
+          value={lastName}
+          onChange={(e) =>
+            setLastName(e.target.value)
+          }
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #d1d5db",
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 20,
+        }}
+      >
+        <button
+          onClick={() =>
+            setShowAddClient(false)
+          }
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            border: "1px solid #d1d5db",
+            background: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleCreateClient}
+          disabled={creating}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            border: "none",
+            background: "#06b6d4",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          {creating
+            ? "Creating..."
+            : "Create Client"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {loading ? (
           <p>Loading...</p>
         ) : filteredClients.length === 0 ? (
