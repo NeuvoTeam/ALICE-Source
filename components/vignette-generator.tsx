@@ -280,7 +280,7 @@ export default function VignetteGenerator({
               <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
             <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">
-              ALICE Clinical
+              ALICE 
             </CardTitle>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -374,7 +374,7 @@ export default function VignetteGenerator({
                     Client Practice Task
                   </h3>
                   <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
-                    Alice Clinical
+                    ALICE
                   </p>
                 </div>
                 <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
