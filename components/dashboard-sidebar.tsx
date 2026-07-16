@@ -131,7 +131,7 @@ export function DashboardSidebar({
       {/* FOOTER */}
       <div className="border-t p-3 text-xs text-gray-500">
         {viewMode === "clinician"
-          ? "AI-assisted clinical workflow"
+          ? "Powered by ALICE"
           : "Client learning materials"}
       </div>
 
