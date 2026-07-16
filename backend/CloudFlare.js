@@ -76,20 +76,17 @@ export default {
         const body = await safeJson(request)
 
         // ✅ Use provided name OR fallback
-        const name =
-          body?.name && body.name.trim()
-            ? body.name.trim()
-            : `Client ${Date.now()}`
+        
 
         const res = await fetch(`${SUPABASE_URL}/clients`, {
-          method: "POST",
-          headers: HEADERS,
-          body: JSON.stringify({
-            first_name,
-            middle_name, 
-            last_name,
-          }),
-        })
+  method: "POST",
+  headers: HEADERS,
+  body: JSON.stringify({
+    first_name: body.first_name || null,
+    middle_name: body.middle_name || null,
+    last_name: body.last_name || null,
+  }),
+})
 
         if (!res.ok) {
           const text = await res.text()
@@ -235,7 +232,11 @@ export default {
             {
               method: "PATCH",
               headers: HEADERS,
-              body: JSON.stringify({ first_name, middle_name, last_name }),
+              body: JSON.stringify({
+  first_name: body.first_name || null,
+  middle_name: body.middle_name || null,
+  last_name: body.last_name || null,
+}),
             }
           )
 
@@ -260,11 +261,9 @@ export default {
             {
               method: "PATCH",
               headers: HEADERS,
-              body: JSON.stringify({ 
-                first_name,
-                middle_name,
-                last_name
-               }),
+              body: JSON.stringify({
+  name: body.name
+}),
             }
           )
 
