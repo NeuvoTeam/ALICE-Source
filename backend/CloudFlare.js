@@ -35,9 +35,151 @@ export default {
       "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       "Prefer": "return=representation"
     }
-
+    const AUTH_HEADERS = {
+      "Content-Type": "application/json",
+      "apikey": env.SUPABASE_ANON_KEY,
+    }
     try {
+/* =========================
+   ✅ AUTH SIGNUP
+========================= */
+if (method === "POST" && cleanPath === "/auth/signup") {
+  const body = await safeJson(request)
 
+  if (!body?.email || !body?.password) {
+    return respond(
+      { error: "Missing email or password" },
+      cors,
+      400
+    )
+  }
+
+  const signupRes = await fetch(
+    `${baseUrl}/auth/v1/signup`,
+    {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        email: body.email,
+        password: body.password,
+      }),
+    }
+  )
+
+  const signupData = await signupRes.json()
+
+  if (!signupRes.ok) {
+    return respond(signupData, cors, 400)
+  }
+
+  return respond(
+    {
+      success: true,
+      message:
+        "Verification email sent",
+    },
+    cors
+  )
+}
+/* =========================
+   ✅ AUTH LOGIN
+========================= */
+if (method === "POST" && cleanPath === "/auth/login") {
+  const body = await safeJson(request)
+
+  if (!body?.email || !body?.password) {
+    return respond(
+      { error: "Missing email or password" },
+      cors,
+      400
+    )
+  }
+
+  const loginRes = await fetch(
+    `${baseUrl}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({
+        email: body.email,
+        password: body.password,
+      }),
+    }
+  )
+
+  const loginData = await loginRes.json()
+
+  if (!loginRes.ok) {
+    return respond(loginData, cors, 401)
+  }
+
+  return respond(
+    {
+      access_token:
+        loginData.access_token,
+
+      refresh_token:
+        loginData.refresh_token,
+
+      user: loginData.user,
+    },
+    cors
+  )
+}
+/* =========================
+   ✅ AUTH ME
+========================= */
+if (method === "GET" && cleanPath === "/auth/me") {
+  const token =
+    request.headers.get("Authorization");
+
+  if (!token) {
+    return respond(
+      { error: "Missing token" },
+      cors,
+      401
+    );
+  }
+
+  const meRes = await fetch(
+    `${baseUrl}/auth/v1/user`,
+    {
+      method: "GET",
+      headers: {
+        "apikey": env.SUPABASE_ANON_KEY,
+        "Authorization": token,
+      },
+    }
+  );
+
+  const meData = await meRes.json();
+
+  if (!meRes.ok) {
+    return respond(
+      meData,
+      cors,
+      401
+    );
+  }
+
+  const profileRes = await fetch(
+    `${SUPABASE_URL}/profiles?id=eq.${meData.id}&select=*`,
+    {
+      headers: HEADERS,
+    }
+  );
+
+  const profiles =
+    await profileRes.json();
+
+  return respond(
+    {
+      user: meData,
+      profile: profiles?.[0] || null,
+    },
+    cors
+  );
+}
 /* =========================
    ✅ GET ALL CLIENTS (FIXED)
    ========================= */

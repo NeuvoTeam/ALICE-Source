@@ -10,11 +10,14 @@ type Client = {
 const API_BASE =
   "https://clinical-ai-backend.neuvoteam.workers.dev";
 
-export default function ClientLanding({
-  onSelectClient,
-}: {
-  onSelectClient: (client: any) => void;
-}) {
+  export default function ClientLanding({
+    onSelectClient,
+  }: {
+    onSelectClient: (
+      client: any,
+      options?: any
+    ) => void | Promise<void>;
+  }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [clickedId, setClickedId] = useState<string | null>(null);
