@@ -25,8 +25,16 @@ const API_BASE =
   const [search, setSearch] = useState("");
 
   const [firstName, setFirstName] = useState("");
-  const [middleName, setMiddleName] = useState("");
-  const [lastName, setLastName] = useState("");
+const [middleName, setMiddleName] = useState("");
+const [lastName, setLastName] = useState("");
+
+const [email, setEmail] = useState("");
+
+const [countryCode, setCountryCode] =
+  useState("+65");
+
+const [phoneNumber, setPhoneNumber] =
+  useState("");
 
   const [creating, setCreating] = useState(false);
 
@@ -110,6 +118,23 @@ const [showAddClient, setShowAddClient] =
       alert("First name is required");
       return;
     }
+    
+    if (!lastName.trim()) {
+      const emailRegex =
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+if (!emailRegex.test(email)) {
+  alert("Please enter a valid email");
+  return;
+}
+      alert("Last name is required");
+      return;
+    }
+    
+    if (!email.trim()) {
+      alert("Email is required");
+      return;
+    }
 
     try {
       setCreating(true);
@@ -126,6 +151,9 @@ const [showAddClient, setShowAddClient] =
             first_name: firstName,
             middle_name: middleName,
             last_name: lastName,
+            email,
+            country_code: countryCode,
+            phone_number: phoneNumber,
           }),
         }
       );
@@ -137,8 +165,13 @@ const [showAddClient, setShowAddClient] =
       }
 
       setFirstName("");
-      setMiddleName("");
-      setLastName("");
+setMiddleName("");
+setLastName("");
+
+setEmail("");
+
+setCountryCode("+65");
+setPhoneNumber("");
 
       await fetchClients();
 
@@ -296,51 +329,117 @@ fontSize: 15,
     marginBottom: 18,
   }}
 />
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <input
-          placeholder="First Name"
-          value={firstName}
-          onChange={(e) =>
-            setFirstName(e.target.value)
-          }
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #d1d5db",
-          }}
-        />
+<div
+  style={{
+    display: "grid",
+    gap: 12,
+  }}
+>
+  <input
+    placeholder="First Name"
+    value={firstName}
+    onChange={(e) =>
+      setFirstName(e.target.value)
+    }
+    style={{
+      padding: 12,
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+    }}
+  />
 
-        <input
-          placeholder="Middle Name"
-          value={middleName}
-          onChange={(e) =>
-            setMiddleName(e.target.value)
-          }
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #d1d5db",
-          }}
-        />
+  <input
+    placeholder="Middle Name"
+    value={middleName}
+    onChange={(e) =>
+      setMiddleName(e.target.value)
+    }
+    style={{
+      padding: 12,
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+    }}
+  />
 
-        <input
-          placeholder="Last Name"
-          value={lastName}
-          onChange={(e) =>
-            setLastName(e.target.value)
-          }
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #d1d5db",
-          }}
-        />
-      </div>
+  <input
+    placeholder="Last Name"
+    value={lastName}
+    onChange={(e) =>
+      setLastName(e.target.value)
+    }
+    style={{
+      padding: 12,
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+    }}
+  />
+
+  <input
+    placeholder="Email"
+    type="email"
+    value={email}
+    onChange={(e) =>
+      setEmail(e.target.value)
+    }
+    style={{
+      padding: 12,
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+    }}
+  />
+
+  <div
+    style={{
+      display: "flex",
+      gap: 10,
+    }}
+  >
+    <select
+      value={countryCode}
+      onChange={(e) =>
+        setCountryCode(e.target.value)
+      }
+      style={{
+        width: 110,
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid #d1d5db",
+      }}
+    >
+      <option value="+65">
+        🇸🇬 +65
+      </option>
+
+      <option value="+61">
+        🇦🇺 +61
+      </option>
+
+      <option value="+44">
+        🇬🇧 +44
+      </option>
+
+      <option value="+1">
+        🇺🇸 +1
+      </option>
+    </select>
+
+    <input
+      placeholder="Phone Number"
+      value={phoneNumber}
+      onChange={(e) =>
+        setPhoneNumber(
+          e.target.value
+        )
+      }
+      style={{
+        flex: 1,
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid #d1d5db",
+      }}
+    />
+  </div>
+</div>
 
       <div
         style={{

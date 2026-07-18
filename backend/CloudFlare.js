@@ -224,10 +224,13 @@ if (method === "GET" && cleanPath === "/auth/me") {
   method: "POST",
   headers: HEADERS,
   body: JSON.stringify({
-    first_name: body.first_name || null,
-    middle_name: body.middle_name || null,
-    last_name: body.last_name || null,
-  }),
+  first_name: body.first_name || null,
+  middle_name: body.middle_name || null,
+  last_name: body.last_name || null,
+  email: body.email || null,
+  country_code: body.country_code || null,
+  phone_number: body.phone_number || null,
+}),
 })
 
         if (!res.ok) {
@@ -378,6 +381,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
   first_name: body.first_name || null,
   middle_name: body.middle_name || null,
   last_name: body.last_name || null,
+  email: body.email || null,
+  country_code: body.country_code || null,
+  phone_number: body.phone_number || null,
 }),
             }
           )

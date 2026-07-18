@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClientNode } from "@/components/sidebar/ClientNode";
-
+import LogoutButton from "@/components/logout-button";
 type ViewMode = "clinician" | "client";
 type ClinicianTab = "vignette" | "summaries";
 
@@ -128,12 +128,17 @@ export function DashboardSidebar({
         </div>
       )}
 
-      {/* FOOTER */}
-      <div className="border-t p-3 text-xs text-gray-500">
-        {viewMode === "clinician"
-          ? "Powered by ALICE"
-          : "Client learning materials"}
-      </div>
+
+{/* FOOTER */}
+<div className="mt-auto border-t px-3 py-2">
+  <LogoutButton />
+
+  <div className="mt-2 text-center text-[11px] text-gray-400">
+    {viewMode === "clinician"
+      ? "Powered by ALICE v1.1"
+      : "Client learning materials"}
+  </div>
+</div>
 
     </aside>
   );
