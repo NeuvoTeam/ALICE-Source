@@ -120,19 +120,25 @@ const [showAddClient, setShowAddClient] =
     }
     
     if (!lastName.trim()) {
-      const emailRegex =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-if (!emailRegex.test(email)) {
-  alert("Please enter a valid email");
-  return;
-}
       alert("Last name is required");
       return;
     }
     
     if (!email.trim()) {
       alert("Email is required");
+      return;
+    }
+    
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(email)) {
+      alert("Please enter a valid email");
+      return;
+    }
+    
+    if (!phoneNumber.trim()) {
+      alert("Phone number is required");
       return;
     }
 
@@ -257,6 +263,7 @@ fontSize: 15,
               border: "1px solid #d1d5db",
             }}
           />
+          
   
           <button
             onClick={fetchClients}
@@ -314,14 +321,24 @@ fontSize: 15,
       }}
     >
       <h3
-        style={{
-          marginTop: 0,
-          marginBottom: 16,
-          fontSize: 22,
-        }}
-      >
-        New Client
-      </h3>
+  style={{
+    marginTop: 0,
+    marginBottom: 8,
+    fontSize: 22,
+  }}
+>
+  New Client
+</h3>
+
+<div
+  style={{
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 16,
+  }}
+>
+  * Required fields
+</div>
       <div
   style={{
     height: 1,
@@ -336,7 +353,7 @@ fontSize: 15,
   }}
 >
   <input
-    placeholder="First Name"
+    placeholder="First Name *"
     value={firstName}
     onChange={(e) =>
       setFirstName(e.target.value)
@@ -349,7 +366,7 @@ fontSize: 15,
   />
 
   <input
-    placeholder="Middle Name"
+    placeholder="Middle Name (Optional)"
     value={middleName}
     onChange={(e) =>
       setMiddleName(e.target.value)
@@ -362,7 +379,7 @@ fontSize: 15,
   />
 
   <input
-    placeholder="Last Name"
+    placeholder="Last Name *"
     value={lastName}
     onChange={(e) =>
       setLastName(e.target.value)
@@ -374,19 +391,51 @@ fontSize: 15,
     }}
   />
 
+<div>
+  <label
+    style={{
+      display: "block",
+      marginBottom: 6,
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#374151",
+    }}
+  >
+    Email{" "}
+    <span
+      style={{
+        color: "#ef4444",
+      }}
+    >
+      *
+    </span>
+  </label>
+
   <input
-    placeholder="Email"
+    placeholder="name@email.com"
     type="email"
     value={email}
     onChange={(e) =>
       setEmail(e.target.value)
     }
     style={{
+      width: "100%",
       padding: 12,
       borderRadius: 10,
       border: "1px solid #d1d5db",
     }}
   />
+
+<div
+  style={{
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 4,
+  }}
+>
+  Required for client invitation
+</div>
+</div>
 
   <div
     style={{
@@ -468,7 +517,7 @@ fontSize: 15,
     </select>
 
     <input
-      placeholder="Phone Number"
+      placeholder="Phone Number *"
       value={phoneNumber}
       onChange={(e) =>
         setPhoneNumber(
@@ -509,21 +558,41 @@ fontSize: 15,
         </button>
 
         <button
-          onClick={handleCreateClient}
-          disabled={creating}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 10,
-            border: "none",
-            background: "#06b6d4",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          {creating
-            ? "Creating..."
-            : "Create Client"}
-        </button>
+  onClick={handleCreateClient}
+  disabled={
+    creating ||
+    !firstName.trim() ||
+    !lastName.trim() ||
+    !email.trim() ||
+    !phoneNumber.trim()
+  }
+  style={{
+    padding: "10px 16px",
+    borderRadius: 10,
+    border: "none",
+    background:
+      creating ||
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !phoneNumber.trim()
+        ? "#cbd5e1"
+        : "#06b6d4",
+    color: "#fff",
+    cursor:
+      creating ||
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !phoneNumber.trim()
+        ? "not-allowed"
+        : "pointer",
+  }}
+>
+  {creating
+    ? "Creating..."
+    : "Create Client"}
+</button>
       </div>
     </div>
   </div>
