@@ -414,8 +414,20 @@ fontSize: 15,
         🇭🇰 +852
       </option>
 
+      <option value="+886">
+        🇹🇼 +886
+      </option>
+
       <option value="+86">
         🇨🇳 +86
+      </option>
+
+      <option value="+82">
+        🇰🇷 +82
+      </option>
+
+      <option value="+81">
+        🇯🇵 +81
       </option>
 
       <option value="+60">
@@ -434,6 +446,14 @@ fontSize: 15,
         🇻🇳 +84
       </option>
 
+      <option value="+63">
+        🇵🇭 +63
+      </option>
+
+      <option value="+91">
+        🇮🇳 +91
+      </option>
+      
       <option value="+61">
         🇦🇺 +61
       </option>
