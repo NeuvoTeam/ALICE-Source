@@ -40,6 +40,15 @@ const [phoneNumber, setPhoneNumber] =
 
 const [showAddClient, setShowAddClient] =
   useState(false);
+  const emailRegex =
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const isFormValid =
+  firstName.trim().length > 0 &&
+  lastName.trim().length > 0 &&
+  emailRegex.test(email) &&
+  /^\d+$/.test(phoneNumber) &&
+  phoneNumber.length >= 6;
 
   const fetchClients = async () => {
     try {
@@ -139,6 +148,20 @@ const [showAddClient, setShowAddClient] =
     
     if (!phoneNumber.trim()) {
       alert("Phone number is required");
+      return;
+    }
+    if (!/^\d+$/.test(phoneNumber)) {
+      alert("Phone number can only contain numbers");
+      return;
+    }
+    
+    if (
+      phoneNumber.length < 6 ||
+      phoneNumber.length > 15
+    ) {
+      alert(
+        "Phone number must be between 6 and 15 digits"
+      );
       return;
     }
 
@@ -517,20 +540,22 @@ fontSize: 15,
     </select>
 
     <input
-      placeholder="Phone Number *"
-      value={phoneNumber}
-      onChange={(e) =>
-        setPhoneNumber(
-          e.target.value
-        )
-      }
-      style={{
-        flex: 1,
-        padding: 12,
-        borderRadius: 10,
-        border: "1px solid #d1d5db",
-      }}
-    />
+  type="tel"
+  inputMode="numeric"
+  placeholder="Phone Number *"
+  value={phoneNumber}
+  onChange={(e) =>
+    setPhoneNumber(
+      e.target.value.replace(/\D/g, "")
+    )
+  }
+  style={{
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+  }}
+/>
   </div>
 </div>
 
@@ -560,31 +585,19 @@ fontSize: 15,
         <button
   onClick={handleCreateClient}
   disabled={
-    creating ||
-    !firstName.trim() ||
-    !lastName.trim() ||
-    !email.trim() ||
-    !phoneNumber.trim()
+    creating || !isFormValid
   }
   style={{
     padding: "10px 16px",
     borderRadius: 10,
     border: "none",
     background:
-      creating ||
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !email.trim() ||
-      !phoneNumber.trim()
+      creating || !isFormValid
         ? "#cbd5e1"
         : "#06b6d4",
     color: "#fff",
     cursor:
-      creating ||
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !email.trim() ||
-      !phoneNumber.trim()
+      creating || !isFormValid
         ? "not-allowed"
         : "pointer",
   }}
@@ -593,6 +606,7 @@ fontSize: 15,
     ? "Creating..."
     : "Create Client"}
 </button>
+
       </div>
     </div>
   </div>
