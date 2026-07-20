@@ -46,9 +46,17 @@ export default {
 if (method === "POST" && cleanPath === "/auth/signup") {
   const body = await safeJson(request)
 
-  if (!body?.email || !body?.password) {
+  if (
+    !body?.email ||
+    !body?.password ||
+    !body?.first_name ||
+    !body?.last_name
+  ) {
     return respond(
-      { error: "Missing email or password" },
+      {
+        error:
+          "Missing first name, last name, email or password",
+      },
       cors,
       400
     )
@@ -62,14 +70,25 @@ if (method === "POST" && cleanPath === "/auth/signup") {
       body: JSON.stringify({
         email: body.email,
         password: body.password,
+
+        data: {
+          first_name: body.first_name,
+          last_name: body.last_name,
+          role: "clinician",
+        },
       }),
     }
   )
 
-  const signupData = await signupRes.json()
+  const signupData =
+    await signupRes.json()
 
   if (!signupRes.ok) {
-    return respond(signupData, cors, 400)
+    return respond(
+      signupData,
+      cors,
+      400
+    )
   }
 
   return respond(
