@@ -7,46 +7,45 @@ export default function LoginPage() {
   const [password, setPassword] =
     useState("");
 
-  const handleLogin = async () => {
-    try {
-      const res = await fetch(
-        "https://clinical-ai-backend.neuvoteam.workers.dev/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
-
-      const data = await res.json();
-
-      if (data.access_token) {
-        localStorage.setItem(
-          "alice_token",
-          data.access_token
+    const handleLogin = async () => {
+      try {
+        const res = await fetch(
+          "https://clinical-ai-backend.neuvoteam.workers.dev/auth/login",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email,
+              password,
+            }),
+          }
         );
-
-        window.location.href =
-          "/dashboard";
-
-        return;
+    
+        const data = await res.json();
+    
+        if (data.access_token) {
+          localStorage.setItem(
+            "alice_token",
+            data.access_token
+          );
+    
+          window.location.href =
+            "/dashboard";
+    
+          return;
+        }
+    
+        alert(
+          data.error ||
+            "Login failed"
+        );
+      } catch (err) {
+        console.error(err);
+        alert("Login failed");
       }
-
-      alert(
-        data.error ||
-          "Login failed"
-      );
-    } catch (err) {
-      console.error(err);
-      alert("Login failed");
-    }
-  };
+    };
 
   return (
     <div

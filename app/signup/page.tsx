@@ -24,16 +24,29 @@ export default function SignupPage() {
 
       const data = await res.json();
 
-      console.log(data);
+console.log("Signup response:", data);
+
+if (!res.ok) {
+  alert(
+    data.error ||
+    JSON.stringify(data) ||
+    "Signup failed"
+  );
+  return;
+}
 
       alert(
         data.message ||
-          data.error ||
-          "Signup complete"
+        "Verification email sent"
       );
-    } catch (err) {
-      console.error(err);
-      alert("Signup failed");
+    } catch (err: any) {
+      console.error("Signup error:", err);
+    
+      alert(
+        err?.message ||
+        JSON.stringify(err) ||
+        "Signup failed"
+      );
     }
   };
 
