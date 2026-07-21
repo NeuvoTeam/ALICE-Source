@@ -4,48 +4,46 @@ import { useState } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] =
-    useState("");
+  const [password, setPassword] = useState("");
 
-    const handleLogin = async () => {
-      try {
-        const res = await fetch(
-          "https://clinical-ai-backend.neuvoteam.workers.dev/auth/login",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email,
-              password,
-            }),
-          }
-        );
-    
-        const data = await res.json();
-    
-        if (data.access_token) {
-          localStorage.setItem(
-            "alice_token",
-            data.access_token
-          );
-    
-          window.location.href =
-            "/dashboard";
-    
-          return;
+  const handleLogin = async () => {
+    try {
+      const res = await fetch(
+        "https://clinical-ai-backend.neuvoteam.workers.dev/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
         }
-    
-        alert(
-          data.error ||
-            "Login failed"
+      );
+
+      const data = await res.json();
+
+      if (data.access_token) {
+        localStorage.setItem(
+          "alice_token",
+          data.access_token
         );
-      } catch (err) {
-        console.error(err);
-        alert("Login failed");
+
+        window.location.href =
+          "/dashboard";
+
+        return;
       }
-    };
+
+      alert(
+        data.error || "Login failed"
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Login failed");
+    }
+  };
 
   return (
     <div
@@ -60,10 +58,10 @@ export default function LoginPage() {
     >
       <div
         style={{
-          width: 400,
-          background: "white",
-          padding: 32,
-          borderRadius: 20,
+          width: 480,
+          background: "#fff",
+          padding: 48,
+          borderRadius: 24,
           boxShadow:
             "0 12px 30px rgba(15,23,42,0.08)",
         }}
@@ -71,7 +69,6 @@ export default function LoginPage() {
         <h1
           style={{
             margin: 0,
-            marginBottom: 24,
             textAlign: "center",
             fontSize: 42,
             fontWeight: 800,
@@ -80,6 +77,18 @@ export default function LoginPage() {
         >
           ALICE
         </h1>
+
+        <p
+          style={{
+            textAlign: "center",
+            color: "#64748b",
+            fontSize: 14,
+            marginTop: 8,
+            marginBottom: 24,
+          }}
+        >
+          Your AI-powered between-session care partner
+        </p>
 
         <input
           placeholder="Email"
@@ -93,6 +102,7 @@ export default function LoginPage() {
             marginBottom: 12,
             border: "1px solid #d1d5db",
             borderRadius: 10,
+            boxSizing: "border-box",
           }}
         />
 
@@ -109,6 +119,7 @@ export default function LoginPage() {
             marginBottom: 16,
             border: "1px solid #d1d5db",
             borderRadius: 10,
+            boxSizing: "border-box",
           }}
         />
 
@@ -120,13 +131,31 @@ export default function LoginPage() {
             border: "none",
             borderRadius: 10,
             background: "#06b6d4",
-            color: "white",
+            color: "#fff",
             fontWeight: 600,
             cursor: "pointer",
           }}
         >
           Login
         </button>
+
+        <div
+  style={{
+    textAlign: "center",
+    marginTop: 16,
+  }}
+>
+  /forgot-password
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    marginTop: 8,
+  }}
+>
+  /signup
+</div>
       </div>
     </div>
   );
