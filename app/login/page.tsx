@@ -87,7 +87,7 @@ export default function LoginPage() {
             marginBottom: 24,
           }}
         >
-          Your AI-powered between-session care partner
+          Supporting mental health professionals with AI-assisted clinical tools
         </p>
 
         <input
@@ -145,7 +145,16 @@ export default function LoginPage() {
     marginTop: 16,
   }}
 >
-  /forgot-password
+  <a
+    href="/forgot-password"
+    style={{
+      color: "#06b6d4",
+      textDecoration: "none",
+      fontSize: 14,
+    }}
+  >
+    Forgot Password?
+  </a>
 </div>
 
 <div
@@ -154,7 +163,16 @@ export default function LoginPage() {
     marginTop: 8,
   }}
 >
-  /signup
+  <a
+    href="/signup"
+    style={{
+      color: "#06b6d4",
+      textDecoration: "none",
+      fontSize: 14,
+    }}
+  >
+    Create Account
+  </a>
 </div>
       </div>
     </div>
