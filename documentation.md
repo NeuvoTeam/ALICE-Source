@@ -320,14 +320,23 @@ service-role key regardless of the caller.
 | Method | Path | Request | Success | Errors |
 | --- | --- | --- | --- | --- |
 | `GET` | `/clients` | – | `200 [{ id, name }]` — `name` is `full_name`, falling back to `Client <first 6 of id>`; `[]` if the payload is not an array | `500` on Supabase error |
-| `POST` | `/clients` | `{ first_name, middle_name, last_name, email, country_code, phone_number }` | `200` the inserted row | `500` |
-| `PATCH` | `/clients/:id` | `{ name }` **plus** any of `first_name, middle_name, last_name, email, country_code, phone_number` | `200 { success: true }` | `400 { error: "Missing name" }` |
+| `POST` | `/clients` | `{ name }` **or** any of `first_name, middle_name, last_name, email, country_code, phone_number` | `200` the inserted row | `400 { error: "Missing client details (name or contact fields)" }`; `500` |
+| `PATCH` | `/clients/:id` | `{ name }` **or** any of `first_name, middle_name, last_name, email, country_code, phone_number` | `200 { success: true }` | `400 { error: "No client fields to update" }` |
 | `GET` | `/client/:id` | – | `200 { id, name, cases: [{ id, name, sessions: [{ id, name }] }] }` | `404 { error: "Client not found" }` |
+| `GET` | `/client/history` | query `clientId` | `200 [material]` — sessions that carry a `vignette` or `practice_package`, newest first | `400 { error: "Missing clientId" }` |
+| `POST` | `/client/worksheet` | `{ clientId, sessionId \| vignetteId, answers }` | `200 { success: true, submission }` | `400 { error: "Missing clientId or answers" }`; `500` |
 
-> **Gotcha — `PATCH /clients/:id`.** The handler *validates* `body.name` but then writes only the six
-> snake_case contact columns, mapping any that are absent to `null`. The store's `renameClient` sends
-> `{ name }` only, so a rename currently rewrites the contact fields to `null` and does not persist the
-> name. See §13.
+`buildClientPayload` accepts either shape: a single `name` is split into `first_name` / `middle_name` /
+`last_name` (and written to `full_name` too), while the discrete contact columns are written verbatim.
+`writeClientRow` retries without `full_name` when Supabase reports it as generated or missing, so renaming
+a client no longer blanks its contacts and `useClientNavStore.createClient(name)` now creates a named row.
+
+`GET /client/history` returns the shape `components/client-view.tsx` renders —
+`{ id, title, content, scenario, skill, reflection, worksheetQuestions[], createdAt, modality }` — derived
+from `practice_package` (scenario / quiz / coachTips) plus `vignette`. Both new routes are declared
+**above** their would-be shadows: `/client/history` before the `GET /client/:id` prefix handler, and
+`/client/worksheet` before the `if (method === "POST")` AI guard. The history query joins through
+`case_formulations` because `sessions.client_id` is frequently `NULL` (§13.2).
 
 ### 5.3 Cases
 
@@ -393,11 +402,23 @@ match, so a missing field returns `400 { error: "Missing sessionNotes" }` even f
 | `POST` | `/generate/practice-package` | `{ sessionNotes, modality?, verifiedModality?, clientId?, sessionId? }` | `{ homework[], scenario{ title, difficulty, situation, objectives[], coachTips[] }, quiz[{ question, answer, rationale }] }` |
 
 - Modality resolution is `verifiedModality ?? modality ?? "cbt"`; the value is passed to the prompt
-  verbatim and stored in `sessions.modality`.
+  verbatim and stored in `sessions.modality`. `components/vignette-generator.tsx` sends the analysed
+  `inferredModality` as `modality` (and persists it via `PATCH /sessions/:id`), so a DBT/ACT analysis no
+  longer produces CBT material.
 - When `sessionId` is supplied, the route **also writes to the database before responding**:
   `persistSessionFields` updates `sessions`, and `saveSessionVersion` appends to `session_versions`.
   A failure inside those helpers is logged, not surfaced — the AI payload still returns `200`.
 - `riskFlags` shape: `{ label, severity: "low"|"medium"|"high", confidence: 0..1, evidence: [string] }`.
+- **Failures are loud by default.** When Groq is unreachable or rejects the request, `callGroq` returns a
+  result object and the route answers `502 { error: "AI unavailable", code: "GROQ_ERROR", detail,
+  groqStatus, model }`, where `detail` is Groq's own `error.message` (for example the
+  `model_not_found` sentence). Nothing is persisted on this path. Append `?allowDegraded=1` to get a
+  `200` with the placeholder payload plus `degraded: true`, `warning` and `model` instead of the `502`
+  (also not persisted — the router returns before any write).
+- **Unparseable output counts as a failure.** If Groq answers but the content is not usable JSON, the
+  route returns `502 { error: "AI unavailable", code: "BAD_AI_RESPONSE", detail, sample, model }` (or a
+  degraded `200` carrying the same `sample` when flagged), so a placeholder can never be presented as a
+  real formulation.
 
 ### 5.6 Preflight, unmatched paths and errors
 
@@ -409,10 +430,21 @@ match, so a missing field returns `400 { error: "Missing sessionNotes" }` even f
 | Any unhandled GET/DELETE/PATCH | Falls through to `404 { error: "Route not found" }` (the outer `respond` at the end of the `try`) |
 | Thrown error anywhere | `500 { error: <err.message> }` + `console.error("Worker error:", err)` |
 
-**Paths referenced by the frontend but not implemented by the Worker** (see §13):
-`GET /client/history` (used by `components/client-view.tsx` — matches `GET /client/:id` and returns
-`404 Client not found` because it looks up a client whose id is literally `history`) and
-`POST /client/worksheet` (falls into the AI guard → `400 Missing sessionNotes`).
+**Paths referenced by the frontend but not implemented by the Worker**: none. `GET /client/history` and
+`POST /client/worksheet` are now implemented (§5.2), each declared above the handler that used to shadow
+it (`GET /client/:id`, and the `if (method === "POST")` AI guard respectively).
+
+### 5.7 AI diagnostics
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/ai/models` | `{ ok, model, configuredAvailable, count, available[] }` — the Worker proxies Groq's `GET /openai/v1/models` with its own key, so this reports exactly which model IDs the account may call, and whether the configured `GROQ_MODEL` is one of them. `ok: false` + `groqStatus`/`detail` when the key itself is rejected |
+| `GET` | `/ai/health` | `{ ok, model, sample }` on success, `{ ok: false, model, groqStatus, detail }` when Groq rejects the request. Always `200` so a script or the dashboard can read it |
+| `GET` | `/ai/probe` | Runs the **real** handler against the configured model and returns `{ ok, prompt, model, parse_ok, finish_reason, raw_sample, parsed, groq_error, failure }`. `?prompt=analyze\|generate\|package`, plus optional `?notes=` and `?modality=`. `failure` is `"groq_error"`, `"parse_error"` or `null` — this is the single call that answers "why is generation not working". Always `200` |
+
+Both are declared **above** the AI guard and need no body. When the AI looks broken, check these before
+blaming the UI: `curl <worker>/ai/models`, then `curl <worker>/ai/health`, then watch
+`npx wrangler tail` while clicking Generate.
 
 ---
 
@@ -461,6 +493,10 @@ This migration does **not** cover `practice_package` (written by the Worker) and
 `session_versions` — both exist only in the live database. Add further migrations to
 `supabase/migrations/` rather than editing this file.
 
+`supabase/migrations/20260914_worksheet_submissions.sql` adds `worksheet_submissions`
+(`client_id`, `session_id`, `answers` jsonb, `created_at` + indexes) which backs
+`POST /client/worksheet`. Run it in the Supabase SQL editor before that route can persist anything.
+
 ### 6.3 JSON payload shapes stored on `sessions`
 
 | Column | Shape |
@@ -480,7 +516,7 @@ All AI output is produced inside `backend/CloudFlare.js` via Groq's OpenAI-compa
 | Setting | Value |
 | --- | --- |
 | Endpoint | `https://api.groq.com/openai/v1/chat/completions` |
-| Model | `llama-3.1-8b-instant` (constant `MODEL`) |
+| Model | `env.GROQ_MODEL` (a `wrangler.jsonc` var) falling back to the `MODEL` constant — both currently `openai/gpt-oss-20b`. The Llama 3.x IDs this code originally targeted (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) are now **Enterprise-only** on Groq and return `404 model_not_found` |
 | Auth | `Authorization: Bearer ${env.GROQ_API_KEY}` |
 | Temperature | `0.3` for `/analyze/session`, `0.6` for `/generate/vignette`, `0.5` for `/generate/practice-package` |
 
@@ -497,13 +533,23 @@ modality (where relevant) and the clinician's notes.
 
 ### 7.2 Robustness
 
-- `callGroq` returns `null` on network/HTTP/parse failure and logs `Groq error:`. It never throws, so a
-  Groq outage degrades to placeholder content instead of a `500`.
-- `stripMarkdown` removes ```json fences and any other fenced block before parsing.
+- `callGroq` returns a result object — `{ ok: true, model, content }` or
+  `{ ok: false, model, error: { status, message, raw } }` — and logs
+  `Groq error: GROQ ERROR <status> <message> (model=<id>)`. It never throws. `extractGroqErrorMessage`
+  lifts Groq's own `error.message` out of the body so both the log and the HTTP response carry the real
+  reason (`model_not_found`, `invalid_api_key`, …) instead of a truncated blob.
+- Handlers translate that result: **`502` by default** (`groqFailureResponse`) or, with
+  `?allowDegraded=1`, a `200` placeholder payload tagged `degraded: true` + `warning`
+  (`degradedGroqPayload`). The router recognises the failure by checking for a `Response` and returns it
+  **before** any persistence runs.
+- `stripMarkdown` **unwraps** a fenced ```json block instead of deleting it. Deleting was the cause of a
+  real incident: any model that fenced its JSON had the answer thrown away, and the handler silently
+  served the placeholder as if it were the formulation. Bare and prose-wrapped JSON both parse.
 - `extractJsonObject` slices from the first `{` to the last `}` and `JSON.parse`s it, returning `null`
   when that fails.
-- Every handler therefore has hard-coded fallbacks: `"Clinical synthesis unavailable."` for the
-  rationale, `"Scenario unavailable."` or a default `Practice Scenario` object for scenarios.
+- Hard-coded fallbacks (`"Clinical synthesis unavailable."`, `"Scenario unavailable."`, the default
+  `Practice Scenario` object) are now used for unparseable *successful* completions and for the
+  `?allowDegraded=1` path — not for the default `502` path.
 
 ### 7.3 Persistence side effects
 
@@ -696,10 +742,12 @@ Runtime configuration (set as Worker secrets/vars — **never** commit the value
 | `SUPABASE_ANON_KEY` | GoTrue signup/login/user calls |
 | `SUPABASE_SERVICE_ROLE_KEY` | All PostgREST reads/writes |
 | `GROQ_API_KEY` | AI routes |
+| `GROQ_MODEL` | **A plain var, not a secret** (`wrangler.jsonc` `vars`) — the Groq model ID; overrides the `MODEL` constant. Change this, not the code, whenever Groq retires a model |
+| `GROQ_MAX_TOKENS` | Optional plain var — when set it is sent as `max_tokens`, so a long model preamble cannot truncate the JSON. Unset by default (no such parameter is sent, so nothing can break on a model that rejects it) |
 
 Locally, Wrangler reads these from a `.dev.vars` file; in production use
-`npx wrangler secret put <NAME>`. `.dev.vars` is **not** covered by `.gitignore` — add it before you
-create one.
+`npx wrangler secret put <NAME>`. `.dev.vars` (like `.wrangler/`) is covered by `.gitignore`, so a local
+secrets file cannot be committed by accident.
 
 ### 10.4 MCP gateway Worker (`alice-mcp`)
 
@@ -713,10 +761,12 @@ It has its own `wrangler.toml` with the `BACKEND` service binding, so it must be
 `clinical-ai-backend` and against the same Cloudflare account.
 
 > ⚠ **Security — read before touching this file.** `workers/mcp-gateway/wrangler.toml` is committed and
-> its `[vars]` block contains the live Supabase project URL **and a service-role JWT**. That key is in
-> git history and bypasses row-level security entirely. Rotate it in the Supabase dashboard, move the
-> value to `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY` (or `.dev.vars`), remove it from the
-> file, and purge it from history. Never write the value into documentation or code.
+> its `[vars]` block still carries the live Supabase project URL. The `SUPABASE_SERVICE_ROLE_KEY` value
+> that used to sit here was a `service_role` JWT that bypasses row-level security entirely; it has been
+> removed from the working tree (along with the stray `workers/mcp-gateway/Untitled` copy), **but it
+> remains in git history**. Rotate it in the Supabase dashboard, then set the new value with
+> `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name alice-mcp` (or a local `.dev.vars`). Never
+> write the value into documentation or code.
 
 ### 10.5 Database
 
@@ -818,21 +868,16 @@ local development, but several are user-visible or security-relevant.
 
 | Item | Detail |
 | --- | --- |
-| **Committed service-role key** | `workers/mcp-gateway/wrangler.toml` `[vars]` contains the Supabase project URL and a live `service_role` JWT, and the file is tracked by git. Rotate the key, move it to a Worker secret, and purge it from history (§10.4) |
+| **Committed service-role key (rotate it)** | A live `service_role` JWT was committed in `workers/mcp-gateway/wrangler.toml` `[vars]`, plus a stray `workers/mcp-gateway/Untitled` copy. Both are now gone from the working tree and `git grep eyJhbGciOi` is clean, but the value is still in git history — **rotate it in Supabase** and re-set it with `wrangler secret put` (§10.4) |
 | **No API authentication** | Every Worker route except `GET /auth/me` is open, CORS is `*`, and the Worker uses its service-role key regardless of the caller. Anyone who knows the Worker URL can read or mutate any client, case or session — including deleting them. The `alice_token` check is client-side only and provides no protection |
 | **Unauthenticated client pages** | `/homework/:sessionId` and `/practice/:sessionId` require no token; knowing (or guessing) a session UUID is the only gate. There are no signed or expiring links |
-| **Tracked Wrangler state** | `.wrangler/state/v3/**` (miniflare cache SQLite files) and `backend/.wrangler/cache/cf.json` are committed |
-| **`.dev.vars` not ignored** | `.gitignore` covers `.env*.local` but not Wrangler's `.dev.vars`, the file that will hold the same secrets |
+| **`POST /client/worksheet` is unauthenticated** | The submissions route is open like the rest of the API and trusts `clientId` from the body, so it needs the same ownership check as the rest of the surface |
 
 ### 13.2 Correctness bugs to fix
 
 | Area | Problem |
 | --- | --- |
-| `PATCH /clients/:id` | Requires `{ name }` but writes `first_name`, `middle_name`, `last_name`, `email`, `country_code`, `phone_number` — mapping absent keys to `null`. `renameClient` sends only `{ name }`, so renaming a client silently blanks its contact details and never persists the new name |
-| `POST /clients` | Ignores a `name` field. `useClientNavStore.createClient(name)` sends `{ name }`, producing rows whose name columns are all null and whose display name becomes `Client <first 6 of id>` |
-| `clients.full_name` | Read by `/clients` and `/client/:id` but never written by the Worker, so it must be a generated column/trigger in Supabase — undocumented and un-migrated in-repo |
-| `components/client-view.tsx` | Calls `GET /client/history?clientId=…` and `POST /client/worksheet`, neither of which exists in the Worker. The materials list therefore 404s, and submissions hit the `Missing sessionNotes` guard. The Client view is effectively non-functional until those routes land |
-| `sessions.client_id` | `createSession` sends `{ caseId }` only, so new sessions can have a `NULL` `client_id` even though the column is written when supplied |
+| `sessions.client_id` | `createSession` sends `{ caseId }` only, so new sessions can have a `NULL` `client_id` even though the column is written when supplied. `GET /client/history` works around this by joining through `case_formulations`; `GET /sessions?clientId=…` (used by the History tab) does not, so it stays empty for such sessions |
 | `/forgot-password` | "Send Reset Link" only shows `alert("Reset password functionality will be connected next.")` — no GoTrue recovery call |
 | `/client-login` | Accepts credentials, then simply `router.push(redirect)`. It authenticates nothing |
 | `session-history-panel.tsx` | Declares `riskFlags?: string[]` while `analysis.riskFlags` entries are objects (`{ label, severity, confidence, evidence }`); nothing currently renders this component against real data |
@@ -865,17 +910,19 @@ local development, but several are user-visible or security-relevant.
 | Two lockfiles | `package-lock.json` and `pnpm-lock.yaml` are both tracked |
 | No Gradle wrapper | `gradlew` and `gradle/wrapper/` are absent; a local Gradle install is required |
 | Launch config port | `.vscode/launch.json` targets `http://localhost:8080` while `next dev` serves `3000` |
-| No `.dev.vars` ignore | See §13.1 |
 
 ### 13.5 Suggested order of attack
 
-1. Rotate the committed Supabase service-role key and remove it from `wrangler.toml`; add `.dev.vars`
-   and `.wrangler/` to `.gitignore`.
-2. Fix `PATCH /clients/:id` (rename vs. contact update) and make `POST /clients` accept/derive a name.
-3. Add the missing Worker routes the Client view needs (`GET /client/history`, `POST /client/worksheet`)
-   or point the view at existing ones.
-4. Decide on one client state model and delete the other.
-5. Introduce lint/type/test gates in CI, then delete the dead code listed in §13.3.
+1. Rotate the committed Supabase service-role key (**outstanding** — the value also exists in git
+   history) and re-set it with `wrangler secret put`; `.wrangler/` and `.dev.vars` are now git-ignored.
+2. `PATCH /clients/:id` rename-vs-contact handling and `POST /clients` name support — done (§5.2).
+3. `GET /client/history` and `POST /client/worksheet` — done (§5.2, §6.2; the migration still has to be
+   run in Supabase).
+4. `/client-login` no longer breaks `npm run build` (its `useSearchParams` call is wrapped in `Suspense`).
+5. Decide on one client state model and delete the other.
+6. Introduce lint/type/test gates in CI, then delete the dead code listed in §13.3.
+7. The Groq model is now a `GROQ_MODEL` var rather than a code constant (§7). Llama 3.x IDs are
+   Enterprise-only, so watch `/ai/models` and bump the var when Groq retires whatever is configured.
 
 ---
 

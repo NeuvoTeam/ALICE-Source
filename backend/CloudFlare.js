@@ -1,6 +1,8 @@
 // @ts-nocheck
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-const MODEL = "llama-3.1-8b-instant"
+const GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
+/** Last-resort default. `env.GROQ_MODEL` (wrangler.jsonc var) always wins. */
+const MODEL = "openai/gpt-oss-20b"
 
 export default {
   async fetch(request, env) {
@@ -236,30 +238,19 @@ if (method === "GET" && cleanPath === "/auth/me") {
       if (method === "POST" && cleanPath === "/clients") {
         const body = await safeJson(request)
 
-        // ✅ Use provided name OR fallback
-        
+        const payload = buildClientPayload(body, true)
 
-        const res = await fetch(`${SUPABASE_URL}/clients`, {
-  method: "POST",
-  headers: HEADERS,
-  body: JSON.stringify({
-  first_name: body.first_name || null,
-  middle_name: body.middle_name || null,
-  last_name: body.last_name || null,
-  email: body.email || null,
-  country_code: body.country_code || null,
-  phone_number: body.phone_number || null,
-}),
-})
-
-        if (!res.ok) {
-          const text = await res.text()
-          throw new Error(text)
+        if (!Object.keys(payload).length) {
+          return respond(
+            { error: "Missing client details (name or contact fields)" },
+            cors,
+            400
+          )
         }
 
-        const data = await res.json()
+        const row = await writeClientRow(SUPABASE_URL, HEADERS, "POST", null, payload)
 
-        return respond(data?.[0] || data, cors)
+        return respond(row, cors)
       }
 
 
@@ -387,27 +378,21 @@ if (method === "GET" && cleanPath === "/auth/me") {
           const id = path.split("/")[2]
           const body = await safeJson(request)
 
-          if (!body?.name) {
-            return respond({ error: "Missing name" }, cors, 400)
+          if (!id) {
+            return respond({ error: "Missing clientId" }, cors, 400)
           }
 
-          const res = await fetch(
-            `${SUPABASE_URL}/clients?id=eq.${id}`,
-            {
-              method: "PATCH",
-              headers: HEADERS,
-              body: JSON.stringify({
-  first_name: body.first_name || null,
-  middle_name: body.middle_name || null,
-  last_name: body.last_name || null,
-  email: body.email || null,
-  country_code: body.country_code || null,
-  phone_number: body.phone_number || null,
-}),
-            }
-          )
+          const payload = buildClientPayload(body, true)
 
-          if (!res.ok) throw new Error(await res.text())
+          if (!Object.keys(payload).length) {
+            return respond(
+              { error: "No client fields to update" },
+              cors,
+              400
+            )
+          }
+
+          await writeClientRow(SUPABASE_URL, HEADERS, "PATCH", id, payload)
 
           return respond({ success: true }, cors)
         }
@@ -563,6 +548,39 @@ if (method === "GET" && cleanPath === "/auth/me") {
         return respond(formatSessionRow(row), cors)
       }
       /*=========================
+          ✅ /client/history (materials assigned to one client)
+      =========================*/
+      if (method === "GET" && cleanPath === "/client/history") {
+        const clientId = url.searchParams.get("clientId")
+
+        if (!clientId) {
+          return respond({ error: "Missing clientId" }, cors, 400)
+        }
+
+        // Sessions hang off cases and `sessions.client_id` is often NULL, so join via cases.
+        const res = await fetch(
+          `${SUPABASE_URL}/case_formulations?client_id=eq.${clientId}&select=id,name,sessions(${SESSION_FULL_SELECT})`,
+          { headers: HEADERS }
+        )
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const cases = await res.json()
+
+        const materials = (Array.isArray(cases) ? cases : [])
+          .flatMap((c) =>
+            (c.sessions || []).map((s) => ({ ...s, name: s.name || c.name }))
+          )
+          .filter((s) => s.vignette || s.practice_package)
+          .map(formatClientMaterial)
+          .sort((a, b) =>
+            String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+          )
+
+        return respond(materials, cors)
+      }
+
+      /*=========================
           ✅ /client/:id (single client tree)
       =========================*/
       if (method === "GET" && cleanPath.startsWith("/client/")) {
@@ -591,6 +609,181 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
 
       /* =========================
+         ✅ CLIENT WORKSHEET SUBMISSION
+         ========================= */
+      if (method === "POST" && cleanPath === "/client/worksheet") {
+        const body = await safeJson(request)
+
+        const clientId = body?.clientId || null
+        const sessionId = body?.sessionId || body?.vignetteId || null
+        const answers = body?.answers || null
+
+        if (!clientId || !answers) {
+          return respond(
+            { error: "Missing clientId or answers" },
+            cors,
+            400
+          )
+        }
+
+        const res = await fetch(`${SUPABASE_URL}/worksheet_submissions`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            client_id: clientId,
+            session_id: sessionId,
+            answers,
+          }),
+        })
+
+        if (!res.ok) throw new Error(await res.text())
+
+        const data = await res.json()
+
+        return respond({ success: true, submission: data?.[0] || null }, cors)
+      }
+
+      /* =========================
+         ✅ AI DIAGNOSTICS
+         ========================= */
+      if (method === "GET" && cleanPath === "/ai/models") {
+        const configured = resolveModel(env)
+
+        const res = await fetch(GROQ_MODELS_URL, {
+          headers: {
+            Authorization: `Bearer ${env.GROQ_API_KEY}`,
+          },
+        })
+
+        const text = await res.text()
+
+        if (!res.ok) {
+          return respond(
+            {
+              ok: false,
+              model: configured,
+              groqStatus: res.status,
+              detail: extractGroqErrorMessage(text),
+            },
+            cors
+          )
+        }
+
+        let data = null
+
+        try {
+          data = JSON.parse(text)
+        } catch {
+          data = null
+        }
+
+        const available = Array.isArray(data?.data)
+          ? data.data.map((m) => m?.id).filter(Boolean)
+          : []
+
+        return respond(
+          {
+            ok: true,
+            model: configured,
+            configuredAvailable: available.includes(configured),
+            count: available.length,
+            available,
+          },
+          cors
+        )
+      }
+
+      if (method === "GET" && cleanPath === "/ai/health") {
+        const model = resolveModel(env)
+
+        const result = await callGroq(
+          [{ role: "user", content: "Reply with the single word: ok" }],
+          env,
+          0
+        )
+
+        if (!result.ok) {
+          return respond(
+            {
+              ok: false,
+              model,
+              groqStatus: result.error.status,
+              detail: result.error.message,
+            },
+            cors
+          )
+        }
+
+        return respond(
+          {
+            ok: true,
+            model,
+            sample: String(result.content).trim().slice(0, 80),
+          },
+          cors
+        )
+      }
+
+      if (method === "GET" && cleanPath === "/ai/probe") {
+        const model = resolveModel(env)
+        const which = url.searchParams.get("prompt") || "analyze"
+        const notes =
+          url.searchParams.get("notes") ||
+          "Client reports low mood and avoids social contact."
+        const modality = url.searchParams.get("modality") || "cbt"
+
+        const debug = {}
+
+        let outcome
+
+        if (which === "generate" || which === "vignette") {
+          outcome = await handleGenerate(
+            notes,
+            modality,
+            env,
+            cors,
+            false,
+            true,
+            debug
+          )
+        } else if (which === "package" || which === "practice-package") {
+          outcome = await handleGeneratePracticePackage(
+            notes,
+            modality,
+            env,
+            cors,
+            false,
+            true,
+            debug
+          )
+        } else {
+          outcome = await handleAnalyze(notes, env, cors, false, true, debug)
+        }
+
+        const groqError = debug.groqError || null
+        const parseOk = Boolean(debug.parsed)
+
+        return respond(
+          {
+            ok: !groqError && parseOk,
+            prompt: which,
+            model: debug.model || model,
+            parse_ok: parseOk,
+            finish_reason: debug.finishReason || null,
+            raw_sample: debug.raw ? String(debug.raw).slice(0, 600) : null,
+            parsed: outcome instanceof Response ? null : outcome,
+            groq_error: groqError,
+            failure: groqError
+              ? "groq_error"
+              : parseOk
+                ? null
+                : "parse_error",
+          },
+          cors
+        )
+      }
+
+      /* =========================
    ✅ AI ROUTES
    ========================= */
 if (method === "POST") {
@@ -604,6 +797,10 @@ if (method === "POST") {
     )
   }
 
+  // Default: fail loudly (502 + readable `detail`) when Groq is unavailable.
+  // `?allowDegraded=1` restores the legacy 200 + placeholder payload + `degraded: true`.
+  const allowDegraded = url.searchParams.get("allowDegraded") === "1"
+
   /* =========================
      ANALYZE SESSION
      ========================= */
@@ -612,8 +809,12 @@ if (method === "POST") {
       body.sessionNotes,
       env,
       cors,
-      false
+      false,
+      allowDegraded
     )
+
+    // A Response means the handler failed: 502, or a degraded 200 when flagged.
+    if (analysis instanceof Response) return analysis
 
     if (body.sessionId) {
       await persistSessionFields(
@@ -653,8 +854,12 @@ if (method === "POST") {
       modality,
       env,
       cors,
-      false
+      false,
+      allowDegraded
     )
+
+    // A Response means the handler failed: 502, or a degraded 200 when flagged.
+    if (generated instanceof Response) return generated
 
     if (body.sessionId) {
       await persistSessionFields(
@@ -701,8 +906,12 @@ if (method === "POST") {
         modality,
         env,
         cors,
-        false
+        false,
+        allowDegraded
       )
+
+    // A Response means the handler failed: 502, or a degraded 200 when flagged.
+    if (generated instanceof Response) return generated
 
     if (body.sessionId) {
       await persistSessionFields(
@@ -849,6 +1058,113 @@ async function patchSessionRow(sessionId, patch, supabaseUrl, headers) {
   return data?.[0] || latest
 }
 
+/* =========================
+   ✅ CLIENT FIELD HELPERS
+========================= */
+const CLIENT_WRITE_KEYS = [
+  "first_name",
+  "middle_name",
+  "last_name",
+  "email",
+  "country_code",
+  "phone_number",
+]
+
+/** "Anna Maria Lopez" -> { first_name: "Anna", middle_name: "Maria", last_name: "Lopez" } */
+function splitClientName(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (!parts.length) {
+    return { first_name: null, middle_name: null, last_name: null }
+  }
+
+  if (parts.length === 1) {
+    return { first_name: parts[0], middle_name: null, last_name: null }
+  }
+
+  return {
+    first_name: parts[0],
+    middle_name: parts.length > 2 ? parts.slice(1, -1).join(" ") : null,
+    last_name: parts[parts.length - 1],
+  }
+}
+
+function isGeneratedColumnError(text) {
+  return (
+    typeof text === "string" &&
+    (text.includes("428C9") || /generated|non-DEFAULT/i.test(text))
+  )
+}
+
+/**
+ * Accepts either the discrete contact fields or a single `name`
+ * (split into first/middle/last). `full_name` is included when a name is
+ * supplied because the Worker only ever reads it — if it turns out to be a
+ * generated column (or missing), writeClientRow retries without it.
+ */
+function buildClientPayload(body, includeFullName = false) {
+  const payload = {}
+
+  for (const key of CLIENT_WRITE_KEYS) {
+    if (body?.[key] !== undefined) {
+      payload[key] = body[key] || null
+    }
+  }
+
+  const name = typeof body?.name === "string" ? body.name.trim() : ""
+
+  if (name) {
+    const nameFields = splitClientName(name)
+
+    for (const key of Object.keys(nameFields)) {
+      if (!payload[key]) payload[key] = nameFields[key]
+    }
+
+    if (includeFullName) payload.full_name = name
+  }
+
+  return payload
+}
+
+async function writeClientRow(SUPABASE_URL, HEADERS, method, id, payload) {
+  const url = id
+    ? `${SUPABASE_URL}/clients?id=eq.${id}`
+    : `${SUPABASE_URL}/clients`
+
+  let res = await fetch(url, {
+    method,
+    headers: HEADERS,
+    body: JSON.stringify(payload),
+  })
+
+  let text = await res.text()
+
+  if (
+    !res.ok &&
+    payload.full_name !== undefined &&
+    (isGeneratedColumnError(text) || isMissingColumnError(text))
+  ) {
+    const retryPayload = { ...payload }
+    delete retryPayload.full_name
+
+    res = await fetch(url, {
+      method,
+      headers: HEADERS,
+      body: JSON.stringify(retryPayload),
+    })
+    text = await res.text()
+  }
+
+  if (!res.ok) throw new Error(text)
+
+  const data = JSON.parse(text)
+
+  return Array.isArray(data) ? data[0] || null : data
+}
+
 function buildSessionPatch(body) {
   if (!body || typeof body !== "object") return {}
 
@@ -881,6 +1197,32 @@ function buildSessionPatch(body) {
   }
 
   return patch
+}
+
+/**
+ * Shapes a session row into the material list `components/client-view.tsx` renders.
+ */
+function formatClientMaterial(row) {
+  const pkg = row.practice_package || null
+  const scenario = pkg?.scenario || null
+  const quiz = Array.isArray(pkg?.quiz) ? pkg.quiz : []
+  const coachTips = Array.isArray(scenario?.coachTips) ? scenario.coachTips : []
+
+  const questions = quiz
+    .map((q) => (typeof q === "string" ? q : q?.question))
+    .filter(Boolean)
+
+  return {
+    id: row.id,
+    title: row.name || scenario?.title || "Practice Materials",
+    content: row.vignette || scenario?.situation || "",
+    scenario: scenario?.situation || row.vignette || "",
+    skill: coachTips.join("\n"),
+    reflection: questions.join("\n"),
+    worksheetQuestions: questions,
+    createdAt: row.created_at || null,
+    modality: row.modality || null,
+  }
 }
 
 function formatSessionRow(row) {
@@ -935,7 +1277,14 @@ async function persistSessionFields(sessionId, fields, env) {
   }
 }
 
-async function handleAnalyze(input, env, cors, wrapResponse = true) {
+async function handleAnalyze(
+  input,
+  env,
+  cors,
+  wrapResponse = true,
+  allowDegraded = false,
+  debug = null
+) {
 
   const messages = [
     {
@@ -968,12 +1317,40 @@ Rules:
     { role: "user", content: input }
   ]
 
-  const raw = await callGroq(messages, env, 0.3)
-  const cleaned = stripMarkdown(raw)
-  const parsed = extractJsonObject(cleaned)
+  const result = await callGroq(messages, env, 0.3)
+
+  if (debug) captureDebug(debug, result)
+
+  const fallback = {
+    rationale: "Clinical synthesis unavailable.",
+    inferredModality: "cbt",
+    riskFlags: [],
+  }
+
+  if (!result.ok) {
+    if (wrapResponse || allowDegraded) {
+      return respond(degradedGroqPayload(fallback, result), cors)
+    }
+
+    return groqFailureResponse(result, cors)
+  }
+
+  const parsed = extractJsonObject(stripMarkdown(result.content))
+
+  if (debug) debug.parsed = parsed
+
+  if (!parsed) {
+    return unparseableAiResponse(
+      result.content,
+      fallback,
+      result,
+      cors,
+      wrapResponse || allowDegraded
+    )
+  }
 
   const payload = {
-    rationale: parsed?.rationale || "Clinical synthesis unavailable.",
+    rationale: parsed?.rationale || fallback.rationale,
     inferredModality: (parsed?.inferredModality || "CBT").toLowerCase(),
     riskFlags: parsed?.riskFlags || [],
   }
@@ -986,7 +1363,15 @@ Rules:
 /* ===============================
    ✅ GENERATE (UNCHANGED SAFE)
    =============================== */
-async function handleGenerate(input, modality, env, cors, wrapResponse = true) {
+async function handleGenerate(
+  input,
+  modality,
+  env,
+  cors,
+  wrapResponse = true,
+  allowDegraded = false,
+  debug = null
+) {
 
   const messages = [
     {
@@ -1028,12 +1413,40 @@ ${input}
     }
   ]
 
-  const raw = await callGroq(messages, env, 0.6)
-  const cleaned = stripMarkdown(raw)
-  const parsed = extractJsonObject(cleaned)
+  const result = await callGroq(messages, env, 0.6)
+
+  if (debug) captureDebug(debug, result)
+
+  const fallback = {
+    scenario: "Scenario unavailable.",
+    quiz: [],
+    homework: [],
+  }
+
+  if (!result.ok) {
+    if (wrapResponse || allowDegraded) {
+      return respond(degradedGroqPayload(fallback, result), cors)
+    }
+
+    return groqFailureResponse(result, cors)
+  }
+
+  const parsed = extractJsonObject(stripMarkdown(result.content))
+
+  if (debug) debug.parsed = parsed
+
+  if (!parsed) {
+    return unparseableAiResponse(
+      result.content,
+      fallback,
+      result,
+      cors,
+      wrapResponse || allowDegraded
+    )
+  }
 
   const payload = {
-    scenario: parsed?.scenario || "Scenario unavailable.",
+    scenario: parsed?.scenario || fallback.scenario,
     quiz: parsed?.quiz || [],
     homework: parsed?.homework || [],
   }
@@ -1047,7 +1460,9 @@ async function handleGeneratePracticePackage(
   modality,
   env,
   cors,
-  wrapResponse = true
+  wrapResponse = true,
+  allowDegraded = false,
+  debug = null
 ) {
   const messages = [
     {
@@ -1109,28 +1524,56 @@ ${input}
     }
   ]
 
-  const raw = await callGroq(
+  const result = await callGroq(
     messages,
     env,
     0.5
   )
 
-  const cleaned = stripMarkdown(raw)
-  const parsed = extractJsonObject(cleaned)
+  if (debug) captureDebug(debug, result)
+
+  const fallback = {
+    homework: [],
+
+    scenario: {
+      title: "Practice Scenario",
+      difficulty: "medium",
+      situation: "Practice applying therapy skills.",
+      objectives: [],
+      coachTips: [],
+    },
+
+    quiz: [],
+  }
+
+  if (!result.ok) {
+    if (wrapResponse || allowDegraded) {
+      return respond(degradedGroqPayload(fallback, result), cors)
+    }
+
+    return groqFailureResponse(result, cors)
+  }
+
+  const parsed = extractJsonObject(stripMarkdown(result.content))
+
+  if (debug) debug.parsed = parsed
+
+  if (!parsed) {
+    return unparseableAiResponse(
+      result.content,
+      fallback,
+      result,
+      cors,
+      wrapResponse || allowDegraded
+    )
+  }
 
   const payload = {
     homework:
       parsed?.homework || [],
 
     scenario:
-      parsed?.scenario || {
-        title: "Practice Scenario",
-        difficulty: "medium",
-        situation:
-          "Practice applying therapy skills.",
-        objectives: [],
-        coachTips: [],
-      },
+      parsed?.scenario || fallback.scenario,
 
     quiz:
       parsed?.quiz || [],
@@ -1143,9 +1586,36 @@ ${input}
   return respond(payload, cors)
 }
 /* ===============================
-   ✅ GROQ CALL (SAFE + DEBUG)
+   ✅ GROQ CALL (RESULT OBJECT)
    =============================== */
+/** `env.GROQ_MODEL` (wrangler var) wins; `MODEL` is the fallback. */
+function resolveModel(env) {
+  return env?.GROQ_MODEL || MODEL
+}
+
+/** Pull the human-readable reason out of a Groq error body. */
+function extractGroqErrorMessage(text) {
+  try {
+    const parsed = JSON.parse(text)
+    const message = parsed?.error?.message || parsed?.message
+
+    if (typeof message === "string" && message.trim()) {
+      return message.trim()
+    }
+  } catch {
+    /* not JSON — fall through */
+  }
+
+  const fallback = String(text || "").trim()
+
+  if (!fallback) return "Groq request failed"
+
+  return fallback.length > 300 ? `${fallback.slice(0, 300)}…` : fallback
+}
+
 async function callGroq(messages, env, temperature = 0.4) {
+  const model = resolveModel(env)
+
   try {
     const res = await fetch(GROQ_API_URL, {
       method: "POST",
@@ -1154,43 +1624,181 @@ async function callGroq(messages, env, temperature = 0.4) {
         Authorization: `Bearer ${env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         messages,
         temperature,
+        ...(env?.GROQ_MAX_TOKENS
+          ? { max_tokens: Number(env.GROQ_MAX_TOKENS) }
+          : {}),
       }),
     })
 
     const text = await res.text()
 
     if (!res.ok) {
-      const text = await res.text()
-      throw new Error(`GROQ ERROR: ${text}`)
+      const message = extractGroqErrorMessage(text)
+
+      console.error(
+        `Groq error: GROQ ERROR ${res.status} ${message} (model=${model})`
+      )
+
+      return {
+        ok: false,
+        model,
+        error: { status: res.status, message, raw: text },
+      }
     }
 
     let parsed
+
     try {
       parsed = JSON.parse(text)
     } catch {
-      return null
+      console.error(`Groq error: non-JSON response (model=${model})`)
+
+      return {
+        ok: false,
+        model,
+        error: {
+          status: 502,
+          message: "Groq returned a non-JSON response",
+          raw: text,
+        },
+      }
     }
 
-    return parsed?.choices?.[0]?.message?.content || null
+    const choice = parsed?.choices?.[0]
+    const content = choice?.message?.content || null
+    const finishReason = choice?.finish_reason || null
 
+    if (finishReason === "length") {
+      console.warn(
+        `Groq warning: completion hit the token limit (model=${model})`
+      )
+    }
+
+    if (!content) {
+      console.error(
+        `Groq error: empty completion (model=${model}, finish_reason=${finishReason})`
+      )
+
+      return {
+        ok: false,
+        model,
+        error: {
+          status: 502,
+          message: `Groq returned an empty completion (finish_reason=${finishReason})`,
+          raw: text,
+        },
+      }
+    }
+
+    return { ok: true, model, content, finishReason }
   } catch (err) {
     console.error("Groq error:", err)
-    return null
+
+    return {
+      ok: false,
+      model,
+      error: {
+        status: 502,
+        message: err?.message || "Groq request failed",
+        raw: null,
+      },
+    }
   }
+}
+
+/* ===============================
+   ✅ AI FAILURE ENVELOPES
+   =============================== */
+function groqFailureResponse(result, cors) {
+  return respond(
+    {
+      error: "AI unavailable",
+      code: "GROQ_ERROR",
+      detail: result.error.message,
+      groqStatus: result.error.status,
+      model: result.model,
+    },
+    cors,
+    502
+  )
+}
+
+function degradedGroqPayload(fallback, result) {
+  return {
+    ...fallback,
+    degraded: true,
+    warning: result.error.message,
+    model: result.model,
+  }
+}
+
+/** Fills the optional `debug` object used by GET /ai/probe. */
+function captureDebug(debug, result) {
+  debug.model = result.model
+  debug.raw = result.ok ? result.content : null
+  debug.finishReason = result.ok ? result.finishReason || null : null
+  debug.groqError = result.ok ? null : result.error
+}
+
+/**
+ * Groq answered, but the content was not usable JSON. Treated like a Groq
+ * failure so a placeholder can never be presented as a real formulation.
+ */
+function unparseableAiResponse(content, fallback, result, cors, degrade) {
+  const sample = String(content || "").slice(0, 300)
+  const message = "The model returned content that could not be parsed as JSON"
+
+  console.error(
+    `Groq parse error: ${message} (model=${result.model}) sample=${JSON.stringify(sample)}`
+  )
+
+  if (degrade) {
+    return respond(
+      {
+        ...degradedGroqPayload(fallback, {
+          model: result.model,
+          error: { status: 502, message },
+        }),
+        sample,
+      },
+      cors
+    )
+  }
+
+  return respond(
+    {
+      error: "AI unavailable",
+      code: "BAD_AI_RESPONSE",
+      detail: message,
+      sample,
+      model: result.model,
+    },
+    cors,
+    502
+  )
 }
 
 /* ===============================
    ✅ CLEAN MARKDOWN
    =============================== */
+/**
+ * Returns the JSON-bearing text. A fenced block is *unwrapped* — the previous
+ * implementation deleted it, which threw the answer away whenever a model
+ * wrapped its JSON in ```json … ``` and silently produced the placeholder.
+ */
 function stripMarkdown(text) {
   if (!text) return ""
-  return text
-    .replace(/```json[\s\S]*?```/gi, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .trim()
+
+  const fenced = String(text).match(/```(?:json)?\s*([\s\S]*?)```/i)
+
+  if (fenced && fenced[1] && fenced[1].trim()) {
+    return fenced[1].trim()
+  }
+
+  return String(text).replace(/```/g, "").trim()
 }
 
 /* ===============================

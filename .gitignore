@@ -14,3 +14,11 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+
+# Bundled/deployed Worker artifacts (reference copies pulled from Cloudflare)
+backend/deployed/
+*.js.map
+
+# Wrangler local state/cache and local secrets (never commit)
+.wrangler/
+.dev.vars

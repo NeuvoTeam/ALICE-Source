@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ClientLoginPage() {
+function ClientLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -65,5 +65,21 @@ export default function ClientLoginPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function ClientLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="w-full max-w-sm bg-white p-6 rounded-xl shadow text-center text-sm text-gray-500">
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <ClientLoginForm />
+    </Suspense>
   );
 }

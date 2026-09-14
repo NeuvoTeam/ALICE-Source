@@ -43,6 +43,9 @@ interface PracticePackage {
 
 const MODERN_COLOR_SYNTAX_RE = /\b(lab|oklch|oklab|lch)\(|color-mix\(/i
 
+/** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
+const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
+
 let colorScratchEl: HTMLDivElement | null = null
 
 function getColorScratchEl(): HTMLDivElement {
@@ -148,10 +151,13 @@ export default function VignetteGenerator({
 
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
+  const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
 
   const worksheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    setDegradedWarning(null)
+
     const session = useClientNavStore
       .getState()
       .client?.cases.find((c) => c.id === caseId)
@@ -166,7 +172,15 @@ export default function VignetteGenerator({
     }
 
     setSessionInput(session.sessionNotes || "")
-    setAnalysis(session.analysis as AnalysisResult | null)
+
+    const storedAnalysis = session.analysis as AnalysisResult | null
+    setAnalysis(storedAnalysis)
+
+    if (storedAnalysis?.rationale === PLACEHOLDER_RATIONALE) {
+      setDegradedWarning(
+        "This session still holds a placeholder analysis from an earlier failed run — regenerate to replace it."
+      )
+    }
 
     // Try to load practice package if in session (from GET /sessions/:id)
     if (session.practicePackage) {
@@ -223,38 +237,85 @@ export default function VignetteGenerator({
   }
 
   const handleAnalyzeAndGenerate = async () => {
-    if (!sessionInput) return
+    console.log("🚀 GENERATE CLICK", {
+      clientId,
+      caseId,
+      sessionId,
+      step,
+      notesLength: sessionInput.length,
+    })
+
+    if (!sessionInput) {
+      console.warn("⛔ GENERATE BLOCKED: session notes are empty")
+      return
+    }
+
     setIsProcessing(true)
+    setDegradedWarning(null)
     try {
       // 1. Analyze
-      const analyzeRes = await fetch(`${API_BASE}/analyze/session`, {
+      const analyzeUrl = `${API_BASE}/analyze/session`
+      const analyzePayload = {
+        sessionNotes: sessionInput,
+        clientId,
+        sessionId,
+      }
+
+      console.log("➡️ POST", analyzeUrl, analyzePayload)
+
+      const analyzeRes = await fetch(analyzeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionNotes: sessionInput,
-          clientId,
-          sessionId,
-        }),
+        body: JSON.stringify(analyzePayload),
       })
       const analyzeData = await analyzeRes.json()
-      if (!analyzeRes.ok) throw new Error(analyzeData?.error || "Analysis failed")
+
+      console.log("⬅️ RESPONSE", analyzeUrl, analyzeRes.status, analyzeData)
+      if (!analyzeRes.ok) {
+        throw new Error(
+          analyzeData?.detail || analyzeData?.error || "Analysis failed"
+        )
+      }
 
       setAnalysis(analyzeData)
 
+      if (analyzeData?.degraded) {
+        setDegradedWarning(analyzeData.warning || "AI analysis was unavailable.")
+      }
+
       // 2. Generate Practice Package
-      const genRes = await fetch(`${API_BASE}/generate/practice-package`, {
+      const genUrl = `${API_BASE}/generate/practice-package`
+      const genPayload = {
+        sessionNotes: sessionInput,
+        modality: analyzeData?.inferredModality,
+        clientId,
+        sessionId,
+      }
+
+      console.log("➡️ POST", genUrl, genPayload)
+
+      const genRes = await fetch(genUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionNotes: sessionInput,
-          clientId,
-          sessionId,
-        }),
+        body: JSON.stringify(genPayload),
       })
       const genData = await genRes.json()
-      if (!genRes.ok) throw new Error(genData?.error || "Practice package generation failed")
+
+      console.log("⬅️ RESPONSE", genUrl, genRes.status, genData)
+      if (!genRes.ok) {
+        throw new Error(
+          genData?.detail ||
+            genData?.error ||
+            "Practice package generation failed"
+        )
+      }
 
       setPracticePackage(genData)
+
+      if (genData?.degraded) {
+        setDegradedWarning(genData.warning || "AI generation was unavailable.")
+      }
+
       setStep(3)
 
       // 3. Save practice package to session
@@ -262,6 +323,7 @@ export default function VignetteGenerator({
         sessionNotes: sessionInput,
         analysis: analyzeData,
         practicePackage: genData,
+        modality: analyzeData?.inferredModality,
       })
     } catch (err) {
       console.error(err)
@@ -298,6 +360,12 @@ export default function VignetteGenerator({
         <Progress value={step * 33.3} className="h-1.5 mt-6 bg-zinc-100" />
       </CardHeader>
 
+      {degradedWarning && (
+        <div className="mx-8 mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900">
+          ⚠️ AI unavailable: {degradedWarning}
+        </div>
+      )}
+
       <CardContent className="pt-8 px-8 pb-10">
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -333,9 +401,10 @@ export default function VignetteGenerator({
         {step === 2 && (
           <div className="space-y-6 animate-in slide-in-from-right">
             <div className="p-6 rounded-[2rem] bg-blue-50/50 border border-blue-100 text-sm italic font-medium text-blue-900 leading-relaxed">
-              {analysis?.rationale
+              {analysis?.rationale &&
+              analysis.rationale !== PLACEHOLDER_RATIONALE
                 ? `"${analysis.rationale}"`
-                : `"Ready to analyze and generate your practice package."`}
+                : `"No formulation yet — run Analyze & Generate. (An earlier run stored no usable analysis.)"`}
             </div>
             <div className="flex gap-3 pt-4">
               <Button
