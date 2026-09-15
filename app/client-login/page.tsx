@@ -3,11 +3,25 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+/* =========================
+   ✅ SAFE REDIRECT
+========================= */
+// Only same-site relative paths are allowed. Rejects absolute URLs
+// ("https://evil.com"), protocol-relative URLs ("//evil.com") and the backslash
+// variant ("/\evil.com"), all of which would navigate off the app origin.
+function resolveRedirect(target: string | null): string {
+  if (!target) return "/";
+  if (!target.startsWith("/")) return "/";
+  if (target.startsWith("//")) return "/";
+  if (target.includes("\\")) return "/";
+  return target;
+}
+
 function ClientLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = resolveRedirect(searchParams.get("redirect"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
