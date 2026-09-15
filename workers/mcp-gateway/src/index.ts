@@ -3,6 +3,34 @@ export default {
     const url = new URL(req.url);
 
     /* =========================
+       ✅ PRIVATE ROUTE GUARD
+       ========================= */
+    // /debug and /tools/run proxy straight into the service-role backend, so they
+    // require `Authorization: Bearer <env.MCP_TOKEN>`.
+    //
+    // TODO(clinician): provision the token on the `alice-mcp` Worker with
+    //   npx wrangler secret put MCP_TOKEN --name alice-mcp
+    // and send the matching `Authorization` header from every MCP client
+    // (.cursor/config.json, ai-config/mcp.json). Until it is set these routes 404.
+    const isPrivateRoute =
+      url.pathname === "/debug" ||
+      (url.pathname === "/tools/run" && req.method === "POST");
+
+    if (isPrivateRoute) {
+      const expected = env?.MCP_TOKEN;
+      const header = req.headers.get("Authorization") || "";
+      const provided = header.startsWith("Bearer ")
+        ? header.slice("Bearer ".length).trim()
+        : "";
+
+      // Fail closed: with no configured token the route must not appear to exist,
+      // and the 404 is byte-identical to the catch-all so nothing is revealed.
+      if (!expected || provided !== expected) {
+        return notFound();
+      }
+    }
+
+    /* =========================
        ✅ DEBUG ROUTE (SAFE)
        ========================= */
     if (url.pathname === "/debug") {
@@ -171,9 +199,18 @@ export default {
       return new Response("ALICE MCP Gateway running");
     }
 
-    return new Response("Not Found", { status: 404 });
+    return notFound();
   }
 };
+
+/* =========================
+   ✅ 404 HELPER
+   ========================= */
+// Single source of truth for "this route does not exist" so a guarded route and
+// an unknown path are indistinguishable to a caller.
+function notFound() {
+  return new Response("Not Found", { status: 404 });
+}
 
 /* =========================
    ✅ JSON HELPER

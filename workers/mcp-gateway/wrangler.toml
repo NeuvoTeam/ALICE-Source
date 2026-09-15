@@ -10,3 +10,8 @@ services = [
 SUPABASE_URL = "https://kdynsmaleuexcmpvpag.supabase.co"
 # SUPABASE_SERVICE_ROLE_KEY is a secret and must never be committed to this file.
 # Set it with: npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name alice-mcp
+#
+# MCP_TOKEN is also a secret and must never be committed to this file. It gates the
+# /debug and /tools/run routes (see src/index.ts). Set it with:
+#   npx wrangler secret put MCP_TOKEN --name alice-mcp
+# MCP clients must then send: Authorization: Bearer <MCP_TOKEN>
