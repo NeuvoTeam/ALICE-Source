@@ -8,8 +8,38 @@ export default {
   async fetch(request, env) {
 
     
+    /* =========================
+       ✅ CORS (ALLOWLIST)
+       ========================= */
+    // Echo back the request Origin only when it is explicitly allowlisted in
+    // env.ALLOWED_ORIGINS (comma-separated). Anything else gets no CORS header
+    // at all, so the browser blocks the response.
+    //
+    // TODO(clinician): ALLOWED_ORIGINS is not set on the `clinical-ai-backend`
+    // Worker yet. Until it is, browsers get no CORS header and the dashboard
+    // cannot call this Worker. Set it in wrangler.jsonc, e.g.
+    //   "vars": { "GROQ_MODEL": "...", "ALLOWED_ORIGINS": "https://<dashboard-origin>,http://localhost:3000" }
+    const requestOrigin = request.headers.get("Origin")
+
+    const allowedOrigins = String(env.ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+
+    const allowedOrigin =
+      requestOrigin && allowedOrigins.includes(requestOrigin)
+        ? requestOrigin
+        : null
+
     const cors = {
-      "Access-Control-Allow-Origin": "*",
+      // Vary: Origin — this response varies by request Origin, so it must never be
+      // served to a different Origin from a shared cache.
+      ...(allowedOrigin
+        ? {
+            "Access-Control-Allow-Origin": allowedOrigin,
+            "Vary": "Origin",
+          }
+        : {}),
       "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer",
     }
