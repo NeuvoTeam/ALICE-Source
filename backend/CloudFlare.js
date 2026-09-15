@@ -329,6 +329,24 @@ if (method === "GET" && cleanPath === "/auth/me") {
           if (!body?.caseId) {
             return respond({ error: "Missing caseId" }, cors, 400)
           }
+
+          // ✅ Resolve the owning client from the case: callers often send only caseId.
+          const caseRes = await fetch(
+            `${SUPABASE_URL}/case_formulations?id=eq.${encodeURIComponent(body.caseId)}&select=id,client_id`,
+            { headers: HEADERS }
+          )
+
+          if (!caseRes.ok) throw new Error(await caseRes.text())
+
+          const caseRows = await caseRes.json()
+
+          if (!Array.isArray(caseRows) || caseRows.length === 0) {
+            return respond({ error: "Case not found" }, cors, 404)
+          }
+
+          // ✅ The case row is the source of truth for client_id; body.clientId only
+          // covers legacy case rows whose own client_id is null.
+          const clientId = caseRows[0].client_id || body.clientId || null
         
           // ✅ Count existing sessions for this case
           const countRes = await fetch(
@@ -346,7 +364,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
             headers: HEADERS,
             body: JSON.stringify({
               case_id: body.caseId,
-              client_id: body.clientId,
+              client_id: clientId,
               name,
             }),
           })
