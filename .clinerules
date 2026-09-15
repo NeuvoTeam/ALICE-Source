@@ -1,0 +1,21 @@
+# Ponytail Rules for Cline (ALICE Workspace)
+
+## 1. Scope & Execution Discipline
+- **Atomic, Verified Changes:** Work in minimal, reviewable steps. Do not modify files outside the immediate scope.
+- **Never Touch Generated or Vendored Code:** Do not hand-edit files in `components/ui/` (regenerate via shadcn instead). Do not manually edit lockfiles.
+- **No Speculative Implementations:** Per project instructions, never guess the database schema or payload contracts[cite: 1]. Query the MCP gateway (`GET /context`) or read the relevant migration files before implementing database-backed changes[cite: 1].
+- **Single Source of Truth:** Prefer the Zustand store (`stores/useClientNavStore.ts`) over the unused `mindcare-clinical-hierarchy-v1` local storage model[cite: 1].
+
+## 2. Architectural Boundaries & Data Access
+- **Frontend Isolation:** The Next.js frontend must NEVER connect directly to Supabase (`lib/supabase.ts` is an intentional throwing proxy; do not bypass it)[cite: 1]. All browser network calls must route through the Cloudflare Worker via `CLINICAL_AI_API_BASE` (`lib/clinical-ai-api.ts`)[cite: 1].
+- **Worker Route Ordering:** When adding new `POST` handlers to `backend/CloudFlare.js`, always declare them ABOVE the catch-all AI route block (`if (method === "POST")`) to prevent them from being rejected with missing session note errors[cite: 1].
+- **Case Mapping:** Maintain snake_case for Supabase database rows and camelCase for frontend/application state, handling conversions exclusively in normalisation helpers[cite: 1].
+- **Java Layering Rules:** If modifying Java subprojects, adhere strictly to `ARCHITECTURE.md`: `alice-core` must contain pure domain logic with zero IO, no threads, and no dependencies; constructor injection only; no static global state[cite: 1].
+
+## 3. Security & Secrets Management
+- **Zero Secret Commits:** Never commit API keys, service-role tokens, or JWTs[cite: 1]. Use `npx wrangler secret put` for production and local `.dev.vars` for local development[cite: 1].
+- **No Browser Leakage:** `SUPABASE_SERVICE_ROLE_KEY` and `GROQ_API_KEY` must strictly reside on Cloudflare Worker runtimes and never be passed to client-side bundles[cite: 1].
+
+## 4. Verification & Testing
+- **Type Checking:** Run `npx tsc --noEmit` to verify TypeScript integrity, as `next.config.mjs` ignores build errors during standard builds[cite: 1].
+- **Worker Verification:** When debugging AI endpoints, check `GET /ai/models` and `GET /ai/health` before altering frontend code[cite: 1].
