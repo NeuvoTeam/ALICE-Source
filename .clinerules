@@ -19,3 +19,21 @@
 ## 4. Verification & Testing
 - **Type Checking:** Run `npx tsc --noEmit` to verify TypeScript integrity, as `next.config.mjs` ignores build errors during standard builds[cite: 1].
 - **Worker Verification:** When debugging AI endpoints, check `GET /ai/models` and `GET /ai/health` before altering frontend code[cite: 1].
+
+## 5. Anti-Patterns (Explicitly Forbidden)
+
+- **Express/Node middleware:** Do not write `app.use`, `app.get`, `req.body`,
+  `res.status`, `next()`, or middleware chains. This is a Cloudflare Worker
+  using the Web Fetch API only. Use `request.headers.get(...)`,
+  `await request.json()`, and `new Response(...)`.
+- **Invented hooks:** Do not propose hooks like `useLoadClients()`,
+  `useRenameClient()`, or `useSetHierarchy()`. State lives in
+  `stores/useClientNavStore.ts` (Zustand). Access it via the hook or
+  `useClientNavStore.getState()`.
+- **Invented config objects:** Do not propose `config`, `allowedOrigins`,
+  or `authMiddleware` modules. Bindings and secrets live on the `env`
+  parameter of the Worker's `fetch` handler.
+- **Wrong paths:** The gateway is at `workers/mcp-gateway/src/index.ts`.
+  The Worker is at `backend/CloudFlare.js`. The store is at
+  `stores/useClientNavStore.ts`. Do not guess paths — verify with
+  `list_files` before reading.

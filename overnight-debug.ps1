@@ -56,7 +56,7 @@ foreach ($File in $Files) {
         continue
     }
 
-    $Code = Get-Content -Path $File.FullName -Raw
+    $Code = Get-Content -LiteralPath $File.FullName -Raw
     if ([string]::IsNullOrWhiteSpace($Code)) {
         Write-Host "Skipping empty file." -ForegroundColor DarkGray
         continue
@@ -108,7 +108,7 @@ $Fence`ntypescript`n$Code`n$Fence
 
         $ReportContent = "# Audit Report: $($File.Name)`n`nPath: ``$($File.FullName)```n`n" + 
                          $Response.message.content
-        Set-Content -Path $OutputFile -Value $ReportContent -Encoding utf8
+        Set-Content -LiteralPath $OutputFile -Value $ReportContent -Encoding utf8
         Write-Host "Report saved -> $OutputFile" -ForegroundColor Green
     }
     catch {
