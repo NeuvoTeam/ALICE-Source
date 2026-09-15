@@ -443,6 +443,10 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
     const client = get().client
     if (!client) return
   
+    // ✅ 0. Capture the current state so a failed PATCH can be rolled back
+    const previousClient = client
+    const previousClients = get().clients
+
     // ✅ 1. Optimistic UI update
     set({
       client: { ...client, name },
@@ -460,8 +464,12 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       })
   
     } catch (err: any) {
-      // ❌ Optional: rollback if needed
-      set({ error: err.message })
+      // ❌ Roll back the optimistic rename, then surface the failure
+      set({
+        client: previousClient,
+        clients: previousClients,
+        error: err.message,
+      })
     }
   },
   
@@ -469,6 +477,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   renameCase: async (caseId: string, name: string) => {
     const client = get().client
     if (!client) return
+
+    // ✅ Capture the current state so a failed PATCH can be rolled back
+    const previousClient = client
   
     set({
       client: {
@@ -486,7 +497,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ name }),
       })
     } catch (err: any) {
-      set({ error: err.message })
+      // ❌ Roll back the optimistic rename, then surface the failure
+      set({ client: previousClient, error: err.message })
     }
   },
 
@@ -497,6 +509,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   ) => {
     const client = get().client
     if (!client) return
+
+    // ✅ Capture the current state so a failed PATCH can be rolled back
+    const previousClient = client
   
     set({
       client: {
@@ -521,7 +536,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ name }),
       })
     } catch (err: any) {
-      set({ error: err.message })
+      // ❌ Roll back the optimistic rename, then surface the failure
+      set({ client: previousClient, error: err.message })
     }
   },
 
