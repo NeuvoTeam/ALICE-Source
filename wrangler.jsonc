@@ -3,5 +3,8 @@
   "compatibility_date": "2026-06-03",
   "main": "backend/CloudFlare.js",
   "observability": { "enabled": true },
-  "vars": { "GROQ_MODEL": "openai/gpt-oss-20b" }
+  "vars": {
+    "GROQ_MODEL": "openai/gpt-oss-20b",
+    "ALLOWED_ORIGINS": "http://localhost:3000"
+  }
 }
