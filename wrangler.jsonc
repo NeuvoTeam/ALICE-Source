@@ -20,6 +20,9 @@
   // see SESSION_NOTES_MAX_CHARS / SESSION_NOTES_WARN_CHARS in lib/clinical-ai-api.ts.
   "vars": {
     "GROQ_MODEL": "openai/gpt-oss-120b",
-    "ALLOWED_ORIGINS": "http://localhost:3000"
+    "ALLOWED_ORIGINS": "http://localhost:3000",
+    // Origin the signed client links point at (`/homework/:id`, `/practice/:id`).
+    // Falls back to the first ALLOWED_ORIGINS entry when unset.
+    "PUBLIC_APP_URL": "http://localhost:3000"
   }
 }

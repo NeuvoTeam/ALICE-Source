@@ -40,8 +40,19 @@ export default function PracticePage() {
       }
 
       try {
+        // Signed, expiring link (…?exp=…&sig=…): a bare UUID opens nothing now.
+        const params = new URLSearchParams(window.location.search);
+        const link = new URLSearchParams();
+
+        if (params.get("exp")) link.set("exp", params.get("exp") as string);
+        if (params.get("sig")) link.set("sig", params.get("sig") as string);
+
+        const query = link.toString();
+
         const res = await fetch(
-          `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}`,
+          `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}${
+            query ? `?${query}` : ""
+          }`,
           {
             method: "GET",
             cache: "no-store",

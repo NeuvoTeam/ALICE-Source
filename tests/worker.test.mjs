@@ -57,14 +57,45 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "test-only",
   SUPABASE_ANON_KEY: "anon-test-only",
   GROQ_API_KEY: "gsk_test_only",
-  GROQ_MODEL: "openai/gpt-oss-20b",
+  GROQ_MODEL: "openai/gpt-oss-120b",
   ALLOWED_ORIGINS: "http://localhost:3000",
+  PUBLIC_APP_URL: "http://localhost:3000",
+  CLIENT_LINK_SECRET: "test-client-link-secret-0123456789",
 }
 
 const NOTES = "Client reports low mood and avoids social contact."
 
 /** The only token the stubbed Supabase `/auth/v1/user` accepts. */
 const VALID_TOKEN = "Bearer test-token"
+
+/**
+ * Signs a client link exactly as the Worker does (`v1|sessionId|exp`), so the
+ * harness can produce valid, expired and cross-session signatures at will.
+ */
+async function signLink(sessionId, exp, secret = env.CLIENT_LINK_SECRET) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`v1|${sessionId}|${exp}`)
+  )
+
+  const bytes = new Uint8Array(signature)
+  let binary = ""
+
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+const inAnHour = () => Math.floor(Date.now() / 1000) + 3600
 
 const tempDir = await mkdtemp(join(tmpdir(), "alice-worker-test-"))
 const workerFile = join(tempDir, "CloudFlare.mjs")
@@ -615,9 +646,19 @@ async function main() {
   assert.equal(authCalls().length, 0)
   pass("guard: OPTIONS preflight is exempt")
 
-  /* 28. The client link stays zero-friction and loses every clinical field. */
+  /* 28. The client link stays zero-friction, but now needs a SIGNED link, and it
+         still carries none of the clinical fields. */
+  const linkExp = inAnHour()
+  const linkSig = await signLink("session-0001", linkExp)
+
   installFetch([{ content: VALID }])
-  r = await call("GET", "/client-homework/session-0001", null, env, { token: null })
+  r = await call(
+    "GET",
+    `/client-homework/session-0001?exp=${linkExp}&sig=${linkSig}`,
+    null,
+    env,
+    { token: null }
+  )
   assert.equal(r.status, 200)
   assert.equal(authCalls().length, 0, "the client link needs no token")
   assert.deepEqual(Object.keys(r.body).sort(), [
@@ -629,7 +670,7 @@ async function main() {
     "vignette",
   ])
   assert.deepEqual(r.body.practiceHomework, ["Practice task A"])
-  pass("public /client-homework: no token, no notes/analysis/riskFlags")
+  pass("public /client-homework: signed link, no token, no clinical fields")
 
   /* 29. The auth routes stay public, or nobody could ever log in. */
   installFetch([{ content: VALID }])
@@ -643,9 +684,121 @@ async function main() {
   assert.notEqual(r.status, 401)
   assert.equal(authCalls().length, 0, "login must not require a token")
   pass("guard: auth routes remain public")
+
+  /* ===== Priority 3: HMAC-signed, expiring client links ===== */
+
+  /* 29. Only a signed-in clinician can mint a link. */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/client-link/session-0001", null, env, { token: null })
+  assert.equal(r.status, 401)
+  assert.equal(authCalls().length, 0)
+
+  /* 30. The minted link really opens the client page anonymously (round trip). */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/client-link/session-0001")
+  assert.equal(r.status, 200)
+  assert.equal(r.body.ttlDays, 14)
+  assert.match(
+    r.body.homeworkUrl,
+    /^http:\/\/localhost:3000\/homework\/session-0001\?exp=\d+&sig=/
+  )
+  assert.ok(r.body.exp * 1000 > Date.now())
+
+  const minted = new URL(r.body.homeworkUrl)
+
+  installFetch([{ content: VALID }])
+  const roundTrip = await call(
+    "GET",
+    `/client-homework/${minted.pathname.split("/").pop()}${minted.search}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(roundTrip.status, 200, "the minted link must open anonymously")
+  assert.equal(roundTrip.body.sessionId, "sess-1")
+  pass("links: minting is clinician-only and its link opens anonymously")
+
+  /* 31. TTL is clamped, so a leaked mint call cannot create eternal links. */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/client-link/session-0001?ttlDays=9999")
+  assert.equal(r.body.ttlDays, 30)
+  pass("links: ttl clamped to 30 days when 9999 was requested")
+
+  /* 32. Every way of guessing a link must fail — and never touch the database. */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/client-homework/session-0001", null, env, {
+    token: null,
+  })
+  assert.equal(r.status, 403)
+  assert.equal(supabaseCalls().length, 0, "a bare UUID never reaches the data")
+
+  const tamperExp = inAnHour()
+  const tamperSig = await signLink("session-0001", tamperExp)
+  const tampered =
+    tamperSig.slice(0, -1) + (tamperSig.endsWith("A") ? "B" : "A")
+
+  installFetch([{ content: VALID }])
+  r = await call(
+    "GET",
+    `/client-homework/session-0001?exp=${tamperExp}&sig=${tampered}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 403)
+
+  const expiry = Math.floor(Date.now() / 1000) - 60
+  const expiredSig = await signLink("session-0001", expiry)
+
+  installFetch([{ content: VALID }])
+  r = await call(
+    "GET",
+    `/client-homework/session-0001?exp=${expiry}&sig=${expiredSig}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 403)
+
+  const foreignExp = inAnHour()
+  const foreignSig = await signLink("session-0002", foreignExp)
+
+  installFetch([{ content: VALID }])
+  r = await call(
+    "GET",
+    `/client-homework/session-0001?exp=${foreignExp}&sig=${foreignSig}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 403)
+  assert.equal(supabaseCalls().length, 0)
+  pass("links: unsigned, tampered, expired, cross-session are all 403")
+
+  /* 33. A missing secret fails closed — no links at all rather than open ones. */
+  const noSecret = { ...env }
+  delete noSecret.CLIENT_LINK_SECRET
+
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/client-link/session-0001", null, noSecret)
+  assert.equal(r.status, 503)
+
+  const orphanExp = inAnHour()
+  const orphanSig = await signLink("session-0001", orphanExp)
+
+  installFetch([{ content: VALID }])
+  r = await call(
+    "GET",
+    `/client-homework/session-0001?exp=${orphanExp}&sig=${orphanSig}`,
+    null,
+    noSecret,
+    { token: null }
+  )
+  assert.equal(r.status, 403)
+  pass("links: missing CLIENT_LINK_SECRET fails closed")
 }
 
-const TOTAL_CHECKS = 28
+const TOTAL_CHECKS = 32
 
 main()
   .then(() => console.log(`\n${passed}/${TOTAL_CHECKS} checks passed`))

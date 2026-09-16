@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import {
   CheckCircle2,
+  Copy,
   Download,
   Loader2,
   Sparkles,
@@ -159,6 +160,7 @@ export default function VignetteGenerator({
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
+  const [linkStatus, setLinkStatus] = useState<string | null>(null)
 
   const worksheetRef = useRef<HTMLDivElement>(null)
 
@@ -251,6 +253,38 @@ export default function VignetteGenerator({
       pdf.save(`ALICE-practice-package-${clientId}.pdf`)
     } finally {
       setIsExporting(false)
+    }
+  }
+
+  /**
+   * Mints a signed, expiring link for the token-free client pages. The Worker
+   * signs `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so the raw session id
+   * alone no longer opens the client's material.
+   */
+  const handleCopyClientLink = async (which: "homework" | "practice") => {
+    setLinkStatus("Creating link…")
+
+    try {
+      const res = await apiFetch(`${API_BASE}/client-link/${sessionId}`)
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok || !data) {
+        throw new Error(data?.error || "Could not create a client link")
+      }
+
+      const url = which === "homework" ? data.homeworkUrl : data.practiceUrl
+
+      await navigator.clipboard.writeText(url)
+
+      setLinkStatus(
+        `Copied the ${which} link — expires ${new Date(
+          data.expiresAt
+        ).toLocaleDateString()}`
+      )
+    } catch (err) {
+      setLinkStatus(
+        err instanceof Error ? err.message : "Could not create a client link"
+      )
     }
   }
 
@@ -676,6 +710,36 @@ export default function VignetteGenerator({
                 </div>
               )}
             </div>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
+              <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                Client links · signed &amp; expiring
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => handleCopyClientLink("homework")}
+                  className="flex-1 h-11 rounded-xl font-bold"
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Copy homework link
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => handleCopyClientLink("practice")}
+                  className="flex-1 h-11 rounded-xl font-bold"
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Copy practice link
+                </Button>
+              </div>
+
+              {linkStatus && (
+                <div className="text-[11px] font-medium text-zinc-500">
+                  {linkStatus}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <Button
                 variant="outline"

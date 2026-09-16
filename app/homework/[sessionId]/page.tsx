@@ -35,9 +35,20 @@ export default function HomeworkPage() {
       }
 
       try {
-        // Narrow public projection: title/vignette/quiz/homework only — no notes,
-        // no formulation, no risk flags ever reach the client's browser.
-        const url = `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}`;
+        // Signed, expiring link (…?exp=…&sig=…): a bare UUID opens nothing now.
+        // Narrow projection: title/vignette/quiz/homework only — no notes, no
+        // formulation, no risk flags ever reach the client's browser.
+        const params = new URLSearchParams(window.location.search);
+        const link = new URLSearchParams();
+
+        if (params.get("exp")) link.set("exp", params.get("exp") as string);
+        if (params.get("sig")) link.set("sig", params.get("sig") as string);
+
+        const query = link.toString();
+
+        const url = `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}${
+          query ? `?${query}` : ""
+        }`;
 
         console.log("📚 HOMEWORK FETCH:", url);
 
@@ -52,8 +63,10 @@ export default function HomeworkPage() {
         console.log("📚 HOMEWORK RESPONSE:", data);
 
         if (!res.ok) {
+          // A 403 carries the Worker's "link invalid or expired" message.
           throw new Error(
-            `Failed to load session (${res.status})`
+            data?.error ||
+              `Failed to load session (${res.status})`
           );
         }
 

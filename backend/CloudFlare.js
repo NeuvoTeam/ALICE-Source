@@ -42,6 +42,147 @@ async function requireUser(request, env, cors, baseUrl) {
   }
 }
 
+/* ===============================
+   ✅ CLIENT LINK SIGNING (HMAC-SHA256)
+   =============================== */
+/**
+ * The client-facing pages (`/homework/:id`, `/practice/:id`) are deliberately
+ * token-free so a client can open a shared link — which used to mean a raw UUID
+ * was the only secret. Links are now signed and expiring:
+ *
+ *   /homework/<sessionId>?exp=<unixSeconds>&sig=<base64url>
+ *
+ * The signature covers `v1|sessionId|exp`, so a UUID alone opens nothing, the
+ * expiry cannot be extended without the secret, and a link cannot be replayed
+ * against a different session.
+ *
+ * `CLIENT_LINK_SECRET` is a Worker secret (never committed). It is *trimmed* on
+ * read, so a trailing newline captured by `wrangler secret put` from a piped
+ * value cannot desynchronise signing from verification.
+ */
+const CLIENT_LINK_DEFAULT_TTL_DAYS = 14
+const CLIENT_LINK_MAX_TTL_DAYS = 30
+
+function clientLinkSecret(env) {
+  const raw = String(env?.CLIENT_LINK_SECRET || "").trim()
+
+  return raw.length >= 16 ? raw : null
+}
+
+/** Where the client pages are served; falls back to the allowlisted app origin. */
+function publicAppBase(env) {
+  const configured = String(env?.PUBLIC_APP_URL || "").trim()
+
+  if (configured) return configured.replace(/\/+$/, "")
+
+  const first = String(env?.ALLOWED_ORIGINS || "").split(",")[0].trim()
+
+  return first ? first.replace(/\/+$/, "") : ""
+}
+
+function base64UrlFromBytes(bytes) {
+  const view = new Uint8Array(bytes)
+  let binary = ""
+
+  for (let i = 0; i < view.length; i++) {
+    binary += String.fromCharCode(view[i])
+  }
+
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+function base64UrlToBytes(value) {
+  const padded =
+    value.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (value.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
+  return bytes
+}
+
+function clientLinkMessage(sessionId, exp) {
+  return `v1|${sessionId}|${exp}`
+}
+
+async function hmacClientLinkKey(secret, usage) {
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    [usage]
+  )
+}
+
+async function signClientLink(sessionId, exp, secret) {
+  const key = await hmacClientLinkKey(secret, "sign")
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(clientLinkMessage(sessionId, exp))
+  )
+
+  return base64UrlFromBytes(signature)
+}
+
+/**
+ * `{ ok, reason }`. Uses `crypto.subtle.verify`, which is constant-time — a
+ * hand-rolled string comparison here would leak the signature byte by byte.
+ */
+async function verifyClientLink(sessionId, searchParams, env) {
+  const secret = clientLinkSecret(env)
+
+  if (!secret) {
+    console.error(
+      "CLIENT_LINK_SECRET missing or too short — client links are disabled"
+    )
+
+    return { ok: false, reason: "not_configured" }
+  }
+
+  const expRaw = searchParams.get("exp")
+  const sig = searchParams.get("sig")
+
+  if (!expRaw || !sig) return { ok: false, reason: "missing" }
+
+  const exp = Number(expRaw)
+
+  if (!Number.isInteger(exp)) return { ok: false, reason: "missing" }
+
+  if (exp * 1000 <= Date.now()) return { ok: false, reason: "expired" }
+
+  try {
+    const key = await hmacClientLinkKey(secret, "verify")
+
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(sig),
+      new TextEncoder().encode(clientLinkMessage(sessionId, exp))
+    )
+
+    return valid ? { ok: true, exp } : { ok: false, reason: "bad_signature" }
+  } catch {
+    return { ok: false, reason: "bad_signature" }
+  }
+}
+
+function clientLinkTtlDays(value) {
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return CLIENT_LINK_DEFAULT_TTL_DAYS
+  }
+
+  return Math.min(Math.floor(parsed), CLIENT_LINK_MAX_TTL_DAYS)
+}
+
 export default {
   async fetch(request, env) {
 
@@ -556,6 +697,55 @@ if (method === "GET" && cleanPath === "/auth/me") {
         }
 
       /* =========================
+         ✅ MINT CLIENT LINK (clinician only)
+         ========================= */
+      // Issues the signed, expiring link for the token-free client pages. This
+      // path is NOT in the public list above, so it is behind `requireUser`:
+      // only a signed-in clinician can produce a link.
+      if (method === "GET" && cleanPath.startsWith("/client-link/")) {
+        const sessionId = cleanPath.split("/")[2]
+
+        if (!sessionId || sessionId.length < 10) {
+          return respond({ error: "Invalid session ID" }, cors, 400)
+        }
+
+        const secret = clientLinkSecret(env)
+
+        if (!secret) {
+          return respond({ error: "Client links are not configured" }, cors, 503)
+        }
+
+        const base = publicAppBase(env)
+
+        if (!base) {
+          return respond({ error: "PUBLIC_APP_URL is not configured" }, cors, 500)
+        }
+
+        const row = await fetchSessionRow(sessionId, SUPABASE_URL, HEADERS)
+
+        if (!row) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+
+        const ttlDays = clientLinkTtlDays(url.searchParams.get("ttlDays"))
+        const exp = Math.floor(Date.now() / 1000) + ttlDays * 86400
+        const sig = await signClientLink(sessionId, exp, secret)
+        const query = `exp=${exp}&sig=${encodeURIComponent(sig)}`
+
+        return respond(
+          {
+            sessionId,
+            ttlDays,
+            exp,
+            expiresAt: new Date(exp * 1000).toISOString(),
+            homeworkUrl: `${base}/homework/${sessionId}?${query}`,
+            practiceUrl: `${base}/practice/${sessionId}?${query}`,
+          },
+          cors
+        )
+      }
+
+      /* =========================
       ✅ CLIENT HOMEWORK ROUTE (MERGED)
       ========================= */
     if (method === "GET" && cleanPath.startsWith("/client-homework/")) {
@@ -563,6 +753,23 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
       if (!sessionId || sessionId.length < 10) {
         return respond({ error: "Invalid session ID" }, cors, 400)
+      }
+
+      const link = await verifyClientLink(sessionId, url.searchParams, env)
+
+      if (!link.ok) {
+        console.warn(
+          `Client link rejected (${link.reason}) for ${String(sessionId).slice(0, 8)}…`
+        )
+
+        return respond(
+          {
+            error:
+              "This link is invalid or has expired. Please ask your clinician for a new one.",
+          },
+          cors,
+          403
+        )
       }
 
       const row = await fetchSessionRow(sessionId, SUPABASE_URL, HEADERS)
