@@ -2771,16 +2771,13 @@ async function saveSessionVersion(
       vignette: fields.vignette || null,
       homework: fields.homework || [],
       quiz: fields.quiz || [],
-
-      practice_package:
-        fields.practice_package || null,
-
+      practice_package: fields.practice_package || null,
       modality: fields.modality || null,
       analysis: fields.analysis || null,
       created_at: new Date().toISOString(),
     }
 
-    await fetch(
+    const res = await fetch(
       `${supabaseUrl}/session_versions`,
       {
         method: "POST",
@@ -2788,13 +2785,14 @@ async function saveSessionVersion(
         body: JSON.stringify(payload),
       }
     )
+
+    if (!res.ok) {
+      throw new Error(await res.text())
+    }
   } catch (err) {
-    console.error(
-      "Session version save failed:",
-      err
-    )
+    console.error("Session version save failed:", err)
+    }
   }
-}
   
 
 /* ===============================
