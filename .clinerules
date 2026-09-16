@@ -55,3 +55,27 @@ new code
 - **Invented hooks:** Do not propose hooks like `useLoadClients()`, `useRenameClient()`, or `useSetHierarchy()`. State lives in `stores/useClientNavStore.ts` (Zustand). Access it via the hook or `useClientNavStore.getState()`.
 - **Invented config objects:** Do not propose `config`, `allowedOrigins`, or `authMiddleware` modules. Bindings and secrets live on the `env` parameter of the Worker's `fetch` handler.
 - **Wrong paths:** The gateway is at `workers/mcp-gateway/src/index.ts`. The Worker is at `backend/CloudFlare.js`. The store is at `stores/useClientNavStore.ts`. Do not guess paths — verify with `list_files` before reading.
+
+## 6. AI Delegation & Sub-Task Protocol (MANDATORY)
+- **Stateless execution:** One Cline task = one sub-task. Never chain sub-tasks in one context.
+- **Intake:** At the start of every sub-task, request only: `task_id`, `playbook name`, `target file paths`, `acceptance criteria`, and `verify command`.
+- **Context limits:** Do not request repo history or unrelated files. If context exceeds 8K tokens, stop and report `CONTEXT_OVERFLOW`.
+
+## 7. Verification & CI Gate (NON-NEGOTIABLE)
+- You do not decide whether code is correct. You run `./scripts/verify.sh` and read its exit code.
+- Exit 0 = pass. Non-zero = fail. No interpretation.
+- You may not edit `scripts/verify.sh`, CI configs, or tooling configs to force a pass.
+- If verify fails twice, stop and trigger `docs/playbooks/escalation.md`.
+
+## 8. Model Routing & Escalation
+- **Local (7B):** Use for boilerplate, CRUD, unit tests, commit messages.
+- **Escalate (Sonnet/Pro):** Escalate immediately if:
+  - `verify.sh` fails twice on the same sub-task.
+  - A change touches > 3 files.
+  - The change touches auth, payments, secrets, or CI configs.
+  - You encounter `CONTEXT_OVERFLOW`.
+
+## 9. Branch Discipline & Deployment
+- Every sub-task must run on branch: `ai/<task_id>`
+- Never commit to `main` or `develop` directly.
+- **Final step:** You must output a `pr-context.txt` file per the active playbook instructions before pushing.

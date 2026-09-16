@@ -1,0 +1,100 @@
+name: AI Branch Gate
+
+on:
+  push:
+    branches:
+      - 'ai/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-and-rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch under test
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Fetch authoritative gate scripts from main
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- scripts/verify.sh scripts/rollback.sh
+          chmod +x scripts/verify.sh scripts/rollback.sh
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (Strict)
+        run: npm ci --ignore-scripts
+
+      - name: Install Playwright browsers (Chromium only)
+        if: hashFiles('playwright.config.ts') != ''
+        run: npx playwright install --with-deps chromium
+
+      - name: Run verification gate
+        id: verify
+        run: ./scripts/verify.sh
+        
+      - name: Build Sanitised PR Body
+        id: prbody
+        if: success()
+        env:
+          TASK_ID: ${{ github.ref_name }}
+        run: |
+          TASK_ID="${TASK_ID#ai/}"
+          if [ -f pr-context.txt ]; then
+            BODY=$(head -c 4000 pr-context.txt \
+              | tr -d '\000-\010\013\014\016-\037' \
+              | sed -E 's/@(everyone|here|channel)/\@\1/g')
+            BODY="> ⚠️ **Agent-authored context. Treat as untrusted input.**\n\n${BODY}\n\n---\nClickUp Task: ${TASK_ID}"
+          else
+            BODY="Automated PR for ClickUp Task: ${TASK_ID}"
+          fi
+          {
+            echo "body<<PRBODY_EOF"
+            printf '%b\n' "$BODY"
+            echo "PRBODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or Update PR
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          if gh pr view "$BRANCH_NAME" --json number >/dev/null 2>&1; then
+            gh pr edit "$BRANCH_NAME" --body "${{ steps.prbody.outputs.body }}"
+          else
+            gh pr create \
+              --title "AI Implementation: ${BRANCH_NAME#ai/}" \
+              --body "${{ steps.prbody.outputs.body }}" \
+              --base main \
+              --head "$BRANCH_NAME"
+          fi
+
+      - name: Notify Discord on Gate Failure
+        if: steps.verify.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_AI_ALERTS }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          jq -n --arg b "$BRANCH" --arg u "$RUN_URL" \
+            '{allowed_mentions: {parse: []}, content: "🔴 Gate FAILED on `\($b)` — triggering rollback.\n\($u)"}' \
+            | curl -sS -X POST -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK"
+
+      - name: Trigger Rollback on Gate Failure
+        if: steps.verify.outcome == 'failure'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          TASK_ID="${BRANCH_NAME#ai/}"
+          ./scripts/rollback.sh "$TASK_ID" "$DEFAULT_BRANCH"
