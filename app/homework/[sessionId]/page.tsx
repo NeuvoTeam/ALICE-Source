@@ -35,7 +35,9 @@ export default function HomeworkPage() {
       }
 
       try {
-        const url = `${CLINICAL_AI_API_BASE}/sessions/${sessionId}`;
+        // Narrow public projection: title/vignette/quiz/homework only — no notes,
+        // no formulation, no risk flags ever reach the client's browser.
+        const url = `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}`;
 
         console.log("📚 HOMEWORK FETCH:", url);
 
@@ -60,8 +62,8 @@ export default function HomeworkPage() {
         }
 
         setSession({
-          id: data.id,
-          name: data.name,
+          id: data.sessionId,
+          name: data.title,
           vignette: data.vignette ?? "",
           quiz: Array.isArray(data.quiz)
             ? data.quiz

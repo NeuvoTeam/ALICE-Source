@@ -14,7 +14,14 @@ import {
   ClipboardPaste,
   BrainCircuit,
 } from "lucide-react"
-import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
+import {
+  CLINICAL_AI_API_BASE as API_BASE,
+  GROQ_TPM_LIMIT_NOTE,
+  SESSION_NOTES_MAX_CHARS,
+  SESSION_NOTES_WARN_CHARS,
+  estimateTokens,
+} from "@/lib/clinical-ai-api"
+import { apiFetch } from "@/lib/auth"
 
 type StepId = 1 | 2 | 3
 
@@ -155,6 +162,17 @@ export default function VignetteGenerator({
 
   const worksheetRef = useRef<HTMLDivElement>(null)
 
+  /**
+   * Groq's 8,000 tokens/minute ceiling is an *input* limit and the notes are sent
+   * twice per run (analyze, then practice package), so an over-long paste is
+   * rejected before it can burn the clinician's minute.
+   */
+  const notesLength = sessionInput.length
+  const notesTokens = estimateTokens(notesLength)
+  const notesTooLong = notesLength > SESSION_NOTES_MAX_CHARS
+  const notesLong = !notesTooLong && notesLength > SESSION_NOTES_WARN_CHARS
+  const notesBudget = `≈${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`
+
   useEffect(() => {
     setDegradedWarning(null)
 
@@ -250,6 +268,21 @@ export default function VignetteGenerator({
       return
     }
 
+    // Defence in depth: `sessionInput` can be hydrated from the database by
+    // `useClientNavStore`, which bypasses the textarea's own guard.
+    if (notesTooLong) {
+      console.warn("⛔ GENERATE BLOCKED: notes exceed the Groq token budget", {
+        notesLength,
+        notesTokens,
+      })
+      alert(
+        `These notes are ${notesLength.toLocaleString()} characters (${notesBudget}). ` +
+          `${GROQ_TPM_LIMIT_NOTE} Trim them to about ${SESSION_NOTES_MAX_CHARS.toLocaleString()} ` +
+          "characters, or split the session, then try again."
+      )
+      return
+    }
+
     setIsProcessing(true)
     setDegradedWarning(null)
     try {
@@ -263,7 +296,7 @@ export default function VignetteGenerator({
 
       console.log("➡️ POST", analyzeUrl, analyzePayload)
 
-      const analyzeRes = await fetch(analyzeUrl, {
+      const analyzeRes = await apiFetch(analyzeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(analyzePayload),
@@ -294,7 +327,7 @@ export default function VignetteGenerator({
 
       console.log("➡️ POST", genUrl, genPayload)
 
-      const genRes = await fetch(genUrl, {
+      const genRes = await apiFetch(genUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(genPayload),
@@ -327,7 +360,23 @@ export default function VignetteGenerator({
       })
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : "Failed to generate practice package")
+
+      const message =
+        err instanceof Error ? err.message : "Failed to generate practice package"
+
+      /**
+       * Groq's 429 body already says how long to wait ("Please try again in
+       * 19.2525s"); surface that instead of a wall of text.
+       */
+      const retryIn = /try again in ([\d.]+)s/i.exec(message)
+
+      alert(
+        retryIn
+          ? `Groq rate limit reached (8,000 tokens/minute). Try again in about ${Math.ceil(
+              Number(retryIn[1])
+            )} seconds, or shorten the notes.`
+          : message
+      )
     } finally {
       setIsProcessing(false)
     }
@@ -388,10 +437,44 @@ export default function VignetteGenerator({
                 <ClipboardPaste className="h-4 w-4 mr-2" /> Paste from Heidi
               </Button>
             </div>
+
+            <div className="flex flex-col gap-2">
+              <div
+                aria-live="polite"
+                className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider"
+              >
+                <span className="text-zinc-400">
+                  {notesLength.toLocaleString()} /{" "}
+                  {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters ·{" "}
+                  {notesBudget}
+                </span>
+                {notesTooLong ? (
+                  <span className="text-red-600">Too long to send</span>
+                ) : notesLong ? (
+                  <span className="text-amber-600">Long note</span>
+                ) : null}
+              </div>
+
+              {notesTooLong && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-900">
+                  {GROQ_TPM_LIMIT_NOTE} Trim these notes to about{" "}
+                  {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters — as they
+                  stand, the request is rejected before any AI work happens.
+                </div>
+              )}
+
+              {notesLong && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900">
+                  {GROQ_TPM_LIMIT_NOTE} Generation should still work, but a second
+                  run inside the same minute may be rate limited.
+                </div>
+              )}
+            </div>
+
             <Button
               onClick={() => setStep(2)}
               className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
-              disabled={!sessionInput || isProcessing}
+              disabled={!sessionInput || isProcessing || notesTooLong}
             >
               Next
             </Button>

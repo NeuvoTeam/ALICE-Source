@@ -41,7 +41,7 @@ export default function PracticePage() {
 
       try {
         const res = await fetch(
-          `${CLINICAL_AI_API_BASE}/sessions/${sessionId}`,
+          `${CLINICAL_AI_API_BASE}/client-homework/${sessionId}`,
           {
             method: "GET",
             cache: "no-store",
@@ -57,10 +57,13 @@ export default function PracticePage() {
         }
 
         setSession({
-          id: data.id,
-          name: data.name,
-          practicePackage:
-            data.practicePackage || null,
+          id: data.sessionId,
+          name: data.title,
+          practicePackage: {
+            homework: Array.isArray(data.practiceHomework)
+              ? data.practiceHomework
+              : [],
+          },
         });
 
         setError(null);

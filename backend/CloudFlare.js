@@ -4,6 +4,44 @@ const GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
 /** Last-resort default. `env.GROQ_MODEL` (wrangler.jsonc var) always wins. */
 const MODEL = "openai/gpt-oss-20b"
 
+/* ===============================
+   ✅ CALLER AUTHENTICATION
+   =============================== */
+/**
+ * Validates the caller's Supabase access token — the same check `GET /auth/me`
+ * has always performed, extracted so every clinician route can reuse it.
+ *
+ * Returns a `401` Response when the caller may not proceed, a `503` when Supabase
+ * itself cannot be reached, or `null` when the request is authenticated.
+ */
+async function requireUser(request, env, cors, baseUrl) {
+  const token = request.headers.get("Authorization")
+
+  if (!token) {
+    return respond({ error: "Missing token" }, cors, 401)
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        "apikey": env.SUPABASE_ANON_KEY,
+        "Authorization": token,
+      },
+    })
+
+    if (res.ok) return null
+
+    const data = await res.json().catch(() => null)
+
+    return respond(data || { error: "Invalid token" }, cors, 401)
+  } catch (err) {
+    console.error("Auth check failed:", err)
+
+    return respond({ error: "Authentication unavailable" }, cors, 503)
+  }
+}
+
 export default {
   async fetch(request, env) {
 
@@ -71,6 +109,24 @@ export default {
       "Content-Type": "application/json",
       "apikey": env.SUPABASE_ANON_KEY,
     }
+    /* =========================
+       ✅ CALLER AUTHENTICATION GUARD
+       ========================= */
+    // Everything below is clinician-only except two things: the auth routes
+    // themselves and the narrow, token-free client projection that
+    // `/homework` and `/practice` read. `OPTIONS` already returned above, so CORS
+    // preflight never needs a token.
+    const isPublicRoute =
+      cleanPath.startsWith("/auth/") ||
+      cleanPath === "/client-homework" ||
+      cleanPath.startsWith("/client-homework/")
+
+    if (!isPublicRoute) {
+      const unauthorized = await requireUser(request, env, cors, baseUrl)
+
+      if (unauthorized) return unauthorized
+    }
+
     try {
 /* =========================
    ✅ AUTH SIGNUP
@@ -515,12 +571,20 @@ if (method === "GET" && cleanPath === "/auth/me") {
         return respond({ error: "Session not found" }, cors, 404)
       }
 
+      const practiceHomework =
+        row.practice_package && Array.isArray(row.practice_package.homework)
+          ? row.practice_package.homework
+          : []
+
       return respond({
         sessionId: row.id,
         title: row.name,
         homework: Array.isArray(row.homework) ? row.homework : [],
         quiz: Array.isArray(row.quiz) ? row.quiz : [],
         vignette: row.vignette || "",
+        // Deliberately narrow: this route is public, so it must never carry
+        // session_notes, analysis or riskFlags.
+        practiceHomework,
       }, cors)
     }
 
@@ -809,7 +873,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
         }
 
         const groqError = debug.groqError || null
-        const parseOk = Boolean(debug.parsed)
+        // "parse_ok" now means *accepted*: the answer parsed AND matched the
+        // contract. A valid-JSON-but-partial answer is a failure, not a pass.
+        const parseOk = Boolean(debug.usable)
 
         return respond(
           {
@@ -818,6 +884,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
             model: debug.model || model,
             parse_ok: parseOk,
             finish_reason: debug.finishReason || null,
+            attempts: debug.attempts || 1,
+            reason: debug.reason || null,
+            parse_error: debug.parseError || null,
+            strategy: debug.strategy || null,
             raw_sample: debug.raw ? String(debug.raw).slice(0, 600) : null,
             parsed: outcome instanceof Response ? null : outcome,
             groq_error: groqError,
@@ -1365,9 +1435,15 @@ Rules:
     { role: "user", content: input }
   ]
 
-  const result = await callGroq(messages, env, 0.3)
+  const attempt = await generateJson(messages, env, 0.3, {
+    debug,
+    contract: "analyze",
+    isValid: isUsableAnalysis,
+    schema: ANALYSIS_SCHEMA,
+    schemaName: "clinical_analysis",
+  })
 
-  if (debug) captureDebug(debug, result)
+  const result = attempt.result
 
   const fallback = {
     rationale: "Clinical synthesis unavailable.",
@@ -1383,13 +1459,11 @@ Rules:
     return groqFailureResponse(result, cors)
   }
 
-  const parsed = extractJsonObject(stripMarkdown(result.content))
-
-  if (debug) debug.parsed = parsed
+  const parsed = attempt.parsed
 
   if (!parsed) {
     return unparseableAiResponse(
-      result.content,
+      attempt,
       fallback,
       result,
       cors,
@@ -1461,9 +1535,15 @@ ${input}
     }
   ]
 
-  const result = await callGroq(messages, env, 0.6)
+  const attempt = await generateJson(messages, env, 0.6, {
+    debug,
+    contract: "generate",
+    isValid: isUsableVignette,
+    schema: VIGNETTE_SCHEMA,
+    schemaName: "clinical_vignette",
+  })
 
-  if (debug) captureDebug(debug, result)
+  const result = attempt.result
 
   const fallback = {
     scenario: "Scenario unavailable.",
@@ -1479,13 +1559,11 @@ ${input}
     return groqFailureResponse(result, cors)
   }
 
-  const parsed = extractJsonObject(stripMarkdown(result.content))
-
-  if (debug) debug.parsed = parsed
+  const parsed = attempt.parsed
 
   if (!parsed) {
     return unparseableAiResponse(
-      result.content,
+      attempt,
       fallback,
       result,
       cors,
@@ -1572,13 +1650,15 @@ ${input}
     }
   ]
 
-  const result = await callGroq(
-    messages,
-    env,
-    0.5
-  )
+  const attempt = await generateJson(messages, env, 0.5, {
+    debug,
+    contract: "practice-package",
+    isValid: isUsablePracticePackage,
+    schema: PRACTICE_PACKAGE_SCHEMA,
+    schemaName: "clinical_practice_package",
+  })
 
-  if (debug) captureDebug(debug, result)
+  const result = attempt.result
 
   const fallback = {
     homework: [],
@@ -1602,13 +1682,11 @@ ${input}
     return groqFailureResponse(result, cors)
   }
 
-  const parsed = extractJsonObject(stripMarkdown(result.content))
-
-  if (debug) debug.parsed = parsed
+  const parsed = attempt.parsed
 
   if (!parsed) {
     return unparseableAiResponse(
-      result.content,
+      attempt,
       fallback,
       result,
       cors,
@@ -1641,6 +1719,30 @@ function resolveModel(env) {
   return env?.GROQ_MODEL || MODEL
 }
 
+/**
+ * `GROQ_RESPONSE_FORMAT` selects how the JSON contract is requested:
+ *   "schema"      - `json_schema` with `strict: true` (constrained decoding);
+ *   "json_object" - syntax-only JSON mode;
+ *   "off"         - prompt-only: the system prompt asks for JSON and nothing is
+ *                   forced at the API level.
+ *
+ * Measured live against openai/gpt-oss-20b (5 runs each, same 1.8k-char note):
+ *   "json_object" - every answer parsed, but 4 of 8 stopped after `homework`,
+ *                   so the placeholder scenario was persisted (valid JSON, wrong
+ *                   shape - the defect this file now rejects);
+ *   "schema"      - ~40% hard 400s ("Generated JSON does not match the expected
+ *                   schema ... expected object, but got array"): Groq validates
+ *                   the generation *after* the fact rather than constraining it,
+ *                   so the model can still fail the schema;
+ *   "off"         - the model is free to write the whole object it was shown.
+ * The default is therefore "off", with the schema still used for the *validator*.
+ */
+function resolveResponseFormat(env) {
+  const mode = String(env?.GROQ_RESPONSE_FORMAT || "off").toLowerCase()
+
+  return mode === "schema" || mode === "json_object" ? mode : "off"
+}
+
 /** Pull the human-readable reason out of a Groq error body. */
 function extractGroqErrorMessage(text) {
   try {
@@ -1661,8 +1763,45 @@ function extractGroqErrorMessage(text) {
   return fallback.length > 300 ? `${fallback.slice(0, 300)}…` : fallback
 }
 
-async function callGroq(messages, env, temperature = 0.4) {
+/**
+ * `options` is either a legacy numeric temperature or
+ * `{ temperature, responseFormat, schema, schemaName, maxCompletionTokens, reasoningEffort }`.
+ */
+async function callGroq(messages, env, options = 0.4) {
+  const opts =
+    typeof options === "number" ? { temperature: options } : options || {}
+
   const model = resolveModel(env)
+
+  const temperature =
+    typeof opts.temperature === "number" ? opts.temperature : 0.4
+
+  /**
+   * Prompt-only JSON is what produced unparseable answers, so the three AI
+   * routes opt into Groq's JSON mode: the endpoint then rejects a completion
+   * that is not valid JSON syntax instead of handing us prose. Callers that do
+   * not want JSON (e.g. GET /ai/health) simply leave this off.
+   */
+  /** "schema" | "json_object" | "off" — resolved by the caller (generateJson). */
+  const responseFormat = opts.responseFormat || "off"
+
+  /** When supplied, "schema" mode uses *strict* JSON Schema mode. */
+  const schema = opts.schema || null
+
+  const schemaName = opts.schemaName || "clinical_payload"
+
+  const maxCompletionTokens =
+    Number(opts.maxCompletionTokens || env?.GROQ_MAX_TOKENS) || null
+
+  /**
+   * gpt-oss/Qwen models spend output tokens on hidden reasoning. An explicit
+   * `GROQ_REASONING_EFFORT` wins; otherwise ask for "low" on reasoning models
+   * only, because a non-reasoning model would reject the parameter outright.
+   */
+  const reasoningEffort =
+    opts.reasoningEffort ||
+    env?.GROQ_REASONING_EFFORT ||
+    (isReasoningModel(model) ? "low" : null)
 
   try {
     const res = await fetch(GROQ_API_URL, {
@@ -1675,8 +1814,23 @@ async function callGroq(messages, env, temperature = 0.4) {
         model,
         messages,
         temperature,
-        ...(env?.GROQ_MAX_TOKENS
-          ? { max_tokens: Number(env.GROQ_MAX_TOKENS) }
+        ...(responseFormat === "off"
+          ? {}
+          : {
+              response_format:
+                responseFormat === "schema" && schema
+                  ? {
+                      type: "json_schema",
+                      json_schema: { name: schemaName, strict: true, schema },
+                    }
+                  : { type: "json_object" },
+            }),
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+        // `max_tokens` is deprecated on Groq; the JSON-bearing equivalent is
+        // `max_completion_tokens`. Sent only when configured, so nothing can
+        // truncate the JSON by accident.
+        ...(maxCompletionTokens
+          ? { max_completion_tokens: maxCompletionTokens }
           : {}),
       }),
     })
@@ -1795,12 +1949,54 @@ function captureDebug(debug, result) {
  * Groq answered, but the content was not usable JSON. Treated like a Groq
  * failure so a placeholder can never be presented as a real formulation.
  */
-function unparseableAiResponse(content, fallback, result, cors, degrade) {
+function unparseableAiResponse(attempt, fallback, result, cors, degrade) {
+  const content = result.ok ? result.content : ""
   const sample = String(content || "").slice(0, 300)
-  const message = "The model returned content that could not be parsed as JSON"
+  const attempts = (attempt && attempt.attempts) || 1
+
+  /**
+   * Three distinct failures used to share one message:
+   *  - `truncated`  the model ran out of output before the object closed;
+   *  - `bad_shape`  the JSON parsed but did not match the contract, so the
+   *                 fallback would have been persisted as if it were real work;
+   *  - anything else: the content was not JSON at all.
+   */
+  const diagnosis =
+    (attempt && attempt.diagnosis) || describeJsonFailure(result, content)
+
+  const message =
+    diagnosis.reason === "truncated"
+      ? "The model's answer was cut off before the JSON was complete"
+      : diagnosis.reason === "bad_shape"
+        ? "The model's answer did not match the required JSON shape"
+        : "The model returned content that could not be parsed as JSON"
+
+  const code =
+    diagnosis.reason === "truncated"
+      ? "AI_TRUNCATED"
+      : diagnosis.reason === "bad_shape"
+        ? "BAD_AI_SHAPE"
+        : "BAD_AI_RESPONSE"
+
+  /**
+   * `parseError` is `JSON.parse`'s own message (it names the offset and the
+   * cause) plus structural counters — never clinical text, so these fields are
+   * safe to return to the browser and to keep in the Worker log.
+   */
+  const diagnostics = {
+    reason: diagnosis.reason,
+    parseError: diagnosis.parseError,
+    finishReason: result.finishReason || null,
+    length: content.length,
+    attempts,
+  }
 
   console.error(
-    `Groq parse error: ${message} (model=${result.model}) sample=${JSON.stringify(sample)}`
+    `Groq parse error: ${message} (model=${result.model}, reason=${
+      diagnosis.reason
+    }, attempts=${attempts}, finish_reason=${
+      result.finishReason || "n/a"
+    }) ${diagnosis.parseError} sample=${JSON.stringify(sample)}`
   )
 
   if (degrade) {
@@ -1810,7 +2006,9 @@ function unparseableAiResponse(content, fallback, result, cors, degrade) {
           model: result.model,
           error: { status: 502, message },
         }),
+        code,
         sample,
+        ...diagnostics,
       },
       cors
     )
@@ -1819,10 +2017,11 @@ function unparseableAiResponse(content, fallback, result, cors, degrade) {
   return respond(
     {
       error: "AI unavailable",
-      code: "BAD_AI_RESPONSE",
+      code,
       detail: message,
       sample,
       model: result.model,
+      ...diagnostics,
     },
     cors,
     502
@@ -1852,6 +2051,84 @@ function stripMarkdown(text) {
 /* ===============================
    ✅ SAFE JSON EXTRACTOR
    =============================== */
+/**
+ * Escapes the JSON the model *should* have escaped: an inner `"` inside a string
+ * value, and raw control characters. Measured live this was the dominant residual
+ * failure — `Expected ',' or ']' after array element in JSON at position 1395`,
+ * i.e. `["task", "he said "hi"", "task"]` (3 of 10 runs).
+ *
+ * Rule for an in-string `"`: it only *closes* the string when the next significant
+ * character is structural (`: , } ]` or end of input); otherwise the model forgot
+ * the backslash. A repair that mangles valid JSON cannot slip through, because the
+ * caller still validates the parsed shape against the contract.
+ */
+function repairJson(text) {
+  let out = ""
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+
+    if (escaped) {
+      out += char
+      escaped = false
+
+      continue
+    }
+
+    if (char === "\\") {
+      out += char
+      escaped = true
+
+      continue
+    }
+
+    if (char === '"') {
+      if (!inString) {
+        inString = true
+        out += char
+
+        continue
+      }
+
+      let j = i + 1
+
+      while (j < text.length && /\s/.test(text[j])) j += 1
+
+      const next = j >= text.length ? "" : text[j]
+
+      if (
+        next === "" ||
+        next === ":" ||
+        next === "," ||
+        next === "}" ||
+        next === "]"
+      ) {
+        inString = false
+        out += char
+      } else {
+        out += '\\"'
+      }
+
+      continue
+    }
+
+    if (inString && (char === "\n" || char === "\r" || char === "\t")) {
+      out += char === "\n" ? "\\n" : char === "\r" ? "\\r" : "\\t"
+
+      continue
+    }
+
+    out += char
+  }
+
+  return out
+}
+
+/** Strategy used by the last `extractJsonObject` call — surfaced by /ai/probe. */
+let lastJsonStrategy = "strict"
+
 function extractJsonObject(text) {
   if (!text) return null
 
@@ -1860,10 +2137,410 @@ function extractJsonObject(text) {
 
   if (start === -1 || end === -1 || end <= start) return null
 
+  const slice = text.slice(start, end + 1)
+
   try {
-    return JSON.parse(text.slice(start, end + 1))
+    lastJsonStrategy = "strict"
+
+    return JSON.parse(slice)
   } catch {
+    /* fall through to the repair pass */
+  }
+
+  try {
+    const repaired = JSON.parse(repairJson(slice))
+
+    lastJsonStrategy = "repaired"
+
+    return repaired
+  } catch {
+    lastJsonStrategy = "failed"
+
     return null
+  }
+}
+
+/* ===============================
+   ✅ JSON MODE + ONE CORRECTIVE RETRY
+   =============================== */
+/**
+ * Models that accept `reasoning_effort`. A non-reasoning model (allam-2-7b,
+ * whisper, …) answers 400 when the parameter is sent, so it is never sent to
+ * one of those.
+ */
+function isReasoningModel(model) {
+  return /gpt-oss|qwen|deepseek|minimax|reason/i.test(String(model || ""))
+}
+
+/** Appended as a final user turn when the first answer was not usable JSON. */
+const JSON_RETRY_INSTRUCTION =
+  "Your previous reply was not valid JSON. Reply again with ONLY the JSON object: no prose, no markdown fences, no trailing commas, and every string properly escaped."
+
+/** Room for reasoning tokens *plus* a complete JSON document on the retry. */
+const TRUNCATION_RETRY_MAX_TOKENS = 4096
+
+/**
+ * Names *why* an answer was unusable without copying clinical text around:
+ * `JSON.parse` itself reports the offset and the cause (bad control character,
+ * unexpected token, …), and that is what makes the failure fixable.
+ */
+function describeJsonFailure(result, text) {
+  const raw = String(text || "")
+
+  if (result && result.ok && result.finishReason === "length") {
+    return {
+      reason: "truncated",
+      parseError: "the completion hit the token limit before the JSON closed",
+    }
+  }
+
+  const start = raw.indexOf("{")
+
+  if (start === -1) {
+    return {
+      reason: "no_json_found",
+      parseError: `no "{" in the ${raw.length}-character reply`,
+    }
+  }
+
+  const end = raw.lastIndexOf("}")
+
+  if (end <= start) {
+    return {
+      reason: "no_json_found",
+      parseError: `the JSON object never closed (length=${raw.length})`,
+    }
+  }
+
+  try {
+    JSON.parse(raw.slice(start, end + 1))
+  } catch (err) {
+    return {
+      reason: raw[start] === "{" && end - start + 1 === raw.trim().length
+        ? "invalid_json"
+        : "prose_wrapped_invalid_json",
+      parseError: err?.message || String(err),
+    }
+  }
+
+  return {
+    reason: "invalid_json",
+    parseError: "the reply only parsed after discarding surrounding text",
+  }
+}
+
+/* ===============================
+   ✅ OUTPUT SHAPE CONTRACTS
+   =============================== */
+/**
+ * The prompts in `documentation.md` §7.1 demand specific fields, but a 20B model
+ * can return *valid JSON that is missing them*. Substituting the hard-coded
+ * fallback then persists a placeholder as if it were real work — verified live:
+ * a real run stored `scenario.title: "Practice Scenario"` with an empty quiz,
+ * because the answer carried `homework` but no `scenario`/`quiz`.
+ *
+ * Each contract therefore states its minimum usable shape, and anything less is
+ * treated exactly like unparseable output: one retry at temperature 0, then a
+ * 502. Nothing is persisted on that path (`unparseableAiResponse` returns a
+ * Response, so the router bails before `persistSessionFields`).
+ */
+/**
+ * Strict JSON Schema definitions.
+ *
+ * JSON Object mode only guarantees *syntactically* valid JSON, so the model is
+ * free to stop after the first key — measured live: 4 of 8 completions returned
+ * `{"homework": [...]}` alone, and the retry did not fix it. Constrained decoding
+ * (`json_schema` + `strict: true`) *forces* every key, which is the only way the
+ * contract below is guaranteed rather than hoped for.
+ *
+ * Strict mode requires that every object sets `additionalProperties: false` and
+ * lists every property in `required`.
+ */
+const ANALYSIS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["rationale", "inferredModality", "riskFlags"],
+  properties: {
+    rationale: { type: "string" },
+    inferredModality: { type: "string", enum: ["CBT", "DBT", "ACT"] },
+    riskFlags: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "severity", "confidence", "evidence"],
+        properties: {
+          label: { type: "string" },
+          severity: { type: "string", enum: ["low", "medium", "high"] },
+          confidence: { type: "number" },
+          evidence: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  },
+}
+
+const VIGNETTE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["scenario", "quiz", "homework"],
+  properties: {
+    scenario: { type: "string" },
+    quiz: { type: "array", items: { type: "string" } },
+    homework: { type: "array", items: { type: "string" } },
+  },
+}
+
+const PRACTICE_PACKAGE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["homework", "scenario", "quiz"],
+  properties: {
+    homework: { type: "array", items: { type: "string" } },
+    scenario: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "difficulty", "situation", "objectives", "coachTips"],
+      properties: {
+        title: { type: "string" },
+        difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+        situation: { type: "string" },
+        objectives: { type: "array", items: { type: "string" } },
+        coachTips: { type: "array", items: { type: "string" } },
+      },
+    },
+    quiz: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["question", "answer", "rationale"],
+        properties: {
+          question: { type: "string" },
+          answer: { type: "string" },
+          rationale: { type: "string" },
+        },
+      },
+    },
+  },
+}
+
+function isUsableAnalysis(parsed) {
+  return Boolean(
+    parsed &&
+      typeof parsed.rationale === "string" &&
+      parsed.rationale.trim() &&
+      // A missing `riskFlags` must not be read as "no risks": that is a safety
+      // claim, not a formatting detail.
+      Array.isArray(parsed.riskFlags)
+  )
+}
+
+function isUsableVignette(parsed) {
+  return Boolean(
+    parsed &&
+      typeof parsed.scenario === "string" &&
+      parsed.scenario.trim() &&
+      Array.isArray(parsed.quiz) &&
+      Array.isArray(parsed.homework)
+  )
+}
+
+function isUsablePracticePackage(parsed) {
+  const scenario = parsed && parsed.scenario
+
+  return Boolean(
+    scenario &&
+      typeof scenario === "object" &&
+      typeof scenario.title === "string" &&
+      scenario.title.trim() &&
+      typeof scenario.situation === "string" &&
+      scenario.situation.trim() &&
+      Array.isArray(scenario.objectives) &&
+      Array.isArray(scenario.coachTips) &&
+      // A package with no homework or no quiz is not a deliverable — and is
+      // exactly what the live run above produced.
+      Array.isArray(parsed.homework) &&
+      parsed.homework.length > 0 &&
+      Array.isArray(parsed.quiz) &&
+      parsed.quiz.length > 0
+  )
+}
+
+/** Explains a valid-JSON-but-wrong-shape answer. Key *names* only — never text. */
+function describeShapeFailure(parsed, contract) {
+  const keys = parsed && typeof parsed === "object" ? Object.keys(parsed) : []
+
+  return {
+    reason: "bad_shape",
+    parseError: `the JSON parsed but did not match the ${contract} contract (keys: ${
+      keys.join(", ") || "none"
+    })`,
+  }
+}
+
+/** Mirrors the last attempt into the optional `debug` object used by /ai/probe. */
+function finishAttempt(debug, attempts, parsed, diagnosis = null, usable = false) {
+  if (!debug) return
+
+  const result = attempts[attempts.length - 1]
+
+  captureDebug(debug, result)
+  debug.attempts = attempts.length
+  debug.parsed = parsed
+  debug.usable = Boolean(usable)
+  debug.reason = diagnosis ? diagnosis.reason : null
+  debug.parseError = diagnosis ? diagnosis.parseError : null
+}
+
+/**
+ * One Groq call in JSON mode, then — only when the answer is unusable — one
+ * temperature-0 corrective retry.
+ *
+ * Prompt-only JSON measured a ~25% failure rate on /generate/practice-package:
+ * complete answers (`finish_reason: "stop"`) that were not valid JSON. JSON mode
+ * removes the prose cases at the source and the single retry absorbs the rest.
+ *
+ * Returns `{ result, parsed, attempts, diagnosis }` where `result` is the *last*
+ * attempt (so a Groq-level failure on the retry is still GROQ_ERROR) and
+ * `parsed` is `null` unless the answer both parsed *and* satisfied `isValid`.
+ */
+async function generateJson(messages, env, temperature, options = {}) {
+  const {
+    debug = null,
+    isValid = null,
+    contract = "json",
+    schema = null,
+    schemaName = contract,
+  } = options
+
+  const accept = (value) => Boolean(value) && (isValid ? isValid(value) : true)
+
+  /** Operator-selectable: "schema" | "json_object" | "off" — see GROQ_RESPONSE_FORMAT. */
+  let responseFormat = resolveResponseFormat(env)
+
+  let first = await callGroq(messages, env, {
+    temperature,
+    responseFormat,
+    schema,
+    schemaName,
+  })
+  const attempts = [first]
+
+  /**
+   * Strict schema mode is what forces every key — a live measurement showed JSON
+   * Object mode letting the model stop after `homework` in 4 of 8 completions.
+   *
+   * Groq validates the generation *after* producing it, so a 400 here carries two
+   * very different meanings and they must not be conflated:
+   *  - "does not match the expected schema" — the model stopped early. That is
+   *    retriable, and retrying *with* the schema is the point of strict mode
+   *    (`failed_generation` names the missing properties);
+   *  - anything else (invalid/unsupported schema) — the request itself is
+   *    refused, so degrade to JSON Object mode rather than fail the route.
+   */
+  const SCHEMA_MISMATCH_400 =
+    /does not match the expected schema|failed_generation/i
+
+  let schemaMismatch = false
+
+  if (
+    !first.ok &&
+    responseFormat === "schema" &&
+    first.error &&
+    first.error.status === 400
+  ) {
+    if (SCHEMA_MISMATCH_400.test(first.error.message || "")) {
+      schemaMismatch = true
+
+      console.warn(
+        `Groq rejected the ${contract} generation against the schema (400: ${first.error.message}) — retrying with the schema`
+      )
+    } else {
+      responseFormat = "json_object"
+
+      console.warn(
+        `Groq rejected the ${contract} JSON schema (400: ${first.error.message}) — falling back to json_object`
+      )
+
+      first = await callGroq(messages, env, { temperature, responseFormat })
+      attempts.push(first)
+    }
+  }
+
+  let parsed = first.ok ? extractJsonObject(stripMarkdown(first.content)) : null
+
+  if (debug) debug.strategy = lastJsonStrategy
+
+  if (!schemaMismatch && (accept(parsed) || !first.ok)) {
+    finishAttempt(debug, attempts, parsed, null, accept(parsed))
+
+    return {
+      result: first,
+      parsed: accept(parsed) ? parsed : null,
+      attempts: attempts.length,
+    }
+  }
+
+  const truncated = first.finishReason === "length"
+  const diagnosis = schemaMismatch
+    ? { reason: "schema_mismatch", parseError: first.error.message }
+    : parsed
+      ? describeShapeFailure(parsed, contract)
+      : describeJsonFailure(first, first.content)
+
+  console.warn(
+    `Groq retry: ${diagnosis.reason} (contract=${contract}, model=${
+      first.model
+    }, finish_reason=${first.finishReason || "n/a"}, length=${String(
+      first.content || ""
+    ).length}) — retrying once at temperature 0`
+  )
+
+  const retry = await callGroq(
+    [...messages, { role: "user", content: JSON_RETRY_INSTRUCTION }],
+    env,
+    {
+      temperature: 0,
+      responseFormat,
+      ...(responseFormat === "schema" ? { schema, schemaName } : {}),
+      maxCompletionTokens: truncated ? TRUNCATION_RETRY_MAX_TOKENS : null,
+    }
+  )
+
+  attempts.push(retry)
+
+  parsed = retry.ok ? extractJsonObject(stripMarkdown(retry.content)) : null
+
+  if (debug) debug.strategy = lastJsonStrategy
+
+  const usable = accept(parsed)
+
+  let finalDiagnosis = null
+
+  if (!usable) {
+    if (parsed) {
+      finalDiagnosis = describeShapeFailure(parsed, contract)
+    } else if (retry.ok) {
+      finalDiagnosis = describeJsonFailure(retry, retry.content)
+    } else if (
+      SCHEMA_MISMATCH_400.test((retry.error && retry.error.message) || "")
+    ) {
+      finalDiagnosis = {
+        reason: "schema_mismatch",
+        parseError: retry.error.message,
+      }
+    }
+  }
+
+  finishAttempt(debug, attempts, parsed, finalDiagnosis, usable)
+
+  return {
+    result: retry,
+    parsed: usable ? parsed : null,
+    attempts: attempts.length,
+    truncated,
+    diagnosis: finalDiagnosis,
   }
 }
 

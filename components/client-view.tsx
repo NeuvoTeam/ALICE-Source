@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Calendar, AlertCircle, Loader2, ChevronLeft, Send } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
+import { apiFetch } from "@/lib/auth"
 import { Client } from "@/types";
 
 // ✅ moved OUTSIDE component (important)
@@ -50,7 +51,7 @@ export function ClientView({ client }: { client: Client }) {
     setIsSubmitting(true)
 
     try {
-      const res = await fetch(`${API_BASE}/client/worksheet`, {
+      const res = await apiFetch(`${API_BASE}/client/worksheet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,7 +95,7 @@ export function ClientView({ client }: { client: Client }) {
 
     const fetchVignettes = async () => {
       try {
-        const response = await fetch(`${API_BASE}/client/history?clientId=${CLIENT_ID}`)
+        const response = await apiFetch(`${API_BASE}/client/history?clientId=${CLIENT_ID}`)
 
         if (!response.ok) throw new Error("Failed to fetch")
 

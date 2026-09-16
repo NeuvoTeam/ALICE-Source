@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import type { PracticePackage } from '@/lib/practice-package'
 
 import { CLINICAL_AI_API_BASE as API } from '@/lib/clinical-ai-api'
+import { apiFetch } from '@/lib/auth'
 import {
   resolveDefaultSession,
   setLastSession,
@@ -121,7 +122,9 @@ type ClientNavState = {
 async function safeFetch(url: string, options?: RequestInit) {
   console.log("🌐 SAFE FETCH:", url);
 
-  const res = await fetch(url, options);
+  // Routed through lib/auth so every clinician call carries the bearer token and
+  // an expired session lands on /login instead of failing silently.
+  const res = await apiFetch(url, options);
 
   const data = await res.json().catch(() => null);
 

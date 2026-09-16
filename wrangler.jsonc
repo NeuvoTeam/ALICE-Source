@@ -3,8 +3,23 @@
   "compatibility_date": "2026-06-03",
   "main": "backend/CloudFlare.js",
   "observability": { "enabled": true },
+  // GROQ_RESPONSE_FORMAT selects how the JSON contract is requested:
+  //   "off" (default) - prompt-only; measured most reliable on gpt-oss-20b;
+  //   "json_object"   - syntax-only JSON mode (answers parsed, but the model
+  //                     stopped after `homework` in 4 of 8 runs);
+  //   "schema"        - strict json_schema (Groq validates after generation and
+  //                     returned 400 "failed_generation" in ~40% of runs).
+  // The strict schemas are always used for *validation* regardless of the mode.
+  //
+  // GROQ_MAX_TOKENS is deliberately NOT set.
+  // Measured on the on-demand 8,000 TPM tier: the limiter reserves the *prompt*
+  // tokens (a 20,000-char note reports "Requested 4776"), not max_completion_tokens.
+  // Capping the completion would therefore not prevent a 429 (the analyze +
+  // practice-package pair sends the notes twice) and would instead risk cutting
+  // the JSON off mid-object (`AI_TRUNCATED`). The ceiling belongs on the input:
+  // see SESSION_NOTES_MAX_CHARS / SESSION_NOTES_WARN_CHARS in lib/clinical-ai-api.ts.
   "vars": {
-    "GROQ_MODEL": "openai/gpt-oss-20b",
+    "GROQ_MODEL": "openai/gpt-oss-120b",
     "ALLOWED_ORIGINS": "http://localhost:3000"
   }
 }

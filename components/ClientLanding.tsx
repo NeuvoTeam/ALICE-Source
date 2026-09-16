@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { apiFetch } from "@/lib/auth";
+
 type Client = {
   id: string;
   name: string;
@@ -54,7 +56,7 @@ const [showAddClient, setShowAddClient] =
     try {
       setLoading(true);
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/clients`,
         {
           method: "GET",
@@ -89,7 +91,7 @@ const [showAddClient, setShowAddClient] =
 
   const fetchClient = async (id: string) => {
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/client/${id}`,
         {
           method: "GET",
@@ -168,7 +170,7 @@ const [showAddClient, setShowAddClient] =
     try {
       setCreating(true);
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/clients`,
         {
           method: "POST",

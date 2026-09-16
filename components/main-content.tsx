@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api";
+import { apiFetch } from "@/lib/auth";
 import { Client } from "@/types";
 import { useClientNavStore } from "@/stores/useClientNavStore";
 
@@ -63,7 +64,7 @@ export function MainContent({
     setError(null);
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_BASE}/sessions?clientId=${client.id}`
       );
 
