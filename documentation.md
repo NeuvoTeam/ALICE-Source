@@ -36,6 +36,10 @@
 ALICE is an AI-assisted clinical workspace for mental-health clinicians, plus a read-only
 client-facing surface that presents the materials a clinician has assigned.
 
+**Access model (current).** Every clinician route requires a Supabase bearer token (`requireUser`,
+§5.0). The client-facing surface needs no login, but is reachable only through a **signed, expiring
+link** (§4.7, §5.2). The only public families are `/auth/*` and the signed-link client endpoints.
+
 **Domain model** — a strict three-level hierarchy, per clinician:
 
 ```
@@ -86,7 +90,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `app/dashboard/page.tsx` | Authenticated shell — client landing → sidebar + clinician/client view |
 | `app/login`, `app/signup`, `app/forgot-password` | Clinician auth screens (inline styles, not shadcn) |
 | `app/client-login`, `app/test-auth` | Stubs / diagnostics (see §13) |
-| `app/homework/[sessionId]`, `app/practice/[sessionId]` | Public, unauthenticated client-facing material views |
+| `app/homework/[sessionId]`, `app/practice/[sessionId]` | Client-facing material views — no login, but only reachable with a signed, expiring link (§4.7, §5.2) |
 | `app/cases/[caseId]/sessions/[sessionId]` | Bookmark-compat redirect shim — selects the session in the store then `router.replace('/')` |
 | `app/api/analyze/session/route.ts` | **Legacy/dev-only** Next.js route calling a local Ollama instance. Not used by the shipped UI (see §7) |
 | `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
@@ -102,7 +106,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 
 | Path | Contents |
 | --- | --- |
-| `backend/CloudFlare.js` | The entire API Worker (`clinical-ai-backend`): auth, CRUD, AI orchestration, Supabase proxy. Single file, ~1280 lines |
+| `backend/CloudFlare.js` | The entire API Worker (`clinical-ai-backend`): caller authentication, CRUD, AI orchestration, Supabase proxy. Single file, ~2,820 lines |
 | `wrangler.jsonc` | Worker config for `clinical-ai-backend` (`main: backend/CloudFlare.js`) |
 | `workers/mcp-gateway/` | Second Worker (`alice-mcp`): MCP context/tools gateway with a service binding to the API Worker |
 | `supabase/migrations/` | `20260603_session_clinical_fields.sql` — adds the clinical columns to `public.sessions` |
@@ -288,24 +292,51 @@ the list. The newly created client is *not* auto-opened — the clinician clicks
 
 ### 4.7 Client-facing material pages (public)
 
-- `app/homework/[sessionId]/page.tsx` → `GET /sessions/:id`, renders `vignette` (Case Summary),
-  `quiz` (Reflection Questions) and `homework` (Your Tasks).
-- `app/practice/[sessionId]/page.tsx` → `GET /sessions/:id`, renders `practicePackage.homework`
-  as a checklist.
-- The Worker also exposes `GET /client-homework/:sessionId` returning
-  `{ sessionId, title, homework, quiz, vignette }` for link previews / MCP tooling.
+Both pages read the same narrow projection, `GET /client-homework/:sessionId`, and must present a
+**signed, expiring link**:
 
-Neither page authenticates, and neither is linked from the clinician UI today — the clinician shares
-the URL. `sessionId` must be at least 10 characters for `/client-homework/*`.
+- `app/homework/[sessionId]/page.tsx` → renders `vignette` (Case Summary), `quiz` (Reflection
+  Questions) and `homework` (Your Tasks) from `GET /client-homework/:id?exp=…&sig=…`.
+- `app/practice/[sessionId]/page.tsx` → renders `practiceHomework` as a checklist from the same call.
+- The projection returns `{ sessionId, title, homework, quiz, vignette, practiceHomework }` — never
+  `session_notes`, `analysis` or `riskFlags`.
+- The clinician obtains the URL from `GET /client-link/:sessionId` (§5.2), or from the
+  **Copy homework link** / **Copy practice link** buttons in step 3 of
+  `components/vignette-generator.tsx`. The Worker signs `v1|sessionId|exp` with HMAC-SHA256 and
+  returns `homeworkUrl`, `practiceUrl` and `expiresAt`.
+- Without a valid `exp`+`sig` pair the route answers `403`, so a bare session UUID opens nothing
+  (§13.1). `sessionId` must be at least 10 characters.
+
+The link's signature, TTL and failure modes are specified in §5.2 (signing protocol).
 
 ---
 
 ## 5. HTTP API reference
 
 Base URL: `https://clinical-ai-backend.neuvoteam.workers.dev`
-(source: `lib/clinical-ai-api.ts`). All bodies and responses are JSON. There is **no** API-level
-authentication on any route except `GET /auth/me` — the Worker authenticates to Supabase with its
-service-role key regardless of the caller.
+(source: `lib/clinical-ai-api.ts`). All bodies and responses are JSON.
+
+### 5.0 Caller authentication
+
+**Every route requires `Authorization: Bearer <supabase access token>` except two public families:**
+
+| Public | Why |
+| --- | --- |
+| `/auth/*` (`signup`, `login`, `me`) | No session exists yet, and `GET /auth/me` validates the token it is handed |
+| `/client-homework/:sessionId` | Read by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§4.7, §5.2) |
+
+`requireUser(request, env, cors, baseUrl)` performs the check by calling Supabase
+`GET ${SUPABASE_URL}/auth/v1/user` with the anon key plus the caller's token — the same call
+`GET /auth/me` has always made. Outcomes: `401 { error: "Missing token" }` when the header is absent,
+`401` with Supabase's own body for a malformed or expired token, and
+`503 { error: "Authentication unavailable" }` if Supabase cannot be reached. Nothing upstream runs
+first: an unauthenticated request never reaches Supabase's REST API or Groq.
+
+`OPTIONS` returns before the guard, so CORS preflight never needs a token, and CORS is an explicit
+origin allowlist (`ALLOWED_ORIGINS`, §10.3) rather than `*`.
+
+The Worker still authenticates *to* Supabase with its service-role key, so any authenticated clinician
+can currently reach any client's rows — see §13.1 (open item).
 
 ### 5.1 Auth
 
@@ -325,6 +356,27 @@ service-role key regardless of the caller.
 | `GET` | `/client/:id` | – | `200 { id, name, cases: [{ id, name, sessions: [{ id, name }] }] }` | `404 { error: "Client not found" }` |
 | `GET` | `/client/history` | query `clientId` | `200 [material]` — sessions that carry a `vignette` or `practice_package`, newest first | `400 { error: "Missing clientId" }` |
 | `POST` | `/client/worksheet` | `{ clientId, sessionId \| vignetteId, answers }` | `200 { success: true, submission }` | `400 { error: "Missing clientId or answers" }`; `500` |
+| `GET` | `/client-link/:sessionId` | query `ttlDays?` (default `14`, clamped to `30`) | `200 { sessionId, ttlDays, exp, expiresAt, homeworkUrl, practiceUrl }` | `400 { error: "Invalid session ID" }`; `404 { error: "Session not found" }`; `500 { error: "PUBLIC_APP_URL is not configured" }`; `503 { error: "Client links are not configured" }` when `CLIENT_LINK_SECRET` is missing |
+
+#### Client link signing (HMAC-SHA256)
+
+Signed links are what make the client-facing pages safe to share by email or SMS without a login:
+
+| Element | Value |
+| --- | --- |
+| Signed payload | `v1\|<sessionId>\|<exp>`, where `exp` is Unix seconds |
+| Algorithm | HMAC-SHA256, key `CLIENT_LINK_SECRET` (Worker secret — §10.3); signature is base64url |
+| URL shape | `<PUBLIC_APP_URL>/homework/<sessionId>?exp=<unix>&sig=<base64url>` — identical for `/practice/…` |
+| TTL | `ttlDays` on the mint call; default **14 days**, hard ceiling **30 days** |
+| Verification | `crypto.subtle.verify` (constant-time — never a string comparison) plus an `exp` check against the clock |
+| Rejection | `403 { error: "This link is invalid or has expired. Please ask your clinician for a new one." }`, logged as `Client link rejected (<reason>)` with `missing` / `expired` / `bad_signature` / `not_configured` |
+| Fail closed | With no `CLIENT_LINK_SECRET` — or one shorter than 16 characters — minting answers `503` and every client read answers `403`; there is no unsigned fallback |
+
+Because the signature covers the `sessionId`, a link cannot be replayed against a different session;
+because it covers `exp`, the expiry cannot be extended without the secret. The secret is trimmed on
+read, so a trailing newline captured by a piped `wrangler secret put` cannot desynchronise signing from
+verification. Minting is a clinician-only route, so the link origin is taken from `PUBLIC_APP_URL`
+(falling back to the first `ALLOWED_ORIGINS` entry).
 
 `buildClientPayload` accepts either shape: a single `name` is split into `first_name` / `middle_name` /
 `last_name` (and written to `full_name` too), while the discrete contact columns are written verbatim.
@@ -375,7 +427,7 @@ Canonical session projection returned by every read/write route (`formatSessionR
 | `GET` | `/latest-session` | query `sessionId?` | `200 session`, or `200 { sessionNotes: "", lastUpdated: null }` when no `sessionId` is supplied | `404` |
 | `PATCH` | `/sessions/:id` | any of `name`, `sessionNotes`, `vignette`, `homework`, `quiz`, `practicePackage`, `analysis`, `modality` | `200 session`; also appends a `session_versions` snapshot | `400 { error: "No fields to update" }`; `404` |
 | `DELETE` | `/sessions/:id` | – | `200 { success: true }` | `400`; `500` |
-| `GET` | `/client-homework/:sessionId` | – | `200 { sessionId, title, homework, quiz, vignette }` | `400 { error: "Invalid session ID" }` when the id is shorter than 10 chars; `404` |
+| `GET` | `/client-homework/:sessionId` | query `exp` + `sig` — **required**, see §5.2 | `200 { sessionId, title, homework, quiz, vignette, practiceHomework }` — the token-free projection | `403 { error: "This link is invalid or has expired…" }` for a missing, expired or tampered signature, and for a bare UUID; `400 { error: "Invalid session ID" }` when the id is shorter than 10 chars; `404` |
 
 `PATCH` field mapping is done by `buildSessionPatch` — camelCase in, snake_case out:
 
@@ -415,10 +467,26 @@ match, so a missing field returns `400 { error: "Missing sessionNotes" }` even f
   `model_not_found` sentence). Nothing is persisted on this path. Append `?allowDegraded=1` to get a
   `200` with the placeholder payload plus `degraded: true`, `warning` and `model` instead of the `502`
   (also not persisted — the router returns before any write).
-- **Unparseable output counts as a failure.** If Groq answers but the content is not usable JSON, the
-  route returns `502 { error: "AI unavailable", code: "BAD_AI_RESPONSE", detail, sample, model }` (or a
-  degraded `200` carrying the same `sample` when flagged), so a placeholder can never be presented as a
-  real formulation.
+- **Unusable output counts as a failure.** A usable answer means "parsed *and* matching the contract":
+  every route validates the parsed object against a minimum shape (`isUsableAnalysis` /
+  `isUsableVignette` / `isUsablePracticePackage`) before accepting it. Valid JSON with missing required
+  fields — or a missing `riskFlags`, which would otherwise read as "no risks" — is treated exactly like
+  unparseable output. Each envelope carries `reason`, `parseError` (the `JSON.parse` message including
+  the character offset — never clinical text), `finishReason`, `length`, `attempts` and `model`:
+
+  | `code` | `reason` | Meaning |
+  | --- | --- | --- |
+  | `BAD_AI_RESPONSE` | `invalid_json`, `prose_wrapped_invalid_json`, `no_json_found` | The content was not usable JSON, even after the repair pass (§7.2) |
+  | `AI_TRUNCATED` | `truncated` | `finish_reason: "length"` — the model ran out of output mid-object |
+  | `BAD_AI_SHAPE` | `bad_shape` | The JSON parsed but did not match the contract |
+  | `GROQ_ERROR` | – | Groq refused the request; `groqStatus` carries the HTTP status |
+
+  The degraded `200` (`?allowDegraded=1`) carries the same fields plus `degraded: true` and `warning`,
+  so a placeholder is never presented as a real formulation nor written to the database.
+- **One corrective retry.** Before returning any envelope above, the handler retries **once** at
+  `temperature: 0`, appending an explicit "your previous reply was not valid JSON…" turn, and asks for a
+  larger `max_completion_tokens` when the first attempt looked truncated. The retry never fires for a
+  `GROQ_ERROR` — a rate limit is not a formatting problem.
 
 ### 5.6 Preflight, unmatched paths and errors
 
@@ -440,11 +508,22 @@ it (`GET /client/:id`, and the `if (method === "POST")` AI guard respectively).
 | --- | --- | --- |
 | `GET` | `/ai/models` | `{ ok, model, configuredAvailable, count, available[] }` — the Worker proxies Groq's `GET /openai/v1/models` with its own key, so this reports exactly which model IDs the account may call, and whether the configured `GROQ_MODEL` is one of them. `ok: false` + `groqStatus`/`detail` when the key itself is rejected |
 | `GET` | `/ai/health` | `{ ok, model, sample }` on success, `{ ok: false, model, groqStatus, detail }` when Groq rejects the request. Always `200` so a script or the dashboard can read it |
-| `GET` | `/ai/probe` | Runs the **real** handler against the configured model and returns `{ ok, prompt, model, parse_ok, finish_reason, raw_sample, parsed, groq_error, failure }`. `?prompt=analyze\|generate\|package`, plus optional `?notes=` and `?modality=`. `failure` is `"groq_error"`, `"parse_error"` or `null` — this is the single call that answers "why is generation not working". Always `200` |
+| `GET` | `/ai/probe` | Runs the **real** handler against the configured model and returns `{ ok, prompt, model, parse_ok, finish_reason, attempts, strategy, reason, parse_error, raw_sample, parsed, groq_error, failure }`. `?prompt=analyze\|generate\|package`, plus optional `?notes=` and `?modality=`. `parse_ok` means *accepted* (parsed **and** matching the contract), `strategy` is `strict` / `repaired` / `failed`, and `failure` is `"groq_error"`, `"parse_error"` or `null` — this is the single call that answers "why is generation not working". Always `200` |
 
-Both are declared **above** the AI guard and need no body. When the AI looks broken, check these before
-blaming the UI: `curl <worker>/ai/models`, then `curl <worker>/ai/health`, then watch
-`npx wrangler tail` while clicking Generate.
+All three are authenticated like every other route (§5.0) and need no body. When the AI looks broken,
+check these before blaming the UI — each needs the clinician token:
+
+```powershell
+$h = @{ Authorization = "Bearer <access_token>" }
+Invoke-RestMethod "https://clinical-ai-backend.neuvoteam.workers.dev/ai/models" -Headers $h
+Invoke-RestMethod "https://clinical-ai-backend.neuvoteam.workers.dev/ai/health" -Headers $h
+# then watch the Worker while clicking Generate:
+npx wrangler tail --format pretty
+```
+
+`/ai/health` costs one small Groq completion per call, which is why it is guarded alongside the rest
+rather than exposed for anonymous probes. If an unauthenticated uptime check is ever needed, add a
+static, zero-cost `GET /ping` and exempt only that.
 
 ---
 
@@ -516,9 +595,13 @@ All AI output is produced inside `backend/CloudFlare.js` via Groq's OpenAI-compa
 | Setting | Value |
 | --- | --- |
 | Endpoint | `https://api.groq.com/openai/v1/chat/completions` |
-| Model | `env.GROQ_MODEL` (a `wrangler.jsonc` var) falling back to the `MODEL` constant — both currently `openai/gpt-oss-20b`. The Llama 3.x IDs this code originally targeted (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) are now **Enterprise-only** on Groq and return `404 model_not_found` |
+| Model | `env.GROQ_MODEL` — an `openai/gpt-oss-120b` var in `wrangler.jsonc`, falling back to the `MODEL` constant `openai/gpt-oss-20b` if the var is ever unset. Switched from 20b to 120b for JSON reliability (§7.2); both IDs are available to the account per `GET /ai/models`. The Llama 3.x IDs this code originally targeted (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) are now **Enterprise-only** on Groq and return `404 model_not_found` |
 | Auth | `Authorization: Bearer ${env.GROQ_API_KEY}` |
-| Temperature | `0.3` for `/analyze/session`, `0.6` for `/generate/vignette`, `0.5` for `/generate/practice-package` |
+| Temperature | `0.3` for `/analyze/session`, `0.6` for `/generate/vignette`, `0.5` for `/generate/practice-package`; a retry always uses `0` |
+| Response format | `env.GROQ_RESPONSE_FORMAT` (plain var; unset ⇒ **`off`**): `off` = prompt-only, `json_object` = syntax-only JSON mode, `schema` = strict `json_schema`. Measured 2026-09-16 on 20b: `off` accepted 7/10 runs, `json_object` 2/5 (the model stopped after `homework`), `schema` 2/5 (Groq returned `400 failed_generation`). Contract *validation* (§7.2) runs in every mode; the strict schemas are `ANALYSIS_SCHEMA`, `VIGNETTE_SCHEMA` and `PRACTICE_PACKAGE_SCHEMA` |
+| Reasoning | `reasoning_effort: "low"` for reasoning models (`isReasoningModel`), overridable with `GROQ_REASONING_EFFORT` — hidden reasoning tokens count against the tier's TPM, so this keeps headroom for the JSON itself |
+| Output cap | `env.GROQ_MAX_TOKENS`, sent as `max_completion_tokens` (not the deprecated `max_tokens`) and unset by default — see the note in `wrangler.jsonc` for why capping the completion does not prevent a 429 |
+| Rate limit | The on-demand tier allows **8,000 tokens/minute, 1,000 requests/day and 200,000 tokens/day** per model for both gpt-oss models. The limiter reserves the *prompt* tokens, and `/analyze/session` + `/generate/practice-package` each send the same notes, so note length is capped in the UI (`SESSION_NOTES_MAX_CHARS = 18000`, warn at `SESSION_NOTES_WARN_CHARS = 8000`; `lib/clinical-ai-api.ts`) |
 
 ### 7.1 Prompt contracts
 
@@ -533,30 +616,39 @@ modality (where relevant) and the clinician's notes.
 
 ### 7.2 Robustness
 
-- `callGroq` returns a result object — `{ ok: true, model, content }` or
+- `callGroq` returns a result object — `{ ok: true, model, content, finishReason }` or
   `{ ok: false, model, error: { status, message, raw } }` — and logs
   `Groq error: GROQ ERROR <status> <message> (model=<id>)`. It never throws. `extractGroqErrorMessage`
   lifts Groq's own `error.message` out of the body so both the log and the HTTP response carry the real
   reason (`model_not_found`, `invalid_api_key`, …) instead of a truncated blob.
-- Handlers translate that result: **`502` by default** (`groqFailureResponse`) or, with
-  `?allowDegraded=1`, a `200` placeholder payload tagged `degraded: true` + `warning`
-  (`degradedGroqPayload`). The router recognises the failure by checking for a `Response` and returns it
-  **before** any persistence runs.
-- `stripMarkdown` **unwraps** a fenced ```json block instead of deleting it. Deleting was the cause of a
-  real incident: any model that fenced its JSON had the answer thrown away, and the handler silently
-  served the placeholder as if it were the formulation. Bare and prose-wrapped JSON both parse.
-- `extractJsonObject` slices from the first `{` to the last `}` and `JSON.parse`s it, returning `null`
-  when that fails.
+- `generateJson` wraps that call with the response-format mode, the contract validator and the single
+  retry; handlers then translate the outcome: **`502` by default**, or with `?allowDegraded=1` a `200`
+  placeholder payload tagged `degraded: true` + `warning`. The router recognises a failure by checking
+  for a `Response` and returns it **before** any persistence runs.
+- `stripMarkdown` **unwraps** a fenced ```json block instead of deleting it. Deleting caused a real
+  incident: any model that fenced its JSON had the answer thrown away, and the handler silently served
+  the placeholder as though it were the formulation.
+- `extractJsonObject` slices from the first `{` to the last `}`, parses, and — when that fails — runs
+  `repairJson`, which escapes the JSON the model should have escaped: an inner `"` inside a string value,
+  plus raw control characters. The in-string rule is that a `"` only *closes* a string when the next
+  significant character is structural (`: , } ]` or end of input). `/ai/probe` reports which path
+  succeeded as `strategy: "strict" | "repaired" | "failed"`. Measured on 20b this was the largest single
+  residual fix: 3 of 10 runs died with `Expected ',' or ']' after array element in JSON at position 1395`
+  — an unescaped quote inside a task string — and none fail that way after it.
 - Hard-coded fallbacks (`"Clinical synthesis unavailable."`, `"Scenario unavailable."`, the default
-  `Practice Scenario` object) are now used for unparseable *successful* completions and for the
-  `?allowDegraded=1` path — not for the default `502` path.
+  `Practice Scenario` object) are used **only** on the `?allowDegraded=1` path. They are never used to
+  paper over a partial answer: a shape-invalid response becomes `BAD_AI_SHAPE` and nothing is written. A
+  live run predating this validation stored `scenario.title: "Practice Scenario"` with an empty quiz;
+  that can no longer happen.
 
 ### 7.3 Persistence side effects
 
 Because a generation carrying a `sessionId` writes *before* responding, the client's follow-up
 `PATCH /sessions/:id` is a second write of the same data. The PATCH is the call that guarantees the
 camelCase `analysis` / `practicePackage` payload reaches the database; the generate-time write exists so
-content survives even if the tab is closed mid-workflow.
+content survives even if the tab is closed mid-workflow. Only validated output reaches either write:
+every failure envelope is returned *before* `persistSessionFields` / `saveSessionVersion` run, and the
+`PATCH` handler stores the same contract-checked shapes (§6.3).
 
 ### 7.4 Legacy Ollama route (not part of the product flow)
 
@@ -583,8 +675,8 @@ import `CLINICAL_AI_API_BASE`.
 | `/test-auth` | diagnostic | calls `getCurrentUser()` and logs the result |
 | `/dashboard` | guarded | client landing → sidebar + clinician/client view |
 | `/cases/[caseId]/sessions/[sessionId]` | redirect shim | selects the session, then `router.replace('/')` |
-| `/homework/[sessionId]` | public | client-facing Case Summary / Reflection Questions / Your Tasks |
-| `/practice/[sessionId]` | public | client-facing practice checklist |
+| `/homework/[sessionId]` | signed link | client-facing Case Summary / Reflection Questions / Your Tasks — needs `?exp=&sig=` (§4.7) |
+| `/practice/[sessionId]` | signed link | client-facing practice checklist — same signed link |
 | `/api/analyze/session` | API route | legacy Ollama bridge (§7.4) |
 
 ### 8.2 The authoritative store — `stores/useClientNavStore.ts`
@@ -598,7 +690,12 @@ A zustand store holding `client`, `clients`, `selectedClientId`, `selectedCaseId
 - **Writes are optimistic**: state is updated first, then the HTTP call runs; on failure only `error`
   is set — there is **no rollback**.
 - `safeFetch` logs `🌐 SAFE FETCH: <url>` and, on failure, the URL plus the parsed body, then throws
-  `data?.error || "Request failed"`.
+  `data?.error || "Request failed"`. It delegates to `apiFetch` (`lib/auth.ts`), which attaches
+  `Authorization: Bearer <alice_token>` to every clinician call and, on `401`, clears the token and
+  routes to `/login` — the token is removed *before* navigating, so `/login` cannot bounce back into a
+  401 loop. `ClientLanding`, `main-content`, `client-view` and `vignette-generator` use `apiFetch`
+  directly for the same reason, while the two client-facing pages deliberately keep using plain
+  anonymous `fetch`.
 - `selectSession` records the choice via `setLastSession` and re-fetches the session to refresh cached
   content.
 - `saveSessionContent(caseId, sessionId, payload)` sends only the camelCase keys present in the payload
@@ -736,14 +833,19 @@ npx wrangler deploy   # publish
 
 Runtime configuration (set as Worker secrets/vars — **never** commit the values):
 
-| Variable | Used for |
-| --- | --- |
-| `SUPABASE_URL` | Base for `${url}/rest/v1` and `${url}/auth/v1` |
-| `SUPABASE_ANON_KEY` | GoTrue signup/login/user calls |
-| `SUPABASE_SERVICE_ROLE_KEY` | All PostgREST reads/writes |
-| `GROQ_API_KEY` | AI routes |
-| `GROQ_MODEL` | **A plain var, not a secret** (`wrangler.jsonc` `vars`) — the Groq model ID; overrides the `MODEL` constant. Change this, not the code, whenever Groq retires a model |
-| `GROQ_MAX_TOKENS` | Optional plain var — when set it is sent as `max_tokens`, so a long model preamble cannot truncate the JSON. Unset by default (no such parameter is sent, so nothing can break on a model that rejects it) |
+| Variable | Secret? | Used for |
+| --- | --- | --- |
+| `SUPABASE_URL` | var | Base for `${url}/rest/v1` and `${url}/auth/v1` |
+| `SUPABASE_ANON_KEY` | secret | GoTrue signup/login/user calls, including the `requireUser` token check (§5.0) |
+| `SUPABASE_SERVICE_ROLE_KEY` | secret | All PostgREST reads/writes |
+| `GROQ_API_KEY` | secret | AI routes |
+| `CLIENT_LINK_SECRET` | **secret** | HMAC-SHA256 key for client links (§5.2). Must be ≥16 characters and is trimmed on read. Missing ⇒ minting `503`, client reads `403` (fail closed). Set with `npx wrangler secret put CLIENT_LINK_SECRET`; a local `wrangler dev` needs it in `.dev.vars` as well |
+| `PUBLIC_APP_URL` | var | Origin the signed client links point at (e.g. `http://localhost:3000`); falls back to the first `ALLOWED_ORIGINS` entry |
+| `ALLOWED_ORIGINS` | var | Comma-separated CORS allowlist. A request from an origin not listed receives no CORS header at all, so the browser blocks the response |
+| `GROQ_MODEL` | var | The Groq model ID — currently `openai/gpt-oss-120b`; overrides the `MODEL` constant (`openai/gpt-oss-20b`). Change this, not the code, whenever Groq retires a model |
+| `GROQ_RESPONSE_FORMAT` | var | `off` (default) / `json_object` / `schema` — see §7 |
+| `GROQ_REASONING_EFFORT` | var | Optional override for the default `low` sent on reasoning models |
+| `GROQ_MAX_TOKENS` | var | Optional; sent as `max_completion_tokens`. Unset by default — reasoning tokens plus the JSON document must fit the tier's 8,000 TPM |
 
 Locally, Wrangler reads these from a `.dev.vars` file; in production use
 `npx wrangler secret put <NAME>`. `.dev.vars` (like `.wrangler/`) is covered by `.gitignore`, so a local
@@ -816,7 +918,21 @@ gradle build        # compiles nothing today — all modules and src/main/java a
   schema** — read it or ask the MCP gateway.
 - Worker routes are order-sensitive (§3). Add new POST routes above the catch-all AI block.
 
-### 11.3 Java module rules (authoritative copy: `ARCHITECTURE.md`)
+### 11.3 Security invariants
+
+- **Auth is default-on.** Every Worker route sits behind `requireUser` (§5.0) unless it is explicitly on
+  the public list. Adding a public route requires a justification in §5.0 *and* a §13.1 entry.
+- **Never widen the public projection.** The only token-free read is `/client-homework/:id`, returning
+  `{ sessionId, title, homework, quiz, vignette, practiceHomework }` and gated by a signed link (§5.2).
+  Adding `session_notes`, `analysis` or `riskFlags` to it would recreate the enumeration leak.
+- **Secrets never reach the browser.** Verification happens in the Worker; the client only ever receives a
+  finished URL. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY` and `CLIENT_LINK_SECRET` exist on the Worker
+  runtime only.
+- **Signature comparisons are constant-time** (`crypto.subtle.verify`), client links *fail closed* when
+  the secret is missing or weak, and generated output is validated against a contract before it is
+  persisted (§7.2) — a placeholder must never be stored as clinical content.
+
+### 11.4 Java module rules (authoritative copy: `ARCHITECTURE.md`)
 
 ```
 alice-core        pure domain logic; no IO, no threads, no platform APIs; depends on nothing
@@ -866,12 +982,14 @@ local development, but several are user-visible or security-relevant.
 
 ### 13.1 Security
 
-| Item | Detail |
-| --- | --- |
-| **Committed service-role key (rotate it)** | A live `service_role` JWT was committed in `workers/mcp-gateway/wrangler.toml` `[vars]`, plus a stray `workers/mcp-gateway/Untitled` copy. Both are now gone from the working tree and `git grep eyJhbGciOi` is clean, but the value is still in git history — **rotate it in Supabase** and re-set it with `wrangler secret put` (§10.4) |
-| **No API authentication** | Every Worker route except `GET /auth/me` is open, CORS is `*`, and the Worker uses its service-role key regardless of the caller. Anyone who knows the Worker URL can read or mutate any client, case or session — including deleting them. The `alice_token` check is client-side only and provides no protection |
-| **Unauthenticated client pages** | `/homework/:sessionId` and `/practice/:sessionId` require no token; knowing (or guessing) a session UUID is the only gate. There are no signed or expiring links |
-| **`POST /client/worksheet` is unauthenticated** | The submissions route is open like the rest of the API and trusts `clientId` from the body, so it needs the same ownership check as the rest of the surface |
+| Item | Status | Detail |
+| --- | --- | --- |
+| **Committed service-role key (rotate it)** | **OPEN** | A live `service_role` JWT was committed in `workers/mcp-gateway/wrangler.toml` `[vars]`, plus a stray `workers/mcp-gateway/Untitled` copy. Both are gone from the working tree and `git grep eyJhbGciOi` is clean, but the value is still in git history — **rotate it in Supabase** and re-set it with `wrangler secret put` (§10.4) |
+| **Unauthenticated API** | **CLOSED** | Every route except `/auth/*` and the signed-link client endpoint now requires a Supabase bearer token (`requireUser`, §5.0). Verified live 2026-09-16: `GET /clients`, `GET /sessions/:id`, `PATCH /sessions/:id`, `GET /ai/health` and `GET /ai/models` all answer `401 { error: "Missing token" }` without one, and a malformed token gets Supabase's `bad_jwt` body. CORS is an explicit `ALLOWED_ORIGINS` allowlist, no longer `*` |
+| **Client-page UUID enumeration** | **CLOSED** | `/homework/:sessionId` and `/practice/:sessionId` now require a signed, expiring link (§5.2). Verified live: a bare session UUID answers `403`, as do tampered, expired and cross-session signatures, and the old anonymous `GET /sessions/:id` read of a full clinical row is gone. The pages themselves now receive only `{ title, homework, quiz, vignette, practiceHomework }` |
+| **Cross-tenant read by an authenticated clinician** | **OPEN** | The Worker still authenticates *to* Supabase with the service-role key, so any signed-in clinician can reach any client's rows. The fix is least privilege — pass the caller's JWT to PostgREST and add RLS policies — not another route guard |
+| **`POST /client/worksheet` trusts `clientId` from the body** | **OPEN** (partially mitigated) | The route is no longer anonymous, but it still trusts `clientId` in the payload, so a signed-in clinician can write a submission against another clinician's client. It needs an ownership check on the session/client |
+| **No refresh-token flow** | **OPEN** | `alice_token` expires (~1h). `apiFetch` now intercepts the resulting `401` and routes to `/login`; a silent refresh (`refresh_token` + a `POST /auth/refresh` route) is the follow-up — the login response already returns `refresh_token`, it is simply discarded |
 
 ### 13.2 Correctness bugs to fix
 
@@ -903,7 +1021,7 @@ local development, but several are user-visible or security-relevant.
 
 | Item | Detail |
 | --- | --- |
-| No tests | No test runner, no test files, no test script |
+| Tests | `npm test` → `node tests/worker.test.mjs`: a dependency-free harness that stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler. 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Still no CI, and nothing covers the Next.js UI |
 | No CI | `.github/` contains only `copilot-instructions.md` — nothing builds or lints on push |
 | Broken lint script | `npm run lint` → `eslint .`, but ESLint is absent from `devDependencies` and no config file exists |
 | Type errors not gated | `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; run `npx tsc --noEmit` manually |
@@ -924,6 +1042,27 @@ local development, but several are user-visible or security-relevant.
 7. The Groq model is now a `GROQ_MODEL` var rather than a code constant (§7). Llama 3.x IDs are
    Enterprise-only, so watch `/ai/models` and bump the var when Groq retires whatever is configured.
 
+### 13.6 Closure record — security & reliability phase (2026-09-16)
+
+Deployed Worker versions on `clinical-ai-backend`, oldest first:
+
+| Version | Change |
+| --- | --- |
+| `98d42111` | Output-shape contracts, honest failure codes, one corrective retry |
+| `3f0af673` | Strict `json_schema` attempt (Groq answered `400 failed_generation` in ~40% of runs) |
+| `9d8de72b` | `GROQ_RESPONSE_FORMAT` knob, default `off` |
+| `cc9e0700` | JSON repair pass (`repairJson`) — closed the unescaped-quote failures |
+| `d475d48c` | Caller authentication guard (`requireUser`) + narrow client projection |
+| `8ab16d22` | `GROQ_MODEL` → `openai/gpt-oss-120b` |
+| `c59c822a` | HMAC-signed, expiring client links + `PUBLIC_APP_URL` |
+
+Evidence for the two closed risk vectors is recorded in §13.1. `npx wrangler rollback` returns to the
+previous version; the model is a plain var, so reverting it is a config change (§7).
+
+**Deliberately frozen for this phase** (do not start without a new decision): RLS / least-privilege reads,
+the refresh-token flow, `POST /client/worksheet` ownership checks, and the repo-hygiene items in §13.3
+and §13.4 (CI, lint config, dead code).
+
 ---
 
 ## 14. Maintaining this document
@@ -933,6 +1072,9 @@ local development, but several are user-visible or security-relevant.
 | Add, rename or remove a Worker route | §5 tables (method, path, body, response, errors), §4 flows if the client consumes it, and the tool table in §9 if you expose it over MCP |
 | Add a column or table | §6 (`Table`, columns used by code, JSON shapes), and add a migration file in `supabase/migrations/` |
 | Change the Groq model, temperature or a prompt contract | §7 |
+| Change the auth model, or add a public route | §1 (access model), §5.0 (guard + public list), §13.1 |
+| Rotate `CLIENT_LINK_SECRET`, or change link TTLs | §5.2 (signing protocol) and §10.3 |
+| Close a security or reliability risk | §13.1 (status) and §13.6 (version + evidence) |
 | Add a route or page | §8.1 |
 | Add, rename or remove a `localStorage` key | §8.4 |
 | Add an MCP tool or endpoint | §9 |
