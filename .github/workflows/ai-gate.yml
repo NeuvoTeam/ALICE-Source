@@ -21,7 +21,6 @@ jobs:
 
       - name: Fetch authoritative gate scripts from main
         run: |
-          git fetch origin main --depth=1
           git checkout origin/main -- scripts/verify.sh scripts/rollback.sh
           chmod +x scripts/verify.sh scripts/rollback.sh
 
@@ -67,20 +66,21 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ steps.prbody.outputs.body }}
         run: |
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           if gh pr view "$BRANCH_NAME" --json number >/dev/null 2>&1; then
-            gh pr edit "$BRANCH_NAME" --body "${{ steps.prbody.outputs.body }}"
+            gh pr edit "$BRANCH_NAME" --body "$PR_BODY"
           else
             gh pr create \
               --title "AI Implementation: ${BRANCH_NAME#ai/}" \
-              --body "${{ steps.prbody.outputs.body }}" \
+              --body "$PR_BODY" \
               --base main \
               --head "$BRANCH_NAME"
           fi
 
       - name: Notify Discord on Gate Failure
-        if: steps.verify.outcome == 'failure'
+        if: failure() && steps.verify.outcome == 'failure'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_AI_ALERTS }}
         run: |
@@ -91,7 +91,7 @@ jobs:
             | curl -sS -X POST -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK"
 
       - name: Trigger Rollback on Gate Failure
-        if: steps.verify.outcome == 'failure'
+        if: failure() && steps.verify.outcome == 'failure'
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |

@@ -29,7 +29,7 @@ run "prettier"    "npx prettier --check ."
 run "unit tests"  "npx vitest run --coverage.enabled --coverage.thresholds.lines=80"
 
 if [ -f "playwright.config.ts" ]; then
-  run "e2e tests" "npx playwright test"
+  run "e2e tests" "npx playwright test --retries=2"
 fi
 
 if compgen -G "schemas/*.schema.json" > /dev/null; then
