@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import {
   estimateTokens,
 } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
+import type { PracticePackage } from "@/lib/practice-package"
 
 type StepId = 1 | 2 | 3
 
@@ -33,110 +34,8 @@ interface AnalysisResult {
   rationale: string
 }
 
-interface PracticePackage {
-  homework: string[]
-  scenario: {
-    title: string
-    difficulty: string
-    situation: string
-    objectives: string[]
-    coachTips: string[]
-  }
-  quiz: {
-    question: string
-    answer: string
-    rationale: string
-  }[]
-}
-
-const MODERN_COLOR_SYNTAX_RE = /\b(lab|oklch|oklab|lch)\(|color-mix\(/i
-
 /** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
 const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
-
-let colorScratchEl: HTMLDivElement | null = null
-
-function getColorScratchEl(): HTMLDivElement {
-  if (!colorScratchEl) {
-    colorScratchEl = document.createElement("div")
-    colorScratchEl.setAttribute("aria-hidden", "true")
-    colorScratchEl.style.cssText =
-      "position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;"
-    document.body.appendChild(colorScratchEl)
-  }
-  return colorScratchEl
-}
-
-/**
- * Chromium often serializes computed colors as lab()/oklch(); html2canvas's parser rejects those.
- */
-function coerceStyleValueForHtml2Canvas(
-  prop: string,
-  value: string,
-  priority: string
-): string {
-  if (!value || !MODERN_COLOR_SYNTAX_RE.test(value)) return value
-  const scratch = getColorScratchEl()
-  const reset =
-    "position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;"
-  scratch.style.cssText = reset
-  try {
-    scratch.style.setProperty(prop, value, priority as "important" | "")
-    const resolved = getComputedStyle(scratch).getPropertyValue(prop)
-    if (resolved && !MODERN_COLOR_SYNTAX_RE.test(resolved)) return resolved.trim()
-  } catch {
-    /* ignore */
-  } finally {
-    scratch.style.cssText = reset
-  }
-  try {
-    const ctx = document.createElement("canvas").getContext("2d")
-    if (ctx) {
-      ctx.fillStyle = "#000"
-      ctx.fillStyle = value
-      const c = ctx.fillStyle
-      if (typeof c === "string" && c && !MODERN_COLOR_SYNTAX_RE.test(c)) return c
-    }
-  } catch {
-    /* ignore */
-  }
-  if (prop === "color") return "rgb(0, 0, 0)"
-  if (prop === "fill" || prop === "stroke") return "rgb(0, 0, 0)"
-  if (/(^|-)color$/.test(prop)) return "rgb(128, 128, 128)"
-  if (prop.includes("shadow")) return "none"
-  if (prop.startsWith("background")) return "rgba(0, 0, 0, 0)"
-  if (prop.startsWith("border")) return "none"
-  return "transparent"
-}
-
-/** html2canvas cannot parse oklch/lab(); inline sRGB-safe values onto the clone before rasterizing. */
-function inlineComputedStylesForCapture(original: Element, clone: Element) {
-  if (
-    !(original instanceof HTMLElement || original instanceof SVGElement) ||
-    !(clone instanceof HTMLElement || clone instanceof SVGElement)
-  ) {
-    return
-  }
-  const computed = window.getComputedStyle(original)
-  for (let i = 0; i < computed.length; i++) {
-    const name = computed.item(i)
-    const value = computed.getPropertyValue(name)
-    const priority = computed.getPropertyPriority(name)
-    const safe = coerceStyleValueForHtml2Canvas(name, value, priority)
-    clone.style.setProperty(name, safe, priority as "important" | "")
-  }
-  clone.removeAttribute("class")
-  for (let i = 0; i < original.children.length; i++) {
-    inlineComputedStylesForCapture(original.children[i], clone.children[i])
-  }
-}
-
-/** Tailwind v4 emits oklch/lab in cloned <style> tags; html2canvas throws when parsing those rules. */
-function stripClonedDocumentStyles(documentClone: Document) {
-  documentClone
-    .querySelectorAll('style, link[rel="stylesheet"], link[rel~="stylesheet"]')
-    .forEach((node) => node.remove())
-}
 
 export default function VignetteGenerator({
   clientId,
@@ -150,6 +49,8 @@ export default function VignetteGenerator({
   sessionName?: string
 }) {
   const saveSessionContent = useClientNavStore((s) => s.saveSessionContent)
+  /** Client name for the exported PDF header. */
+  const clientName = useClientNavStore((s) => s.client?.name)
 
   const [step, setStep] = useState<StepId>(1)
   const [sessionInput, setSessionInput] = useState("")
@@ -161,8 +62,6 @@ export default function VignetteGenerator({
   const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
   const [linkStatus, setLinkStatus] = useState<string | null>(null)
-
-  const worksheetRef = useRef<HTMLDivElement>(null)
 
   /**
    * Groq's 8,000 tokens/minute ceiling is an *input* limit and the notes are sent
@@ -231,26 +130,27 @@ export default function VignetteGenerator({
     }
   }
 
+  /**
+   * Programmatic A4 export (`lib/export-practice-pdf.ts`): vector text with
+   * explicit page-boundary maths, so nothing overlaps or spills off the sheet.
+   */
   const handleDownloadPdf = async () => {
-    if (!worksheetRef.current) return
+    if (!practicePackage) {
+      alert("Generate a practice package before exporting.")
+      return
+    }
+
     setIsExporting(true)
     try {
-      const [jsPDF, html2canvas] = await Promise.all([
-        import("jspdf").then((m) => m.default),
-        import("html2canvas").then((m) => m.default),
-      ])
-      const canvas = await html2canvas(worksheetRef.current, {
-        scale: 2,
-        onclone: (documentClone, clonedRoot) => {
-          const orig = worksheetRef.current
-          if (orig && clonedRoot) inlineComputedStylesForCapture(orig, clonedRoot)
-          stripClonedDocumentStyles(documentClone)
-        },
+      const { downloadPracticePackagePdf } = await import("@/lib/export-practice-pdf")
+
+      downloadPracticePackagePdf(practicePackage, {
+        clientName,
+        sessionName,
       })
-      const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF("p", "mm", "a4")
-      pdf.addImage(imgData, "PNG", 10, 10, 190, (canvas.height * 190) / canvas.width)
-      pdf.save(`ALICE-practice-package-${clientId}.pdf`)
+    } catch (err) {
+      console.error("❌ PDF EXPORT FAILED", err)
+      alert(err instanceof Error ? err.message : "Could not export the PDF")
     } finally {
       setIsExporting(false)
     }
@@ -550,10 +450,7 @@ export default function VignetteGenerator({
 
         {step === 3 && (
           <div className="space-y-6 animate-in zoom-in-95">
-            <div
-              ref={worksheetRef}
-              className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm"
-            >
+            <div className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm">
               <div className="flex justify-between items-start border-b pb-8">
                 <div>
                   <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
@@ -603,110 +500,6 @@ export default function VignetteGenerator({
                     )}
                   </section>
 
-                  {/* Section 2: Role Play Scenario */}
-                  {false && (
-                    <section>
-                      <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-                        2. Role Play Scenario
-                      </h4>
-                      {practicePackage.scenario ? (
-                        <div className="space-y-3">
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                              Title:
-                            </span>
-                            <span className="font-bold text-zinc-800">{practicePackage.scenario.title}</span>
-                          </div>
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                              Difficulty:
-                            </span>
-                            <span className="text-zinc-700">{practicePackage.scenario.difficulty}</span>
-                          </div>
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                              Situation:
-                            </span>
-                            <span className="text-zinc-700">{practicePackage.scenario.situation}</span>
-                          </div>
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                              Objectives:
-                            </span>
-                            {practicePackage.scenario.objectives &&
-                            practicePackage.scenario.objectives.length > 0 ? (
-                              <ul className="list-disc ml-6 text-zinc-800">
-                                {practicePackage.scenario.objectives.map((obj, i) => (
-                                  <li key={i} className="text-xs">{obj}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="text-zinc-500 italic">None</span>
-                            )}
-                          </div>
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                              Coach Tips:
-                            </span>
-                            {practicePackage.scenario.coachTips &&
-                            practicePackage.scenario.coachTips.length > 0 ? (
-                              <ul className="list-disc ml-6 text-zinc-800">
-                                {practicePackage.scenario.coachTips.map((tip, i) => (
-                                  <li key={i} className="text-xs">{tip}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="text-zinc-500 italic">None</span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-zinc-400 italic">No role play scenario provided.</div>
-                      )}
-                    </section>
-                  )}
-             
-
-                  {/* Section 3: Quiz */}
-                  {false && (
-                    <section>
-                      <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-                        3. Quiz
-                      </h4>
-                      {practicePackage.quiz && practicePackage.quiz.length > 0 ? (
-                        <div className="space-y-6">
-                          {practicePackage.quiz.map((qz, i) => (
-                            <div
-                              key={i}
-                              className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 space-y-1"
-                            >
-                              <div>
-                                <span className="font-bold uppercase text-[10px] text-zinc-500 mr-2">
-                                  Q{i + 1}:
-                                </span>
-                                <span className="text-zinc-700 font-medium">{qz.question}</span>
-                              </div>
-                              <div>
-                                <span className="font-bold uppercase text-[10px] text-green-700 mr-2">
-                                  Answer:
-                                </span>
-                                <span className="text-zinc-700">{qz.answer}</span>
-                              </div>
-                              <div>
-                                <span className="font-bold uppercase text-[10px] text-blue-600 mr-2">
-                                  Rationale:
-                                </span>
-                                <span className="text-zinc-700">{qz.rationale}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-zinc-400 italic">No quiz provided.</div>
-                      )}
-                    </section>
-                  )}
-             
                 </div>
               )}
             </div>
@@ -751,7 +544,7 @@ export default function VignetteGenerator({
               <Button
                 onClick={handleDownloadPdf}
                 className="flex-1 bg-zinc-900 text-white h-12 rounded-2xl font-bold"
-                disabled={isExporting}
+                disabled={isExporting || !practicePackage}
               >
                 {isExporting ? (
                   <Loader2 className="animate-spin mr-2" />

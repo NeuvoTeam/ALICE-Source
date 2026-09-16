@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node tests/worker.test.mjs"
+    "test": "node tests/worker.test.mjs && node tests/pdf-export.test.mjs",
+    "test:pdf": "node tests/pdf-export.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -46,7 +47,6 @@
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.6.0",
-    "html2canvas": "^1.4.1",
     "input-otp": "1.4.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.564.0",

@@ -69,7 +69,8 @@ Client  ──▶  Case (case formulation)  ──▶  Session
 1. **Phase 1 — input.** Paste/label session notes.
 2. **Phase 2 — analysis.** `POST /analyze/session` → `{ rationale, inferredModality, riskFlags[] }`.
 3. **Phase 3 — materials.** `POST /generate/practice-package` → `{ homework[], scenario{...}, quiz[...] }`,
-   rendered as a worksheet that can be exported to PDF (jsPDF + html2canvas).
+   rendered as a worksheet whose homework list exports to A4 via `lib/export-practice-pdf.ts`
+   (programmatic jsPDF — no rasterisation).
 
 Every phase transition persists to the current session, and each save also appends a row to
 `session_versions` so prior content is recoverable.
@@ -727,10 +728,17 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
 ### 8.5 Notable component details
 
 - `components/vignette-generator.tsx` is the largest client component: a 3-phase state machine, a
-  `Progress` bar, and PDF export via dynamic `jspdf` + `html2canvas`. Because Tailwind v4 emits
-  `oklch()`/`lab()` colours that html2canvas cannot parse, it inlines sRGB-safe computed styles onto the
-  cloned DOM (`coerceStyleValueForHtml2Canvas`, `inlineComputedStylesForCapture`) before capture — keep
-  that shim if you change the worksheet markup.
+  `Progress` bar, and PDF export through `lib/export-practice-pdf.ts` (dynamically imported, so `jspdf`
+  stays out of the main bundle). The exporter builds the A4 document programmatically — the homework list
+  only, matching what `/practice/[sessionId]` exposes — with explicit sRGB colours (the Tailwind v4
+  `oklch()` tokens are mapped in its `COLORS` table), an exact-fit `wrapText()`, and page breaks derived
+  from `A4.CONTENT_BOTTOM`, so text can neither overlap nor leave the sheet. Downloads are named
+  `ALICE_PracticePackage_YYYYMMDD_ClientName.pdf` (`buildPracticePackageFileName`, which strips spaces and
+  illegal characters and folds accents; an unusable name drops the segment) and the `fileName` option
+  overrides it. `html2canvas` and the computed-style inlining shim it required were removed in favour of
+  this approach; the hidden role-play/quiz blocks and the unreferenced `components/clinical-folder-tree.tsx`
+  stub went with them, since neither had a consumer (the screen hid them and the PDF excludes them) and
+  both were the only `tsc` errors. `npm run test:pdf` guards geometry, pagination, glyph hygiene and naming.
 - `components/main-content.tsx` dynamically imports the generator with `ssr: false`; its History tab
   lists `GET /sessions?clientId=…` rows keyed on `created_at`.
 - `components/auth-guard.tsx` renders `Loading...` until `GET /auth/me` resolves, then either renders
