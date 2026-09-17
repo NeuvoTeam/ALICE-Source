@@ -476,9 +476,9 @@ export default function VignetteGenerator({
                   <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
   Please complete the following tasks before your next session
 </h4>
-                    {practicePackage.homework && practicePackage.homework.length > 0 ? (
+                    {practicePackage?.homework && practicePackage.homework.length > 0 ? (
                       <div className="space-y-4">
-                      {practicePackage.homework.map((item: any, i) => (
+                      {practicePackage?.homework?.map((item: any, i) => (
                         <div
                           key={i}
                           className="flex items-start gap-3"
