@@ -245,21 +245,22 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
   /* ========================= */
   loadClients: async () => {
-    try {
-      set({ error: null })
+    set({ loading: true, error: null })
 
+    try {
       const data = await safeFetch(`${API}/clients`)
 
       set({
-        clients: data.map((c: any) => ({
+        clients: (Array.isArray(data) ? data : []).map((c: any) => ({
           id: c.id,
           name: c.name || 'Unnamed Client',
           cases: [],
         })),
+        loading: false,
       })
 
     } catch (err: any) {
-      set({ error: err.message })
+      set({ error: err.message, loading: false })
     }
   },
 
@@ -347,24 +348,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
   /* ========================= */
   load: async () => {
-    set({ loading: true, error: null })
-
-    try {
-      const clients = await safeFetch(`${API}/clients`)
-
-      if (!clients.length) {
-        set({ clients: [], loading: false })
-        return
-      }
-
-      set({
-        clients,
-        loading: false,
-      })
-
-    } catch (err: any) {
-      set({ error: err.message, loading: false })
-    }
+    await get().loadClients()
   },
 
   /* ========================= */
