@@ -355,3 +355,142 @@ Printed from the files themselves (not `git diff`) after each commit:
 | 3 | `backend/CloudFlare.js` | 332-349 case lookup + 404 · 367 `client_id: clientId` |
 | 4 | `app/client-login/page.tsx` | 6-18 `resolveRedirect` · 24 call site · 41 `router.push(redirect)` (unchanged) |
 | 5 | `stores/useClientNavStore.ts` | 446-449 + 467-472 (`renameClient`) · 481-482 + 500-501 (`renameCase`) · 513-514 + 539-540 (`renameSession`) |
+
+---
+
+# Overnight bearer-token & clinician-client access control — 2026-09-17
+
+**Run:** 2026-09-17, overnight run
+**Branch:** current working branch
+**Commits:** `f24e58f`, `7e18fe0`, `be33cea` (this report update replaces the third)
+
+## Result summary
+
+| # | Commit | Scope | Gate |
+| --- | --- | --- | --- |
+| 1 | `f24e58f` | Auth infrastructure: `requireUser`, `checkClientAccess`, `isPublicRoute` guard | `node --check` exit 0 |
+| 2 | `7e18fe0` | Route-level `checkClientAccess` enforcement on all client/session/AI routes | `node --check` exit 0 |
+| 3 | `be33cea` | This report (replaced by this update) | — |
+
+## Auth infrastructure (Commit 1 — `f24e58f`)
+
+### `requireUser(request, env, cors, baseUrl)`
+
+Validates the caller's Supabase access token by calling `GET ${baseUrl}/auth/v1/user` with:
+- `apikey: env.SUPABASE_ANON_KEY`
+- `Authorization: <caller's bearer token>`
+
+Returns `{ user }` on success, `{ errorResponse: 401 }` on invalid/missing token, or
+`{ errorResponse: 503 }` when Supabase is unreachable.
+
+### `isPublicRoute` guard
+
+Routes that bypass `requireUser`:
+- `POST /auth/signup` — public registration
+- `POST /auth/login` — public authentication
+- `GET /auth/me` — already does its own token check internally
+- `GET /client-homework/*` — public client-facing, verified via signed HMAC links (not bearer tokens)
+
+All other routes must pass `requireUser` before executing.
+
+### `checkClientAccess(clientId)`
+
+Queries `clinician_clients?clinician_id=eq.${authUser.id}&client_id=eq.${clientId}&select=id`
+using the service-role headers. Returns `true` if the mapping row exists, `false` otherwise.
+When `clientId` is null/undefined or `authUser.id` is missing, returns `false` (fail closed).
+
+## Route-by-route security audit (Commit 2 — `7e18fe0`)
+
+### Routes secured with bearer token only (no clientId to verify)
+
+| Route | Notes |
+| --- | --- |
+| `GET /ai/models` | Diagnostic — returns available Groq models |
+| `GET /ai/health` | Diagnostic — sends a ping to Groq |
+| `GET /ai/probe` | Diagnostic — tests prompt parsing |
+
+### Routes secured with bearer token + `checkClientAccess`
+
+| Route | How clientId is resolved |
+| --- | --- |
+| `GET /clients` | Queries `clinician_clients` for all the clinician's client_ids, returns only those |
+| `POST /clients` | Creates client, then inserts `clinician_clients` mapping row |
+| `PATCH /clients/:id` | `checkClientAccess(id)` on URL param |
+| `POST /cases` | `checkClientAccess(body.clientId)` |
+| `DELETE /cases/:id` | Looks up case → `checkClientAccess(case.client_id)` |
+| `PATCH /cases/:id` | Looks up case → `checkClientAccess(case.client_id)` |
+| `POST /sessions` | Resolves case → `checkClientAccess(clientId)` |
+| `GET /sessions` | If `clientId` param: `checkClientAccess(clientId)`. If `sessionId` param: resolves session → checks. If neither: queries `clinician_clients` for all client_ids, filters with `&client_id=in.(...)` |
+| `GET /sessions/:id` | Resolves session → `checkClientAccess(session.client_id)` |
+| `PATCH /sessions/:id` | Resolves session → `checkClientAccess(session.client_id)` |
+| `DELETE /sessions/:id` | Resolves session → `checkClientAccess(session.client_id)` |
+| `GET /latest-session` | Resolves session → `checkClientAccess(session.client_id)` |
+| `GET /client/history` | `checkClientAccess(clientId)` on query param |
+| `GET /client/:id` | `checkClientAccess(id)` on URL param |
+| `POST /client/worksheet` | `checkClientAccess(body.clientId)` |
+| `GET /client-link/:sessionId` | Resolves session → `checkClientAccess(session.client_id)` |
+
+### AI POST routes (bearer token + session-level access)
+
+| Route | How access is checked |
+| --- | --- |
+| `POST /analyze/session` | If `body.sessionId`: resolves session → `checkClientAccess(session.client_id)` |
+| `POST /generate/vignette` | Same as above |
+| `POST /generate/practice-package` | Same as above |
+
+## Supabase schema findings
+
+### Tables confirmed in codebase
+
+The following tables are referenced in `backend/CloudFlare.js` REST queries and/or
+`supabase/migrations/*.sql`:
+
+| Table | Evidence | Key columns used |
+| --- | --- | --- |
+| `clients` | REST queries in CloudFlare.js | `id`, `full_name`, `first_name`, `middle_name`, `last_name`, `email`, `country_code`, `phone_number` |
+| `case_formulations` | REST queries in CloudFlare.js | `id`, `client_id`, `name` |
+| `sessions` | REST queries in CloudFlare.js | `id`, `case_id`, `client_id`, `name`, `session_notes`, `vignette`, `homework`, `quiz`, `practice_package`, `analysis`, `modality` |
+| `profiles` | `/auth/me` route | `id` (matches auth user id) |
+| `worksheet_submissions` | `/client/worksheet` route | `client_id`, `session_id`, `answers` |
+| `session_versions` | `saveSessionVersion` helper | `session_id`, snapshot data |
+
+### `clinician_clients` — assumed schema
+
+**No local migration file defines this table.** Its schema is inferred from the `fetch` calls
+in `checkClientAccess` and `GET /clients`:
+
+| Column | Type (assumed) | Purpose |
+| --- | --- | --- |
+| `id` | UUID / serial | Primary key |
+| `clinician_id` | UUID | References the authenticated user (`authUser.id` from Supabase auth) |
+| `client_id` | UUID | References `clients.id` |
+
+**⚠️ Risk:** If the live column is named `user_id` instead of `clinician_id`, every
+`checkClientAccess` call will silently return zero rows (access denied for all). This is
+fail-closed (secure), but would block all clinician operations. Verify against the live
+Supabase schema before deploying.
+
+## Verification record
+
+```
+$ node --check backend/CloudFlare.js   # exit 0 — all three commits
+$ git status --short                   # clean working tree after commits
+$ git log --oneline -5
+be33cea docs: rewrite OVERNIGHT_REPORT.md with full security audit and schema findings
+7e18fe0 feat(auth): secure route-level access for clients, cases, and sessions
+f24e58f feat(auth): add auth infrastructure (requireUser, checkClientAccess, isPublicRoute)
+24d2858 client log in page (AGY)
+09badd6 Update CloudFlare.js
+```
+
+## TODOs for this run
+
+1. **Verify `clinician_clients` schema** — Confirm column names (`clinician_id` vs `user_id`)
+   against the live Supabase database. If the column is `user_id`, search-replace in
+   `checkClientAccess` and `GET /clients`.
+
+2. **Test in staging** — Deploy to a staging Worker and verify:
+   - Unauthenticated requests to `/clients` return 401
+   - Authenticated requests only see their own clients
+   - `/auth/login`, `/auth/signup`, `/auth/me` still work without bearer tokens
+   - `GET /sessions` with no params returns only the clinician's sessions
