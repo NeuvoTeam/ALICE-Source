@@ -18,7 +18,7 @@ async function requireUser(request, env, cors, baseUrl) {
   const token = request.headers.get("Authorization")
 
   if (!token) {
-    return respond({ error: "Missing token" }, cors, 401)
+    return { errorResponse: respond({ error: "Missing token" }, cors, 401) }
   }
 
   try {
@@ -30,15 +30,18 @@ async function requireUser(request, env, cors, baseUrl) {
       },
     })
 
-    if (res.ok) return null
+    if (res.ok) {
+      const user = await res.json()
+      return { user }
+    }
 
     const data = await res.json().catch(() => null)
 
-    return respond(data || { error: "Invalid token" }, cors, 401)
+    return { errorResponse: respond(data || { error: "Invalid token" }, cors, 401) }
   } catch (err) {
     console.error("Auth check failed:", err)
 
-    return respond({ error: "Authentication unavailable" }, cors, 503)
+    return { errorResponse: respond({ error: "Authentication unavailable" }, cors, 503) }
   }
 }
 
@@ -262,10 +265,20 @@ export default {
       cleanPath === "/client-homework" ||
       cleanPath.startsWith("/client-homework/")
 
+    let authUser = null
     if (!isPublicRoute) {
-      const unauthorized = await requireUser(request, env, cors, baseUrl)
+      const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
 
-      if (unauthorized) return unauthorized
+      if (errorResponse) return errorResponse
+      authUser = user
+    }
+
+    async function checkClientAccess(clientId) {
+      if (!clientId || !authUser?.id) return false
+      const res = await fetch(`${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&client_id=eq.${clientId}&select=id`, { headers: HEADERS })
+      if (!res.ok) return false
+      const data = await res.json()
+      return Array.isArray(data) && data.length > 0
     }
 
     try {
