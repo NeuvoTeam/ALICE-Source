@@ -18,7 +18,7 @@ async function requireUser(request, env, cors, baseUrl) {
   const token = request.headers.get("Authorization")
 
   if (!token) {
-    return respond({ error: "Missing token" }, cors, 401)
+    return { errorResponse: respond({ error: "Missing token" }, cors, 401) }
   }
 
   try {
@@ -30,15 +30,18 @@ async function requireUser(request, env, cors, baseUrl) {
       },
     })
 
-    if (res.ok) return null
+    if (res.ok) {
+      const user = await res.json()
+      return { user }
+    }
 
     const data = await res.json().catch(() => null)
 
-    return respond(data || { error: "Invalid token" }, cors, 401)
+    return { errorResponse: respond(data || { error: "Invalid token" }, cors, 401) }
   } catch (err) {
     console.error("Auth check failed:", err)
 
-    return respond({ error: "Authentication unavailable" }, cors, 503)
+    return { errorResponse: respond({ error: "Authentication unavailable" }, cors, 503) }
   }
 }
 
@@ -262,10 +265,20 @@ export default {
       cleanPath === "/client-homework" ||
       cleanPath.startsWith("/client-homework/")
 
+    let authUser = null
     if (!isPublicRoute) {
-      const unauthorized = await requireUser(request, env, cors, baseUrl)
+      const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
 
-      if (unauthorized) return unauthorized
+      if (errorResponse) return errorResponse
+      authUser = user
+    }
+
+    async function checkClientAccess(clientId) {
+      if (!clientId || !authUser?.id) return false
+      const res = await fetch(`${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&client_id=eq.${clientId}&select=id`, { headers: HEADERS })
+      if (!res.ok) return false
+      const data = await res.json()
+      return Array.isArray(data) && data.length > 0
     }
 
     try {
@@ -432,8 +445,21 @@ if (method === "GET" && cleanPath === "/auth/me") {
    ✅ GET ALL CLIENTS (FIXED)
    ========================= */
    if (method === "GET" && cleanPath === "/clients") {
+    const mappingRes = await fetch(
+      `${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&select=client_id`,
+      { headers: HEADERS }
+    )
+    if (!mappingRes.ok) throw new Error(await mappingRes.text())
+    
+    const mappingData = await mappingRes.json()
+    const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+
+    if (clientIds.length === 0) {
+      return respond([], cors)
+    }
+
     const res = await fetch(
-      `${SUPABASE_URL}/clients?select=id,full_name`,
+      `${SUPABASE_URL}/clients?id=in.(${clientIds.join(",")})&select=id,full_name`,
       { headers: HEADERS }
     )
   
@@ -477,6 +503,15 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
         const row = await writeClientRow(SUPABASE_URL, HEADERS, "POST", null, payload)
 
+        await fetch(`${SUPABASE_URL}/clinician_clients`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            clinician_id: authUser.id,
+            client_id: row.id
+          })
+        })
+
         return respond(row, cors)
       }
 
@@ -489,6 +524,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
         
           if (!body?.clientId) {
             return respond({ error: "Missing clientId" }, cors, 400)
+          }
+
+          if (!(await checkClientAccess(body.clientId))) {
+            return respond({ error: "Client not found or access denied" }, cors, 404)
           }
         
           // ✅ Count existing cases for this client
@@ -544,6 +583,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
           // ✅ The case row is the source of truth for client_id; body.clientId only
           // covers legacy case rows whose own client_id is null.
           const clientId = caseRows[0].client_id || body.clientId || null
+          if (!(await checkClientAccess(clientId))) {
+            return respond({ error: "Client not found or access denied" }, cors, 404)
+          }
         
           // ✅ Count existing sessions for this case
           const countRes = await fetch(
@@ -582,6 +624,16 @@ if (method === "GET" && cleanPath === "/auth/me") {
           return respond({ error: "Missing caseId" }, cors, 400)
         }
 
+        const caseRes = await fetch(`${SUPABASE_URL}/case_formulations?id=eq.${id}&select=client_id`, { headers: HEADERS })
+        if (!caseRes.ok) throw new Error(await caseRes.text())
+        const caseData = await caseRes.json()
+        if (!caseData || !caseData.length) {
+          return respond({ error: "Case not found" }, cors, 404)
+        }
+        if (!(await checkClientAccess(caseData[0].client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
         const res = await fetch(
           `${SUPABASE_URL}/case_formulations?id=eq.${id}`,
           { method: "DELETE", headers: HEADERS }
@@ -602,6 +654,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
         if (!id) {
           return respond({ error: "Missing sessionId" }, cors, 400)
+        }
+
+        const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${id}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+        if (!(await checkClientAccess(sessionClientId))) {
+          return respond({ error: "Access denied" }, cors, 403)
         }
 
         const res = await fetch(
@@ -625,6 +688,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
           if (!id) {
             return respond({ error: "Missing clientId" }, cors, 400)
+          }
+
+          if (!(await checkClientAccess(id))) {
+            return respond({ error: "Client not found or access denied" }, cors, 404)
           }
 
           const payload = buildClientPayload(body, true)
@@ -651,6 +718,16 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
           if (!body?.name) {
             return respond({ error: "Missing name" }, cors, 400)
+          }
+
+          const caseRes = await fetch(`${SUPABASE_URL}/case_formulations?id=eq.${id}&select=client_id`, { headers: HEADERS })
+          if (!caseRes.ok) throw new Error(await caseRes.text())
+          const caseData = await caseRes.json()
+          if (!caseData || !caseData.length) {
+            return respond({ error: "Case not found" }, cors, 404)
+          }
+          if (!(await checkClientAccess(caseData[0].client_id))) {
+            return respond({ error: "Access denied" }, cors, 403)
           }
 
           const res = await fetch(
@@ -680,6 +757,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
             return respond({ error: "Missing sessionId" }, cors, 400)
           }
 
+          const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${id}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+          if (!sessionRes.ok) throw new Error(await sessionRes.text())
+          const sessionData = await sessionRes.json()
+          if (!sessionData || !sessionData.length) {
+            return respond({ error: "Session not found" }, cors, 404)
+          }
+          const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+          if (!(await checkClientAccess(sessionClientId))) {
+            return respond({ error: "Access denied" }, cors, 403)
+          }
+
           const patch = buildSessionPatch(body)
           if (!Object.keys(patch).length) {
             return respond({ error: "No fields to update" }, cors, 400)
@@ -707,6 +795,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
         if (!sessionId || sessionId.length < 10) {
           return respond({ error: "Invalid session ID" }, cors, 400)
+        }
+
+        const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+        if (!(await checkClientAccess(sessionClientId))) {
+          return respond({ error: "Access denied" }, cors, 403)
         }
 
         const secret = clientLinkSecret(env)
@@ -805,6 +904,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
           return respond({ error: "Missing sessionId" }, cors, 400)
         }
 
+        const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${id}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+        if (!(await checkClientAccess(sessionClientId))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
         const row = await fetchSessionRow(id, SUPABASE_URL, HEADERS)
         if (!row) {
           return respond({ error: "Session not found" }, cors, 404)
@@ -820,14 +930,44 @@ if (method === "GET" && cleanPath === "/auth/me") {
           const clientId = url.searchParams.get("clientId")
           const sessionId = url.searchParams.get("sessionId")
 
+          if (clientId) {
+            if (!(await checkClientAccess(clientId))) {
+              return respond({ error: "Client not found or access denied" }, cors, 404)
+            }
+          }
+
+          if (sessionId && !clientId) {
+            const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+            if (!sessionRes.ok) throw new Error(await sessionRes.text())
+            const sessionData = await sessionRes.json()
+            if (!sessionData || !sessionData.length) {
+              return respond({ error: "Session not found" }, cors, 404)
+            }
+            const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+            if (!(await checkClientAccess(sessionClientId))) {
+              return respond({ error: "Access denied" }, cors, 403)
+            }
+          }
+
           let query = `${SUPABASE_URL}/sessions?select=${SESSION_FULL_SELECT}&order=created_at.desc`
 
           if (clientId) {
             query += `&client_id=eq.${clientId}`
-          }
-
-          if (sessionId) {
+          } else if (sessionId) {
             query += `&id=eq.${sessionId}`
+          } else {
+            const mappingRes = await fetch(
+              `${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&select=client_id`,
+              { headers: HEADERS }
+            )
+            if (!mappingRes.ok) throw new Error(await mappingRes.text())
+            const mappingData = await mappingRes.json()
+            const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+            
+            if (clientIds.length === 0) {
+              return respond([], cors)
+            }
+            query += `&client_id=in.(${clientIds.join(",")})`
           }
 
           const res = await fetch(query, { headers: HEADERS })
@@ -859,6 +999,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
           }, cors)
         }
 
+        const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+        if (!(await checkClientAccess(sessionClientId))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
         const row = await fetchSessionRow(sessionId, SUPABASE_URL, HEADERS)
         if (!row) {
           return respond({ error: "Session not found" }, cors, 404)
@@ -874,6 +1025,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
         if (!clientId) {
           return respond({ error: "Missing clientId" }, cors, 400)
+        }
+        
+        if (!(await checkClientAccess(clientId))) {
+          return respond({ error: "Client not found or access denied" }, cors, 404)
         }
 
         // Sessions hang off cases and `sessions.client_id` is often NULL, so join via cases.
@@ -904,6 +1059,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
       =========================*/
       if (method === "GET" && cleanPath.startsWith("/client/")) {
         const id = cleanPath.split("/")[2]
+
+        if (!(await checkClientAccess(id))) {
+          return respond({ error: "Client not found or access denied" }, cors, 404)
+        }
 
         const res = await fetch(
           `${SUPABASE_URL}/clients?id=eq.${id}&select=id,full_name,case_formulations(id,name,sessions(id,name))`,
@@ -943,6 +1102,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
             cors,
             400
           )
+        }
+
+        if (!(await checkClientAccess(clientId))) {
+          return respond({ error: "Client not found or access denied" }, cors, 404)
         }
 
         const res = await fetch(`${SUPABASE_URL}/worksheet_submissions`, {
@@ -1125,6 +1288,20 @@ if (method === "POST") {
   // Default: fail loudly (502 + readable `detail`) when Groq is unavailable.
   // `?allowDegraded=1` restores the legacy 200 + placeholder payload + `degraded: true`.
   const allowDegraded = url.searchParams.get("allowDegraded") === "1"
+
+  async function checkSessionAccess(sessionId) {
+    if (!sessionId) return false;
+    const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+    if (!sessionRes.ok) return false;
+    const sessionData = await sessionRes.json()
+    if (!sessionData || !sessionData.length) return false;
+    const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+    return await checkClientAccess(sessionClientId);
+  }
+
+  if (body.sessionId && !(await checkSessionAccess(body.sessionId))) {
+    return respond({ error: "Access denied" }, cors, 403)
+  }
 
   /* =========================
      ANALYZE SESSION

@@ -22,3 +22,4 @@ backend/deployed/
 # Wrangler local state/cache and local secrets (never commit)
 .wrangler/
 .dev.vars
+tsconfig.tsbuildinfo

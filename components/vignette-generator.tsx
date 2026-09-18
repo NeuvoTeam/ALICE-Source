@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,7 @@ import {
 } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
 import type { PracticePackage } from "@/lib/practice-package"
+import { decideSessionHydration } from "@/lib/session-hydration"
 
 type StepId = 1 | 2 | 3
 
@@ -52,6 +53,21 @@ export default function VignetteGenerator({
   /** Client name for the exported PDF header. */
   const clientName = useClientNavStore((s) => s.client?.name)
 
+  const session = useClientNavStore((s) =>
+    s.client?.cases.find((c) => c.id === caseId)
+      ?.sessions.find((sess) => sess.id === sessionId)
+  )
+
+  /**
+   * `GET /client/:id` embeds only `sessions(id,name)`, so the tree row is a stub
+   * that shares this id without any payload — `sessionHydratedId` only matches
+   * once `selectSession` has merged `GET /sessions/:id`. `hydratedSessionRef`
+   * makes hydration one-shot per session, so later writes (blur-saves, renames,
+   * the PATCH echo) can never reset the clinician's step.
+   */
+  const sessionHydratedId = useClientNavStore((s) => s.sessionHydratedId)
+  const hydratedSessionRef = useRef<string | null>(null)
+
   const [step, setStep] = useState<StepId>(1)
   const [sessionInput, setSessionInput] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
@@ -75,20 +91,29 @@ export default function VignetteGenerator({
   const notesBudget = `≈${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`
 
   useEffect(() => {
-    setDegradedWarning(null)
-
-    const session = useClientNavStore
-      .getState()
-      .client?.cases.find((c) => c.id === caseId)
-      ?.sessions.find((sess) => sess.id === sessionId)
-
     if (!session) {
+      hydratedSessionRef.current = null
+      setDegradedWarning(null)
       setStep(1)
       setSessionInput("")
       setAnalysis(null)
       setPracticePackage(null)
       return
     }
+
+    // `wait` while the tree stub is all we have (GET /client/:id carries only
+    // `sessions(id,name)`), `keep` for a later store write — blur-save, rename, PATCH
+    // echo — so the phase is never re-derived from anything but the real payload.
+    const action = decideSessionHydration({
+      sessionId: session.id,
+      sessionHydratedId,
+      latchedSessionId: hydratedSessionRef.current,
+    })
+
+    if (action !== "hydrate") return
+
+    hydratedSessionRef.current = session.id
+    setDegradedWarning(null)
 
     setSessionInput(session.sessionNotes || "")
 
@@ -109,7 +134,7 @@ export default function VignetteGenerator({
       setPracticePackage(null)
       setStep(1)
     }
-  }, [sessionId, caseId])
+  }, [session, sessionHydratedId])
 
   const persistNotes = async (notes: string) => {
     setIsSaving(true)
@@ -157,27 +182,27 @@ export default function VignetteGenerator({
   }
 
   /**
-   * Mints a signed, expiring link for the token-free client pages. The Worker
-   * signs `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so the raw session id
-   * alone no longer opens the client's material.
+   * Mints the single signed, expiring client link for the token-free practice
+   * page. The Worker signs `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so the
+   * raw session id alone no longer opens the client's material.
    */
-  const handleCopyClientLink = async (which: "homework" | "practice") => {
+  const handleCopyClientLink = async () => {
     setLinkStatus("Creating link…")
 
     try {
       const res = await apiFetch(`${API_BASE}/client-link/${sessionId}`)
       const data = await res.json().catch(() => null)
 
-      if (!res.ok || !data) {
+      if (!res.ok || !data?.practiceUrl) {
         throw new Error(data?.error || "Could not create a client link")
       }
 
-      const url = which === "homework" ? data.homeworkUrl : data.practiceUrl
+      const url = data.practiceUrl as string
 
       await navigator.clipboard.writeText(url)
 
       setLinkStatus(
-        `Copied the ${which} link — expires ${new Date(
+        `Copied the client link — expires ${new Date(
           data.expiresAt
         ).toLocaleDateString()}`
       )
@@ -476,9 +501,9 @@ export default function VignetteGenerator({
                   <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
   Please complete the following tasks before your next session
 </h4>
-                    {practicePackage.homework && practicePackage.homework.length > 0 ? (
+                    {practicePackage?.homework && practicePackage.homework.length > 0 ? (
                       <div className="space-y-4">
-                      {practicePackage.homework.map((item: any, i) => (
+                      {practicePackage?.homework?.map((item: any, i) => (
                         <div
                           key={i}
                           className="flex items-start gap-3"
@@ -505,24 +530,16 @@ export default function VignetteGenerator({
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
               <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                Client links · signed &amp; expiring
+                Client link · signed &amp; expiring
               </div>
 
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => handleCopyClientLink("homework")}
-                  className="flex-1 h-11 rounded-xl font-bold"
+                  onClick={handleCopyClientLink}
+                  className="w-full h-11 rounded-xl font-bold"
                 >
-                  <Copy className="h-4 w-4 mr-2" /> Copy homework link
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => handleCopyClientLink("practice")}
-                  className="flex-1 h-11 rounded-xl font-bold"
-                >
-                  <Copy className="h-4 w-4 mr-2" /> Copy practice link
+                  <Copy className="h-4 w-4 mr-2" /> Copy Client Link
                 </Button>
               </div>
 

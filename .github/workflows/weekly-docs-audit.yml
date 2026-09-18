@@ -1,0 +1,63 @@
+name: weekly-docs-audit
+
+# Weekly documentation debt audit: scans the preceding 7 days of commit history
+# for instances of the 'DOCS: none' bypass and outputs a debt report to run logs.
+on:
+  schedule:
+    # Trigger weekly on Mondays at 00:00 UTC
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Documentation Debt Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan DOCS: none overrides and generate debt report
+        run: |
+          echo "============================================================"
+          echo "            WEEKLY DOCUMENTATION DEBT AUDIT REPORT          "
+          echo "============================================================"
+          echo "Scan window: Preceding 7 days ($(date -u -d '7 days ago' '+%Y-%m-%d %H:%M:%S UTC') to $(date -u '+%Y-%m-%d %H:%M:%S UTC'))"
+          echo "Filter pattern: 'DOCS: none' in commit message body"
+          echo ""
+
+          COMMITS=$(git log --since="7 days ago" -i --grep="DOCS: none" --format="%H")
+
+          if [ -z "$COMMITS" ]; then
+            echo "Result: No 'DOCS: none' overrides found in the preceding 7 days."
+            echo "Documentation debt status: Clean (no bypassed changes)."
+            echo "============================================================"
+            exit 0
+          fi
+
+          COUNT=$(echo "$COMMITS" | wc -l)
+          echo "WARNING: Found $COUNT commit(s) using 'DOCS: none' override in the last 7 days:"
+          echo "------------------------------------------------------------"
+
+          for HASH in $COMMITS; do
+            AUTHOR=$(git log -1 --format='%an <%ae>' "$HASH")
+            DATE=$(git log -1 --format='%cd' --date=iso "$HASH")
+            SUBJECT=$(git log -1 --format='%s' "$HASH")
+            echo "Commit:  $HASH"
+            echo "Author:  $AUTHOR"
+            echo "Date:    $DATE"
+            echo "Subject: $SUBJECT"
+            echo "Modified files:"
+            git diff-tree --no-commit-id --name-only -r "$HASH" | sed 's/^/  - /'
+            echo "------------------------------------------------------------"
+          done
+
+          echo ""
+          echo "Summary: $COUNT commit(s) bypassed documentation gates."
+          echo "Recommendation: Review the modified files listed above to determine"
+          echo "whether documentation.md needs to be updated."
+          echo "============================================================"

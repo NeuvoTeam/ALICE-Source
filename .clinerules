@@ -1,31 +1,22 @@
 # CRITICAL: CLINE TOOL CALL FORMAT
 
-You MUST use XML tags for ALL tool calls. You MUST NOT use JSON.
+Emit tool calls in Cline's XML format - never a bare JSON envelope - and use only the tools the
+runtime actually lists. Do not invent tools that are not there.
 
-FORBIDDEN:
-- NEVER output JSON like {"name": "editor", "arguments": {...}}
-- NEVER use a tool called "editor". It does not exist.
-- NEVER use absolute paths like "d:\\Work\\...". Use relative paths like "lib/auth.ts".
+AVAILABLE TOOLS:
+- `editor` - create a file, `str_replace` inside one, or `insert` at a line. `str_replace` needs an
+  `old_text` anchor that matches exactly once, so keep anchors small and unique.
+- `read_files` - absolute paths, optionally `start_line`/`end_line` per file; batch several files
+  in one call.
+- `search_codebase` - regex queries, batched.
+- `run_commands` - non-interactive PowerShell (pwsh.exe); sequence commands with `;`.
+- `ask_question`, `fetch_web_content`.
 
-REQUIRED FORMAT FOR WRITING FILES:
-<write_to_file>
-<path>lib/auth.ts</path>
-<content>
-// your code here
-</content>
-</write_to_file>
-
-REQUIRED FORMAT FOR EDITING FILES:
-<replace_in_file>
-<path>app/login/page.tsx</path>
-<diff>
-<<<<<<< SEARCH
-old code
-=======
-new code
->>>>>>> REPLACE
-</diff>
-</replace_in_file>
+RULES:
+- The file tools take ABSOLUTE paths (workspace root plus `lib/auth.ts`). Relative paths are for
+  prose only - the old blanket ban on absolute paths was wrong.
+- Read a file before editing it; never hand-edit generated files.
+- If this file contradicts the tool list the runtime gives you, the runtime wins - fix this file.
 
 # Ponytail Rules for Cline (ALICE Workspace)
 
@@ -56,18 +47,23 @@ new code
 - **Invented config objects:** Do not propose `config`, `allowedOrigins`, or `authMiddleware` modules. Bindings and secrets live on the `env` parameter of the Worker's `fetch` handler.
 - **Wrong paths:** The gateway is at `workers/mcp-gateway/src/index.ts`. The Worker is at `backend/CloudFlare.js`. The store is at `stores/useClientNavStore.ts`. Do not guess paths — verify with `list_files` before reading.
 
-## 6. AI Delegation & Sub-Task Protocol (MANDATORY)
+## 6. Documentation Is Part of the Change
+- **Same commit, every time:** any change to code, config or the data model updates `documentation.md` in the same commit. Use its §14 "Maintaining this document" table to pick the section, and update §13 if you closed or opened a known gap. `AGENTS.md` holds the full contract every agent follows.
+- **Verify:** run `npm run docs:check` before committing. It is also the `.githooks/commit-msg` hook (this clone sets `core.hooksPath=.githooks`) and the `docs-check` workflow.
+- **Opt-out:** a change that genuinely needs no doc edit says `DOCS: none` in the commit message. There is no other exemption.
+
+## 7. AI Delegation & Sub-Task Protocol (MANDATORY)
 - **Stateless execution:** One Cline task = one sub-task. Never chain sub-tasks in one context.
 - **Intake:** At the start of every sub-task, request only: `task_id`, `playbook name`, `target file paths`, `acceptance criteria`, and `verify command`.
 - **Context limits:** Do not request repo history or unrelated files. If context exceeds 8K tokens, stop and report `CONTEXT_OVERFLOW`.
 
-## 7. Verification & CI Gate (NON-NEGOTIABLE)
+## 8. Verification & CI Gate (NON-NEGOTIABLE)
 - You do not decide whether code is correct. You run `./scripts/verify.sh` and read its exit code.
 - Exit 0 = pass. Non-zero = fail. No interpretation.
 - You may not edit `scripts/verify.sh`, CI configs, or tooling configs to force a pass.
 - If verify fails twice, stop and trigger `docs/playbooks/escalation.md`.
 
-## 8. Model Routing & Escalation
+## 9. Model Routing & Escalation
 - **Local (7B):** Use for boilerplate, CRUD, unit tests, commit messages.
 - **Escalate (Sonnet/Pro):** Escalate immediately if:
   - `verify.sh` fails twice on the same sub-task.
@@ -75,7 +71,8 @@ new code
   - The change touches auth, payments, secrets, or CI configs.
   - You encounter `CONTEXT_OVERFLOW`.
 
-## 9. Branch Discipline & Deployment
+## 10. Branch Discipline & Deployment
 - Every sub-task must run on branch: `ai/<task_id>`
 - Never commit to `main` or `develop` directly.
 - **Final step:** You must output a `pr-context.txt` file per the active playbook instructions before pushing.
+

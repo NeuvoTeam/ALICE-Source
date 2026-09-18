@@ -56,6 +56,14 @@ type ClientNavState = {
   selectedCaseId: string | null
   selectedSessionId: string | null
 
+  /**
+   * Set to a session id only once `GET /sessions/:id` has been merged into the
+   * tree. `GET /client/:id` embeds just `sessions(id,name)`, so a session row can
+   * exist before its notes/analysis/practice_package are known; the vignette
+   * generator uses this flag to tell "payload has landed" from "tree stub".
+   */
+  sessionHydratedId: string | null
+
   loading: boolean
   error: string | null
 
@@ -239,27 +247,29 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
   selectedClientId: null,
   selectedCaseId: null,
   selectedSessionId: null,
+  sessionHydratedId: null,
 
   loading: false,
   error: null,
 
   /* ========================= */
   loadClients: async () => {
-    try {
-      set({ error: null })
+    set({ loading: true, error: null })
 
+    try {
       const data = await safeFetch(`${API}/clients`)
 
       set({
-        clients: data.map((c: any) => ({
+        clients: (Array.isArray(data) ? data : []).map((c: any) => ({
           id: c.id,
           name: c.name || 'Unnamed Client',
           cases: [],
         })),
+        loading: false,
       })
 
     } catch (err: any) {
-      set({ error: err.message })
+      set({ error: err.message, loading: false })
     }
   },
 
@@ -301,7 +311,11 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       setLastSession(clientId, caseId, sessionId)
     }
 
-    set({ selectedCaseId: caseId, selectedSessionId: sessionId })
+    set({
+      selectedCaseId: caseId,
+      selectedSessionId: sessionId,
+      sessionHydratedId: null,
+    })
 
     try {
       const data = await safeFetch(`${API}/sessions/${sessionId}`)
@@ -314,6 +328,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
             sessionId,
             normalizeSession(data)
           ),
+          sessionHydratedId: sessionId,
         })
       }
     } catch (err: any) {
@@ -347,24 +362,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
   /* ========================= */
   load: async () => {
-    set({ loading: true, error: null })
-
-    try {
-      const clients = await safeFetch(`${API}/clients`)
-
-      if (!clients.length) {
-        set({ clients: [], loading: false })
-        return
-      }
-
-      set({
-        clients,
-        loading: false,
-      })
-
-    } catch (err: any) {
-      set({ error: err.message, loading: false })
-    }
+    await get().loadClients()
   },
 
   /* ========================= */
@@ -647,6 +645,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         selectedClientId: null,
         selectedCaseId: null,
         selectedSessionId: null,
+        sessionHydratedId: null,
       })},
     
 }))

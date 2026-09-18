@@ -2,6 +2,9 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
+
+const TOKEN_KEY = "alice_token";
 
 /* =========================
    ✅ SAFE REDIRECT
@@ -38,7 +41,42 @@ function ClientLoginForm() {
       return;
     }
 
-    router.push(redirect);
+    try {
+      const res = await fetch(`${CLINICAL_AI_API_BASE}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.access_token) {
+        let errorMsg = "Login failed";
+        if (data) {
+          if (typeof data.error_description === "string") {
+            errorMsg = data.error_description;
+          } else if (typeof data.error === "string") {
+            errorMsg = data.error;
+          } else if (typeof data.message === "string") {
+            errorMsg = data.message;
+          } else if (typeof data.msg === "string") {
+            errorMsg = data.msg;
+          }
+        }
+        setError(errorMsg);
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      router.push(redirect);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+      setLoading(false);
+    }
   };
 
   return (

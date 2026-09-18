@@ -1,1 +1,5 @@
+# Git for Windows hands hooks to its bundled bash, whose shebang parser rejects a CRLF line.
+# This keeps the tracked hook LF in every clone, whatever core.autocrlf is set to.
+.githooks/* text eol=lf
 *.sh text eol=lf
+

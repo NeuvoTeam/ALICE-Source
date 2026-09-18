@@ -5,11 +5,34 @@ import { useClientNavStore } from "@/stores/useClientNavStore";
 import EditableName from "./EditableName";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api";
+import { apiFetch } from "@/lib/auth";
 
 type Session = {
   id: string;
   name: string;
 };
+
+/**
+ * Mints the signed, expiring client link from the Worker. The Worker signs
+ * `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so a raw session id alone no
+ * longer opens the client's material. Only a signed-in clinician can mint one:
+ * `apiFetch` attaches the bearer token and routes an expired session to /login.
+ *
+ * There is a single client link: `practiceUrl`. The Worker still returns
+ * `homeworkUrl` for compatibility, but `/homework/:id` forwards to
+ * `/practice/:id`, so the interactive view is the one canonical destination.
+ */
+async function mintClientLink(sessionId: string): Promise<string> {
+  const res = await apiFetch(`${API_BASE}/client-link/${sessionId}`);
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok || !data?.practiceUrl) {
+    throw new Error(data?.error || "Could not create a client link");
+  }
+
+  return data.practiceUrl as string;
+}
 
 export function SessionNode({
   session,
@@ -27,22 +50,59 @@ export function SessionNode({
 
   const isSelected = selectedSessionId === session.id;
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState<"copy" | "open" | null>(null);
 
-  // ✅ COPY
+  // ✅ COPY — mint a fresh signed link, then copy it
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (busy) return;
 
-    const link = `${window.location.origin}/practice/${session.id}`;
-    await navigator.clipboard.writeText(link);
+    setBusy("copy");
 
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    try {
+      const url = await mintClientLink(session.id);
+
+      await navigator.clipboard.writeText(url);
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (err) {
+      console.error("❌ COPY CLIENT LINK FAILED", err);
+      alert(
+        err instanceof Error ? err.message : "Could not create a client link"
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
-  // ✅ OPEN
-  const handleOpen = (e: React.MouseEvent) => {
+  // ✅ OPEN — the tab is opened synchronously so the popup blocker still sees
+  // the user gesture, then pointed at the signed URL once it resolves.
+  const handleOpen = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(`/practice/${session.id}`, "_blank");
+    if (busy) return;
+
+    setBusy("open");
+    const tab = window.open("", "_blank");
+
+    try {
+      const url = await mintClientLink(session.id);
+
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      tab?.close();
+      console.error("❌ OPEN CLIENT LINK FAILED", err);
+      alert(
+        err instanceof Error ? err.message : "Could not create a client link"
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -69,12 +129,14 @@ export function SessionNode({
       {/* RIGHT ACTIONS */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
 
-        {/* COPY */}
+        {/* COPY CLIENT LINK */}
         <button
+          type="button"
           onClick={handleCopy}
-          title="Copy homework link"
+          disabled={busy !== null}
+          title="Copy client link"
           className={cn(
-            "p-1 rounded transition",
+            "p-1 rounded transition disabled:opacity-50",
             copied ? "bg-green-100" : "hover:bg-blue-100"
           )}
         >
@@ -85,11 +147,13 @@ export function SessionNode({
           )}
         </button>
 
-        {/* OPEN */}
+        {/* OPEN CLIENT LINK */}
         <button
+          type="button"
           onClick={handleOpen}
-          title="Open homework"
-          className="p-1 rounded hover:bg-gray-100 transition"
+          disabled={busy !== null}
+          title="Open client link"
+          className="p-1 rounded hover:bg-gray-100 transition disabled:opacity-50"
         >
           <ExternalLink className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
         </button>
