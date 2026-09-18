@@ -98,7 +98,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
 | `components/ui/` | Generated shadcn/ui primitives (new-york style). Treat as vendored — regenerate rather than hand-edit |
 | `hooks/` | `use-clinical-workspace.ts` (local-only workspace — see §8), `use-mobile.ts`, `use-toast.ts` |
-| `lib/` | API base constant, auth helpers, Supabase tripwire, session/hierarchy models, utils |
+| `lib/` | API base constant, auth helpers, Supabase tripwire, session/hierarchy models, the session-hydration guard (§8.2), utils |
 | `stores/` | `useClientNavStore.ts` — the **authoritative** zustand store for client/case/session state |
 | `types/` | Shared types (`Client`) |
 | `styles/globals.css` | Duplicate of the Tailwind theme (the canonical copy per `components.json` is `app/globals.css`) |
@@ -111,11 +111,16 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `backend/CloudFlare.js` | The entire API Worker (`clinical-ai-backend`): caller authentication, CRUD, AI orchestration, Supabase proxy. Single file, ~2,820 lines |
 | `wrangler.jsonc` | Worker config for `clinical-ai-backend` (`main: backend/CloudFlare.js`) |
 | `workers/mcp-gateway/` | Second Worker (`alice-mcp`): MCP context/tools gateway with a service binding to the API Worker |
-| `supabase/migrations/` | `20260603_session_clinical_fields.sql` — adds the clinical columns to `public.sessions` |
+| `supabase/migrations/` | `20260603_session_clinical_fields.sql` (clinical columns on `public.sessions`) and `20260914_worksheet_submissions.sql` (storage behind `POST /client/worksheet`) — see §6.2 |
 | `supabase/functions/` | Empty — reserved for Supabase edge functions |
 | `ai-config/` | `mcp.json` (MCP server registration; contains a placeholder subdomain) and `prompts/` (`intake.txt`, `session.txt` — both empty) |
 | `.cursor/config.json` | Cursor MCP client config pointing at the deployed gateway |
 | `.github/copilot-instructions.md` | Agent rules: use the MCP gateway, never guess the DB schema |
+| `AGENTS.md` | The agent contract for **every** CLI in this repo: the documentation rule (§14) plus the project rules |
+| `.clinerules` | Cline's copy: tool-call format plus the same project rules |
+| `scripts/check-docs.mjs` | `npm run docs:check` — fails a change that touches source without updating `documentation.md` (§14) |
+| `.githooks/commit-msg`, `.github/workflows/docs-check.yml`, `.github/workflows/weekly-docs-audit.yml` | The local and CI gates that run and audit it; CI runs as a non-blocking warning with automated PR comments detailing uncommitted documentation gaps, and weekly audit generates debt reports for `DOCS: none` overrides; `.gitattributes` keeps the hook LF so the Git-for-Windows bash can read its shebang |
+| `tests/` | `worker.test.mjs`, `pdf-export.test.mjs`, `hydration-guard.test.mjs` — dependency-free Node harnesses (§13.4) |
 
 ### Java skeleton and shared config
 
@@ -285,6 +290,13 @@ Phase 3      └─ POST /generate/practice-package { sessionNotes, clientId, se
              └─ store.saveSessionContent(caseId, sessionId, { sessionNotes, analysis, practicePackage })
                    → PATCH /sessions/:sessionId  (optimistic UI, then reconcile with response)
 ```
+
+Phase 1 does not become authoritative until the session payload has landed.
+`components/vignette-generator.tsx` hydrates exactly once per session, keyed on
+`[session, sessionHydratedId]` (§8.2) and latched in a `useRef`: `GET /client/:id` embeds only
+`sessions(id,name)`, so the row that mounts the component is a content-less stub. A later store
+write — blur-save, rename, the `PATCH` echo — therefore cannot reset the phase or discard unsaved
+notes, and a failed `GET /sessions/:id` leaves Phase 1 empty rather than showing the stub.
 
 `POST /generate/vignette` is the lighter alternative (`{ scenario, quiz, homework }`) used for the
 plain vignette flow; it persists `vignette`, `homework`, `quiz` and `modality`.
@@ -693,7 +705,7 @@ import `CLINICAL_AI_API_BASE`.
 ### 8.2 The authoritative store — `stores/useClientNavStore.ts`
 
 A zustand store holding `client`, `clients`, `selectedClientId`, `selectedCaseId`,
-`selectedSessionId`, `loading` and `error`.
+`selectedSessionId`, `sessionHydratedId`, `loading` and `error`.
 
 - **Reads** go through `/clients`, `/client/:id` and `/sessions/:id`; `normalizeSession` and
   `normalizeClientTree` convert snake_case DB rows into camelCase app state and coerce `homework` /
@@ -707,8 +719,12 @@ A zustand store holding `client`, `clients`, `selectedClientId`, `selectedCaseId
   401 loop. `ClientLanding`, `main-content`, `client-view` and `vignette-generator` use `apiFetch`
   directly for the same reason, while the two client-facing pages deliberately keep using plain
   anonymous `fetch`.
-- `selectSession` records the choice via `setLastSession` and re-fetches the session to refresh cached
-  content.
+- `selectSession` records the choice via `setLastSession`, clears `sessionHydratedId`, re-fetches the
+  session and then sets `sessionHydratedId` to its id. That flag is the deterministic "the payload has
+  landed" signal, and it is needed because `GET /client/:id` embeds only `sessions(id,name)`: the tree
+  row can exist — sharing the session's id — before its notes/analysis/practice_package are known.
+  `lib/session-hydration.ts` (`decideSessionHydration`) is the consumer's rule: wait for the signal,
+  then hydrate once per session, so a later write cannot re-derive the phase (§4.5, §8.5).
 - `saveSessionContent(caseId, sessionId, payload)` sends only the camelCase keys present in the payload
   and merges the response back into the tree.
 
@@ -737,10 +753,11 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
 
 ### 8.5 Notable component details
 
-- `components/vignette-generator.tsx` is the largest client component: a 3-phase state machine, a
-  `Progress` bar, and PDF export through `lib/export-practice-pdf.ts` (dynamically imported, so `jspdf`
-  stays out of the main bundle). The exporter builds the A4 document programmatically — the homework list
-  only, matching what `/practice/[sessionId]` exposes — with explicit sRGB colours (the Tailwind v4
+- `components/vignette-generator.tsx` is the largest client component: a 3-phase state machine that
+  hydrates once per session through `lib/session-hydration.ts` (§8.2), a `Progress` bar, and PDF export
+  through `lib/export-practice-pdf.ts` (dynamically imported, so `jspdf` stays out of the main
+  bundle). The exporter builds the A4 document programmatically — the homework list only, matching
+  what `/practice/[sessionId]` exposes — with explicit sRGB colours (the Tailwind v4
   `oklch()` tokens are mapped in its `COLORS` table), an exact-fit `wrapText()`, and page breaks derived
   from `A4.CONTENT_BOTTOM`, so text can neither overlap nor leave the sheet. Downloads are named
   `ALICE_PracticePackage_YYYYMMDD_ClientName.pdf` (`buildPracticePackageFileName`, which strips spaces and
@@ -828,12 +845,18 @@ npm run dev          # Next.js dev server → http://localhost:3000
 npm run build        # production build (type errors are ignored, see §11)
 npm run start        # serve the production build
 npm run lint         # ⚠ currently broken — see below
+npm test             # worker + PDF + hydration suites (plain node, no dependencies)
+npm run docs:check   # fails a change that touched source without documentation.md (§14)
 ```
 
 - **Pick one package manager.** Both `package-lock.json` and `pnpm-lock.yaml` are committed. Mixing
   them produces large, noisy diffs; the lockfile you touch should be the one the team standardises on.
 - `npm run lint` runs `eslint .`, but ESLint is not in `devDependencies` and there is no
   `eslint.config.mjs` / `.eslintrc.json`, so the command fails out of the box (§13).
+- `npm test` runs the three dependency-free Node harnesses of §13.4; `npm run test:pdf` and
+  `npm run test:hydration` run them individually. `npm run docs:check` is the documentation gate of
+  §14 — it also runs as the `.githooks/commit-msg` hook in this clone (`core.hooksPath=.githooks`)
+  and as the `docs-check` workflow.
 - `.vscode/launch.json` launches Chrome against `http://localhost:8080`, which does not match the
   Next.js default port (`3000`). Either start the dev server on 8080 or update the launch config.
 - The frontend talks to the **deployed** Worker by default, because the base URL is a hard-coded
@@ -1040,8 +1063,9 @@ local development, but several are user-visible or security-relevant.
 
 | Item | Detail |
 | --- | --- |
-| Tests | `npm test` → `node tests/worker.test.mjs && node tests/pdf-export.test.mjs`: dependency-free harnesses. The worker one stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler; 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Its Supabase stub models the session→client ownership chain that `checkSessionAccess` walks, and asserts "nothing was persisted" against writes only, because every `sessionId`-bearing AI route reads the session and its owner first. `npm test` is green as of 2026-09-18 (32 worker + 12 PDF checks). Still no CI, and nothing covers the Next.js UI |
-| No CI | `.github/` contains only `copilot-instructions.md` — nothing builds or lints on push |
+| Tests | `npm test` → `node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs`: dependency-free harnesses. The worker one stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler; 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Its Supabase stub models the session→client ownership chain that `checkSessionAccess` walks, and asserts "nothing was persisted" against writes only, because every `sessionId`-bearing AI route reads the session and its owner first. `npm test` is green as of 2026-09-18 (32 worker + 12 PDF + 15 hydration checks). `tests/hydration-guard.test.mjs` imports the real guard (`lib/session-hydration.ts`) under Node's type stripping and locks the race, the blur-save bounce, the placeholder advisory and the failed-fetch fallback; no harness renders React, so component-level regressions still rely on review |
+| Partial CI | `.github/workflows/docs-check.yml` runs `npm run docs:check` on push and pull requests as a non-blocking warning (`continue-on-error: true`), posting PR comments detailing uncommitted documentation gaps, while `.github/workflows/weekly-docs-audit.yml` audits `DOCS: none` overrides weekly. Nothing builds, lints or runs `npm test` on push yet |
+| Docs gate | `scripts/check-docs.mjs` (`npm run docs:check`, the `.githooks/commit-msg` hook, and the workflow above) checks changes touching `app/ components/ stores/ lib/ hooks/ backend/ workers/ supabase/migrations/ tests/` or root configs against `documentation.md`. In local `.githooks/commit-msg`, the failure output explicitly directs callers to bypass via `DOCS: none`. In CI, the gate issues a non-blocking warning and comments on PRs without failing the build, while weekly cron audits log `DOCS: none` bypass debt. `DOCS: none` in the commit message is the bypass, `DOCS_CHECK=off` the local env override |
 | Broken lint script | `npm run lint` → `eslint .`, but ESLint is absent from `devDependencies` and no config file exists |
 | Type errors not gated | `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; run `npx tsc --noEmit` manually |
 | Two lockfiles | `package-lock.json` and `pnpm-lock.yaml` are both tracked |
@@ -1082,9 +1106,27 @@ previous version; the model is a plain var, so reverting it is a config change (
 the refresh-token flow, `POST /client/worksheet` ownership checks, and the repo-hygiene items in §13.3
 and §13.4 (CI, lint config, dead code).
 
+### 13.7 Closure record — UI hydration race (2026-09-18)
+
+| Item | Detail |
+| --- | --- |
+| Symptom | Opening a session that already held content could stick on Phase 1 with an empty notes box |
+| Cause | `components/vignette-generator.tsx` read `useClientNavStore.getState()` once, with deps `[sessionId, caseId]`, while `selectSession` sets the selection *before* `GET /sessions/:id` resolves (§8.2). `GET /client/:id` embeds only `sessions(id,name)`, so the row that mounted the component was a stub sharing the session's id — the arriving payload changed no dependency, so the effect never re-ran |
+| Fix | `sessionHydratedId` on the store (set only after the merge) plus `lib/session-hydration.ts`, consumed by the effect with a `useRef` latch: hydration is one-shot per session, so a later write cannot re-derive the phase or discard unsaved notes |
+| Evidence | `npx tsc --noEmit` exit 0; `npm test` green — including `tests/hydration-guard.test.mjs` (15 checks: the guard table, the race, the blur-save bounce, the placeholder advisory, the failed fetch, remount, re-select), which imports the real guard rather than a copy; commit `c902331` |
+| Note | `c902331` also carried an unrelated client-link documentation rewrite, so its diff is not a record of this change |
+
+Anything that changes the store's shape or the hydration contract must update §8.2 (and §4.5/§8.5 if
+the phases change) — see §14.
+
 ---
 
 ## 14. Maintaining this document
+
+**Every agent must update this file in the same change.** Pick the section from the table below;
+`npm run docs:check` (the `.githooks/commit-msg` hook, plus the `docs-check` workflow) checks a change that
+touches source without it, and `DOCS: none` in the commit message is the bypass. `AGENTS.md`
+states the same rule for every CLI in this repo.
 
 | If you… | Update |
 | --- | --- |
@@ -1094,7 +1136,9 @@ and §13.4 (CI, lint config, dead code).
 | Change the auth model, or add a public route | §1 (access model), §5.0 (guard + public list), §13.1 |
 | Rotate `CLIENT_LINK_SECRET`, or change link TTLs | §5.2 (signing protocol) and §10.3 |
 | Change how a client link is minted, delivered or routed | §1 (access model), §4.4 and §4.7 (flows), §5.2 (response fields), §8.1 (routes) |
-| Close a security or reliability risk | §13.1 (status) and §13.6 (version + evidence) |
+| Change the store's shape, or the session-hydration contract | §8.2 (and §4.5/§8.5 if the phases change) |
+| Change an agent rule, a hook, a workflow or a script | §2 (repo map) and §14 itself (this table + Document ownership) |
+| Close a security or reliability risk | §13.1 (status) and §13.6, or the newest §13.x closure record (version + evidence) |
 | Add a route or page | §8.1 |
 | Add, rename or remove a `localStorage` key | §8.4 |
 | Add an MCP tool or endpoint | §9 |
@@ -1107,12 +1151,15 @@ and §13.4 (CI, lint config, dead code).
 | Document | Owns |
 | --- | --- |
 | `ARCHITECTURE.md` | Java module layering rules (the normative copy) |
-| `documentation.md` (this file) | Product behaviour, architecture of the running system, APIs, data model, setup, gaps |
-| `.github/copilot-instructions.md` | Agent-specific instructions for using the ALICE MCP Gateway |
+| `documentation.md` (this file) | Product behaviour, architecture of the running system, APIs, data model, setup, gaps, and the maintenance contract above |
+| `AGENTS.md` | The agent contract for every CLI in this repo: the documentation rule plus the project rules |
+| `.clinerules` | Cline's tool-call format; mirrors the `AGENTS.md` rules |
+| `.github/copilot-instructions.md` | Copilot's MCP gateway instructions |
+| `scripts/check-docs.mjs`, `.githooks/commit-msg`, `.github/workflows/docs-check.yml`, `.github/workflows/weekly-docs-audit.yml` | Enforcement and audit of this section — plain Node, no dependencies, non-blocking CI warning with automated PR comments and weekly debt reports |
 
 Keep this file honest: if a claim here no longer matches the code, the code wins — fix the document in
-the same pull request that changes the behaviour. Never paste secret values (keys, tokens, JWTs,
-connection strings) into this file; refer to variable names only.
+the same commit that changes the behaviour. Never paste secret values (keys, tokens, JWTs, connection
+strings) into this file; refer to variable names only.
 
 
 

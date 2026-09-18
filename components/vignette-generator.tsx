@@ -24,6 +24,7 @@ import {
 } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
 import type { PracticePackage } from "@/lib/practice-package"
+import { decideSessionHydration } from "@/lib/session-hydration"
 
 type StepId = 1 | 2 | 3
 
@@ -100,14 +101,16 @@ export default function VignetteGenerator({
       return
     }
 
-    // The tree row from `GET /client/:id` only carries `sessions(id,name)` and
-    // reuses this id with no payload, so wait for `GET /sessions/:id` to land
-    // before treating anything as hydrated.
-    if (sessionHydratedId !== session.id) return
+    // `wait` while the tree stub is all we have (GET /client/:id carries only
+    // `sessions(id,name)`), `keep` for a later store write — blur-save, rename, PATCH
+    // echo — so the phase is never re-derived from anything but the real payload.
+    const action = decideSessionHydration({
+      sessionId: session.id,
+      sessionHydratedId,
+      latchedSessionId: hydratedSessionRef.current,
+    })
 
-    // One-shot per session: a later store write (blur-save, rename, PATCH echo)
-    // must never reset the step or stomp unsaved edits.
-    if (hydratedSessionRef.current === session.id) return
+    if (action !== "hydrate") return
 
     hydratedSessionRef.current = session.id
     setDegradedWarning(null)

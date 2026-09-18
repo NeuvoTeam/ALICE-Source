@@ -1,0 +1,11 @@
+#!/bin/sh
+# documentation.md must move with the code (AGENTS.md, documentation.md §14).
+#
+# commit-msg, not pre-commit: the `DOCS: none` opt-out lives in the message, and Git only writes
+# the message file after the pre-commit hook has run. $1 is that file (.git/COMMIT_EDITMSG).
+# Deliberate skip: git commit --no-verify
+if ! node scripts/check-docs.mjs --staged --message "$1"; then
+  echo ""
+  echo "Bypass this gate by adding 'DOCS: none' anywhere in your commit message."
+  exit 1
+fi

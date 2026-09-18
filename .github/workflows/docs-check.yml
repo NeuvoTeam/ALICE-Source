@@ -1,0 +1,91 @@
+name: docs-check
+
+# Non-blocking documentation gate: warns when behavior changes without documentation.md updates
+# and posts an automated comment detailing affected files on Pull Requests.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: documentation.md must move with the code
+        id: check_docs
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! node scripts/check-docs.mjs --range "${BASE_SHA}...HEAD" 2>&1 | tee docs_check_output.txt; then
+            echo "::warning title=Documentation Check Warning::Behavior-affecting files modified without an update to documentation.md."
+            echo "triggered=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Post PR comment on documentation gap
+        if: steps.check_docs.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let output = '';
+            try {
+              output = fs.readFileSync('docs_check_output.txt', 'utf8');
+            } catch (err) {
+              output = '';
+            }
+
+            const lines = output.split('\n');
+            const triggeringFiles = [];
+            let capture = false;
+            for (const line of lines) {
+              if (line.includes('These paths can change behaviour:')) {
+                capture = true;
+                continue;
+              }
+              if (capture) {
+                if (line.trim().startsWith('Update documentation.md') || line.trim().startsWith('docs:check') || line.trim().startsWith('Bypass this gate')) {
+                  break;
+                }
+                const trimmed = line.trim();
+                if (trimmed) {
+                  triggeringFiles.push(trimmed);
+                }
+              }
+            }
+
+            const fileList = triggeringFiles.length > 0
+              ? triggeringFiles.map(f => `- \`${f}\``).join('\n')
+              : '- *(Could not parse triggering files from check output)*';
+
+            const commentBody = [
+              '### ⚠️ Documentation Check Warning',
+              '',
+              'The documentation gate identified modifications to behavior-affecting files without an update to `documentation.md`:',
+              '',
+              fileList,
+              '',
+              '**Action required:**',
+              '- Please update `documentation.md` in accordance with §14 "Maintaining this document".',
+              '- Or bypass this gate by adding `DOCS: none` anywhere in your commit message.'
+            ].join('\n');
+
+            const prNumber = context.payload.pull_request?.number || context.issue.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: commentBody
+            });

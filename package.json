@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node tests/worker.test.mjs && node tests/pdf-export.test.mjs",
-    "test:pdf": "node tests/pdf-export.test.mjs"
+    "test": "node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs",
+    "test:pdf": "node tests/pdf-export.test.mjs",
+    "test:hydration": "node tests/hydration-guard.test.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
