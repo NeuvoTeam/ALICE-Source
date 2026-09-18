@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,6 +52,21 @@ export default function VignetteGenerator({
   /** Client name for the exported PDF header. */
   const clientName = useClientNavStore((s) => s.client?.name)
 
+  const session = useClientNavStore((s) =>
+    s.client?.cases.find((c) => c.id === caseId)
+      ?.sessions.find((sess) => sess.id === sessionId)
+  )
+
+  /**
+   * `GET /client/:id` embeds only `sessions(id,name)`, so the tree row is a stub
+   * that shares this id without any payload — `sessionHydratedId` only matches
+   * once `selectSession` has merged `GET /sessions/:id`. `hydratedSessionRef`
+   * makes hydration one-shot per session, so later writes (blur-saves, renames,
+   * the PATCH echo) can never reset the clinician's step.
+   */
+  const sessionHydratedId = useClientNavStore((s) => s.sessionHydratedId)
+  const hydratedSessionRef = useRef<string | null>(null)
+
   const [step, setStep] = useState<StepId>(1)
   const [sessionInput, setSessionInput] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
@@ -75,20 +90,27 @@ export default function VignetteGenerator({
   const notesBudget = `≈${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`
 
   useEffect(() => {
-    setDegradedWarning(null)
-
-    const session = useClientNavStore
-      .getState()
-      .client?.cases.find((c) => c.id === caseId)
-      ?.sessions.find((sess) => sess.id === sessionId)
-
     if (!session) {
+      hydratedSessionRef.current = null
+      setDegradedWarning(null)
       setStep(1)
       setSessionInput("")
       setAnalysis(null)
       setPracticePackage(null)
       return
     }
+
+    // The tree row from `GET /client/:id` only carries `sessions(id,name)` and
+    // reuses this id with no payload, so wait for `GET /sessions/:id` to land
+    // before treating anything as hydrated.
+    if (sessionHydratedId !== session.id) return
+
+    // One-shot per session: a later store write (blur-save, rename, PATCH echo)
+    // must never reset the step or stomp unsaved edits.
+    if (hydratedSessionRef.current === session.id) return
+
+    hydratedSessionRef.current = session.id
+    setDegradedWarning(null)
 
     setSessionInput(session.sessionNotes || "")
 
@@ -109,7 +131,7 @@ export default function VignetteGenerator({
       setPracticePackage(null)
       setStep(1)
     }
-  }, [sessionId, caseId])
+  }, [session, sessionHydratedId])
 
   const persistNotes = async (notes: string) => {
     setIsSaving(true)

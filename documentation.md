@@ -91,7 +91,8 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `app/dashboard/page.tsx` | Authenticated shell — client landing → sidebar + clinician/client view |
 | `app/login`, `app/signup`, `app/forgot-password` | Clinician auth screens (inline styles, not shadcn) |
 | `app/client-login`, `app/test-auth` | Stubs / diagnostics (see §13) |
-| `app/homework/[sessionId]`, `app/practice/[sessionId]` | Client-facing material views — no login, but only reachable with a signed, expiring link (§4.7, §5.2) |
+| `app/practice/[sessionId]` | Client-facing material view (the `practiceHomework` checklist) — no login, but only reachable with a signed, expiring link (§4.7, §5.2) |
+| `app/homework/[sessionId]` | Legacy redirect shim — forwards an already-shared `/homework` link to `/practice/<id>`, carrying `?exp=&sig=` across unchanged (§4.7) |
 | `app/cases/[caseId]/sessions/[sessionId]` | Bookmark-compat redirect shim — selects the session in the store then `router.replace('/')` |
 | `app/api/analyze/session/route.ts` | **Legacy/dev-only** Next.js route calling a local Ollama instance. Not used by the shipped UI (see §7) |
 | `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
@@ -258,10 +259,14 @@ Three tiers, one direction of trust: the browser only ever talks to a Cloudflare
 | Rename client | `renameClient` | optimistic local update, then `PATCH /clients/:id` |
 | Rename case | `renameCase` | optimistic local update, then `PATCH /cases/:id` |
 | Rename session | `renameSession` | optimistic local update, then `PATCH /sessions/:id` |
+| Copy / open client link | `SessionNode` row actions (no store call) | `GET /client-link/:sessionId` (§5.2) with the clinician's bearer token, then clipboard or a new tab (§4.7) |
 
 The sidebar UI is `components/sidebar/ClientNode.tsx` → `CaseNode.tsx` → `SessionNode.tsx`, with
-`EditableName` inline rename. `components/clinical-folder-tree.tsx` and
-`components/sidebar/Sidebar.tsx` are unused alternates (see §13).
+`EditableName` inline rename. Each session row reveals three actions on hover: **Copy client link**
+and **Open client link** — both mint a fresh signed link through `apiFetch`, so an expired token is
+routed to `/login` rather than failing silently — and a `confirm()`-gated delete.
+`components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
+(see §13).
 
 ### 4.5 The AI workflow (notes → analysis → materials)
 
@@ -293,18 +298,23 @@ the list. The newly created client is *not* auto-opened — the clinician clicks
 
 ### 4.7 Client-facing material pages (public)
 
-Both pages read the same narrow projection, `GET /client-homework/:sessionId`, and must present a
-**signed, expiring link**:
+There is **one client link**: `/practice/<sessionId>?exp=…&sig=…`. It is the only page that reads the
+narrow projection `GET /client-homework/:sessionId`, and it renders `practiceHomework` as a checklist.
 
-- `app/homework/[sessionId]/page.tsx` → renders `vignette` (Case Summary), `quiz` (Reflection
-  Questions) and `homework` (Your Tasks) from `GET /client-homework/:id?exp=…&sig=…`.
-- `app/practice/[sessionId]/page.tsx` → renders `practiceHomework` as a checklist from the same call.
-- The projection returns `{ sessionId, title, homework, quiz, vignette, practiceHomework }` — never
-  `session_notes`, `analysis` or `riskFlags`.
-- The clinician obtains the URL from `GET /client-link/:sessionId` (§5.2), or from the
-  **Copy homework link** / **Copy practice link** buttons in step 3 of
-  `components/vignette-generator.tsx`. The Worker signs `v1|sessionId|exp` with HMAC-SHA256 and
-  returns `homeworkUrl`, `practiceUrl` and `expiresAt`.
+- `app/practice/[sessionId]/page.tsx` → renders the `practiceHomework` checklist from
+  `GET /client-homework/:id?exp=…&sig=…`.
+- `app/homework/[sessionId]/page.tsx` → **legacy shim only**. Links minted before the consolidation
+  (or bookmarked) still work: the page fetches nothing and forwards to `/practice/<id>` with
+  `window.location.replace` plus `window.location.search` verbatim, so the signed `exp`+`sig` pair —
+  the page's only credential — survives untouched and the dead URL stays out of the history.
+- The projection still returns `{ sessionId, title, homework, quiz, vignette, practiceHomework }` —
+  never `session_notes`, `analysis` or `riskFlags`. `vignette`, `quiz` and `homework` are no longer
+  rendered by any page (§13.3); only `practiceHomework` reaches the client today.
+- The clinician obtains the URL from `GET /client-link/:sessionId` (§5.2), from the **Copy Client
+  Link** button in step 3 of `components/vignette-generator.tsx`, or from the session row's
+  **Copy client link** / **Open client link** actions in the sidebar (§4.4). The Worker signs
+  `v1|sessionId|exp` with HMAC-SHA256 and still returns `homeworkUrl`, `practiceUrl` and
+  `expiresAt`; every UI consumer now uses `practiceUrl`.
 - Without a valid `exp`+`sig` pair the route answers `403`, so a bare session UUID opens nothing
   (§13.1). `sessionId` must be at least 10 characters.
 
@@ -367,7 +377,7 @@ Signed links are what make the client-facing pages safe to share by email or SMS
 | --- | --- |
 | Signed payload | `v1\|<sessionId>\|<exp>`, where `exp` is Unix seconds |
 | Algorithm | HMAC-SHA256, key `CLIENT_LINK_SECRET` (Worker secret — §10.3); signature is base64url |
-| URL shape | `<PUBLIC_APP_URL>/homework/<sessionId>?exp=<unix>&sig=<base64url>` — identical for `/practice/…` |
+| URL shape | `<PUBLIC_APP_URL>/practice/<sessionId>?exp=<unix>&sig=<base64url>` — the only link in use. The response also carries `homeworkUrl` (`/homework/…`) for compatibility: that page forwards to `/practice/…` (§4.7) |
 | TTL | `ttlDays` on the mint call; default **14 days**, hard ceiling **30 days** |
 | Verification | `crypto.subtle.verify` (constant-time — never a string comparison) plus an `exp` check against the clock |
 | Rejection | `403 { error: "This link is invalid or has expired. Please ask your clinician for a new one." }`, logged as `Client link rejected (<reason>)` with `missing` / `expired` / `bad_signature` / `not_configured` |
@@ -676,8 +686,8 @@ import `CLINICAL_AI_API_BASE`.
 | `/test-auth` | diagnostic | calls `getCurrentUser()` and logs the result |
 | `/dashboard` | guarded | client landing → sidebar + clinician/client view |
 | `/cases/[caseId]/sessions/[sessionId]` | redirect shim | selects the session, then `router.replace('/')` |
-| `/homework/[sessionId]` | signed link | client-facing Case Summary / Reflection Questions / Your Tasks — needs `?exp=&sig=` (§4.7) |
-| `/practice/[sessionId]` | signed link | client-facing practice checklist — same signed link |
+| `/homework/[sessionId]` | redirect shim | forwards to `/practice/<id>` keeping `?exp=&sig=` — legacy alias for links minted before the consolidation (§4.7) |
+| `/practice/[sessionId]` | signed link | client-facing practice checklist — the one canonical client link (§4.7) |
 | `/api/analyze/session` | API route | legacy Ollama bridge (§7.4) |
 
 ### 8.2 The authoritative store — `stores/useClientNavStore.ts`
@@ -1022,6 +1032,7 @@ local development, but several are user-visible or security-relevant.
 | Gateway package manifest | `workers/mcp-gateway/package.json` declares no dependencies and no scripts, so there is no `dev`/`deploy` shortcut |
 | Schema not fully migrated | `session_versions` (written on every save) and `sessions.practice_package` exist only in the live database — no migration in-repo |
 | Legacy Ollama route | `app/api/analyze/session/route.ts` (§7.4) |
+| Unrendered client projection fields | `GET /client-homework/:id` still returns `vignette`, `quiz` and `homework`, but since the two client pages were consolidated (§4.7) no UI renders them — the client sees only the `practiceHomework` checklist. The worker test asserts the full key set, so the fields are deliberate for now; decide whether to surface them again or narrow the projection |
 | Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` |
 | Empty README | `README.md` is zero bytes; this document is not linked from anywhere in the repo |
 
@@ -1029,7 +1040,7 @@ local development, but several are user-visible or security-relevant.
 
 | Item | Detail |
 | --- | --- |
-| Tests | `npm test` → `node tests/worker.test.mjs`: a dependency-free harness that stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler. 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Still no CI, and nothing covers the Next.js UI |
+| Tests | `npm test` → `node tests/worker.test.mjs && node tests/pdf-export.test.mjs`: dependency-free harnesses. The worker one stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler; 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Its Supabase stub models the session→client ownership chain that `checkSessionAccess` walks, and asserts "nothing was persisted" against writes only, because every `sessionId`-bearing AI route reads the session and its owner first. `npm test` is green as of 2026-09-18 (32 worker + 12 PDF checks). Still no CI, and nothing covers the Next.js UI |
 | No CI | `.github/` contains only `copilot-instructions.md` — nothing builds or lints on push |
 | Broken lint script | `npm run lint` → `eslint .`, but ESLint is absent from `devDependencies` and no config file exists |
 | Type errors not gated | `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; run `npx tsc --noEmit` manually |
@@ -1082,6 +1093,7 @@ and §13.4 (CI, lint config, dead code).
 | Change the Groq model, temperature or a prompt contract | §7 |
 | Change the auth model, or add a public route | §1 (access model), §5.0 (guard + public list), §13.1 |
 | Rotate `CLIENT_LINK_SECRET`, or change link TTLs | §5.2 (signing protocol) and §10.3 |
+| Change how a client link is minted, delivered or routed | §1 (access model), §4.4 and §4.7 (flows), §5.2 (response fields), §8.1 (routes) |
 | Close a security or reliability risk | §13.1 (status) and §13.6 (version + evidence) |
 | Add a route or page | §8.1 |
 | Add, rename or remove a `localStorage` key | §8.4 |
