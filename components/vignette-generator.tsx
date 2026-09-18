@@ -157,27 +157,27 @@ export default function VignetteGenerator({
   }
 
   /**
-   * Mints a signed, expiring link for the token-free client pages. The Worker
-   * signs `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so the raw session id
-   * alone no longer opens the client's material.
+   * Mints the single signed, expiring client link for the token-free practice
+   * page. The Worker signs `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so the
+   * raw session id alone no longer opens the client's material.
    */
-  const handleCopyClientLink = async (which: "homework" | "practice") => {
+  const handleCopyClientLink = async () => {
     setLinkStatus("Creating link…")
 
     try {
       const res = await apiFetch(`${API_BASE}/client-link/${sessionId}`)
       const data = await res.json().catch(() => null)
 
-      if (!res.ok || !data) {
+      if (!res.ok || !data?.practiceUrl) {
         throw new Error(data?.error || "Could not create a client link")
       }
 
-      const url = which === "homework" ? data.homeworkUrl : data.practiceUrl
+      const url = data.practiceUrl as string
 
       await navigator.clipboard.writeText(url)
 
       setLinkStatus(
-        `Copied the ${which} link — expires ${new Date(
+        `Copied the client link — expires ${new Date(
           data.expiresAt
         ).toLocaleDateString()}`
       )
@@ -505,24 +505,16 @@ export default function VignetteGenerator({
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
               <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                Client links · signed &amp; expiring
+                Client link · signed &amp; expiring
               </div>
 
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => handleCopyClientLink("homework")}
-                  className="flex-1 h-11 rounded-xl font-bold"
+                  onClick={handleCopyClientLink}
+                  className="w-full h-11 rounded-xl font-bold"
                 >
-                  <Copy className="h-4 w-4 mr-2" /> Copy homework link
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => handleCopyClientLink("practice")}
-                  className="flex-1 h-11 rounded-xl font-bold"
-                >
-                  <Copy className="h-4 w-4 mr-2" /> Copy practice link
+                  <Copy className="h-4 w-4 mr-2" /> Copy Client Link
                 </Button>
               </div>
 

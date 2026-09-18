@@ -14,20 +14,24 @@ type Session = {
 };
 
 /**
- * Mints the signed, expiring homework link from the Worker. The Worker signs
+ * Mints the signed, expiring client link from the Worker. The Worker signs
  * `v1|sessionId|exp` with `CLIENT_LINK_SECRET`, so a raw session id alone no
  * longer opens the client's material. Only a signed-in clinician can mint one:
  * `apiFetch` attaches the bearer token and routes an expired session to /login.
+ *
+ * There is a single client link: `practiceUrl`. The Worker still returns
+ * `homeworkUrl` for compatibility, but `/homework/:id` forwards to
+ * `/practice/:id`, so the interactive view is the one canonical destination.
  */
-async function mintHomeworkLink(sessionId: string): Promise<string> {
+async function mintClientLink(sessionId: string): Promise<string> {
   const res = await apiFetch(`${API_BASE}/client-link/${sessionId}`);
   const data = await res.json().catch(() => null);
 
-  if (!res.ok || !data?.homeworkUrl) {
+  if (!res.ok || !data?.practiceUrl) {
     throw new Error(data?.error || "Could not create a client link");
   }
 
-  return data.homeworkUrl as string;
+  return data.practiceUrl as string;
 }
 
 export function SessionNode({
@@ -56,14 +60,14 @@ export function SessionNode({
     setBusy("copy");
 
     try {
-      const url = await mintHomeworkLink(session.id);
+      const url = await mintClientLink(session.id);
 
       await navigator.clipboard.writeText(url);
 
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch (err) {
-      console.error("❌ COPY HOMEWORK LINK FAILED", err);
+      console.error("❌ COPY CLIENT LINK FAILED", err);
       alert(
         err instanceof Error ? err.message : "Could not create a client link"
       );
@@ -82,7 +86,7 @@ export function SessionNode({
     const tab = window.open("", "_blank");
 
     try {
-      const url = await mintHomeworkLink(session.id);
+      const url = await mintClientLink(session.id);
 
       if (tab) {
         tab.opener = null;
@@ -92,7 +96,7 @@ export function SessionNode({
       }
     } catch (err) {
       tab?.close();
-      console.error("❌ OPEN HOMEWORK FAILED", err);
+      console.error("❌ OPEN CLIENT LINK FAILED", err);
       alert(
         err instanceof Error ? err.message : "Could not create a client link"
       );
@@ -125,12 +129,12 @@ export function SessionNode({
       {/* RIGHT ACTIONS */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
 
-        {/* COPY */}
+        {/* COPY CLIENT LINK */}
         <button
           type="button"
           onClick={handleCopy}
           disabled={busy !== null}
-          title="Copy homework link"
+          title="Copy client link"
           className={cn(
             "p-1 rounded transition disabled:opacity-50",
             copied ? "bg-green-100" : "hover:bg-blue-100"
@@ -143,12 +147,12 @@ export function SessionNode({
           )}
         </button>
 
-        {/* OPEN */}
+        {/* OPEN CLIENT LINK */}
         <button
           type="button"
           onClick={handleOpen}
           disabled={busy !== null}
-          title="Open homework"
+          title="Open client link"
           className="p-1 rounded hover:bg-gray-100 transition disabled:opacity-50"
         >
           <ExternalLink className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
