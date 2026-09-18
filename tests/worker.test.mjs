@@ -144,10 +144,16 @@ function installFetch(steps) {
 
     if (!isGroq) {
       // Supabase REST with `Prefer: return=representation` answers with an array.
+      // The row carries the ownership chain the Worker walks before any
+      // session-scoped work: `checkSessionAccess` reads `client_id` (or the
+      // `case_formulations(client_id)` embed), then `checkClientAccess` asks
+      // /clinician_clients and only needs a non-empty answer. Without an owner
+      // on the row, every AI route carrying a sessionId answers 403.
       return new Response(
         JSON.stringify([
           {
             id: "sess-1",
+            client_id: "client-1",
             name: "Session 1",
             practice_package: { homework: ["Practice task A"] },
           },
@@ -183,6 +189,12 @@ function installFetch(steps) {
 const groqCalls = () => calls.filter((c) => c.kind === "groq")
 const supabaseCalls = () => calls.filter((c) => c.kind === "supabase")
 const authCalls = () => calls.filter((c) => c.kind === "auth")
+/**
+ * Every AI route carrying a `sessionId` legitimately READS the session and its
+ * owner before doing any work (`checkSessionAccess` → `clinician_clients`), so
+ * "nothing was persisted" has to be asserted against writes only.
+ */
+const writeCalls = () => supabaseCalls().filter((c) => c.method !== "GET")
 const pathOf = (c) => new URL(c.url).pathname
 const queryOf = (c) => new URL(c.url).search
 
@@ -432,7 +444,7 @@ async function main() {
     sessionId: "sess-1",
   })
   assert.equal(r.status, 502)
-  assert.equal(supabaseCalls().length, 0)
+  assert.equal(writeCalls().length, 0, "a failed run is never persisted")
 
   installFetch([
     { content: TRUNCATED, finishReason: "length" },
@@ -444,7 +456,7 @@ async function main() {
     sessionId: "sess-1",
   })
   assert.equal(r.body.degraded, true)
-  assert.equal(supabaseCalls().length, 0, "degraded output is never persisted")
+  assert.equal(writeCalls().length, 0, "degraded output is never persisted")
   pass("persistence: failed and degraded runs write nothing")
 
   /* 14. Shape validation: the live defect was valid JSON carrying only
@@ -480,7 +492,7 @@ async function main() {
     "The model's answer did not match the required JSON shape"
   )
   assert.match(r.body.parseError, /practice-package contract/)
-  assert.equal(supabaseCalls().length, 0, "a placeholder must never be persisted")
+  assert.equal(writeCalls().length, 0, "a placeholder must never be persisted")
   pass("package: unwrapped partial answer => 502 BAD_AI_SHAPE, no writes")
 
   /* 16. A missing `riskFlags` must not be read as "no risks" — that is a safety
