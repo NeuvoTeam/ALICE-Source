@@ -37,6 +37,9 @@ thinking.
 | Secrets | Never commit keys, service-role tokens or JWTs. `npx wrangler secret put` for the Worker; `.dev.vars` locally. |
 | Generated code | Do not hand-edit `components/ui/*` (shadcn) or lockfiles. |
 | Java | Follow `ARCHITECTURE.md`: `alice-core` is pure domain logic — zero IO, no threads, no dependencies, constructor injection only. |
+| Clinical Privacy (APP 8) | Client PII/PHI must never be transmitted to external LLM endpoints. Enforce client-side de-identification before payloads hit the Cloudflare Worker. |
+| TGA / SaMD Boundaries | Do not generate code for autonomous diagnostics or clinical outcome interpretation. High-risk triage must use deterministic, hardcoded fallback logic. |
+| Human Approval | Workflows generating client activities must include a mandatory clinician review and sign-off step in the UI before generation is finalised. |
 
 ## Verify before you claim done
 

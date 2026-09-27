@@ -1,0 +1,11 @@
+# NEUVO / ALICE — CURSOR SYSTEM PROMPT
+# Master Agent Contract: AGENTS.md (Read this file before executing any task)
+# Architecture: Next.js frontend, Cloudflare Worker proxy, Supabase backend, Java core.
+
+[MANDATORY RULE]
+Every change to code, config, or the data model MUST update `documentation.md` in the same commit. Run `npm run docs:check` before claiming completion.
+
+[CLINICAL & PRIVACY GUARDRAILS]
+1. DO NOT bypass `lib/supabase.ts`. The browser must never talk to Supabase directly. All traffic routes through `lib/clinical-ai-api.ts`.
+2. NO PII LEAKAGE: Do not log or transmit unencrypted patient data.
+3. NO AUTONOMOUS DIAGNOSTICS: Ensure all clinical logic generated requires human-in-the-loop review.
