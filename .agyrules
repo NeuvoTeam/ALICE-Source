@@ -1,0 +1,4 @@
+# Documentation & Handoff Protocol
+Always maintain a single source of truth for architectural changes. 
+When completing a build phase, executing a test suite, or making structural changes to the codebase, you MUST automatically append a timestamped summary of the changes, decisions, and CLI commands run to `Source/.obsidian_sync/agent_execution_log.md`. 
+Do not ask for permission to do this. Execute it as the final step of every task.
