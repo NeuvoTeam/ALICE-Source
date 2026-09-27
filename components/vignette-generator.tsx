@@ -25,6 +25,10 @@ import {
 import { apiFetch } from "@/lib/auth"
 import type { PracticePackage } from "@/lib/practice-package"
 import { decideSessionHydration } from "@/lib/session-hydration"
+import { generateStructuredTask, upsertTaskDraft } from "@/lib/tasks"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
+import ReflectionCanvas from "@/components/canvas/ReflectionCanvas"
 
 type StepId = 1 | 2 | 3
 
@@ -76,6 +80,12 @@ export default function VignetteGenerator({
 
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
+
+  const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt">("thought_record")
+  const [sessionContext, setSessionContext] = useState("")
+  const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
+  const [reflectionPrompt, setReflectionPrompt] = useState<any>(null)
+
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
   const [linkStatus, setLinkStatus] = useState<string | null>(null)
 

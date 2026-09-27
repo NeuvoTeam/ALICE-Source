@@ -92,15 +92,18 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `app/login`, `app/signup`, `app/forgot-password` | Clinician auth screens (inline styles, not shadcn) |
 | `app/client-login`, `app/test-auth` | Stubs / diagnostics (see §13) |
 | `app/practice/[sessionId]` | Client-facing material view (the `practiceHomework` checklist) — no login, but only reachable with a signed, expiring link (§4.7, §5.2) |
+| `app/practitioner/tasks/[id]/review` | Practitioner Review Gateway — review CBT submissions side-by-side with reflection canvas outputs, append notes, adjust labels, request revisions, and approve/lock records (§5.8) |
 | `app/homework/[sessionId]` | Legacy redirect shim — forwards an already-shared `/homework` link to `/practice/<id>`, carrying `?exp=&sig=` across unchanged (§4.7) |
 | `app/cases/[caseId]/sessions/[sessionId]` | Bookmark-compat redirect shim — selects the session in the store then `router.replace('/')` |
 | `app/api/analyze/session/route.ts` | **Legacy/dev-only** Next.js route calling a local Ollama instance. Not used by the shipped UI (see §7) |
 | `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
+| `components/tasks/` | Practice-task module: `DynamicTaskForm` (Typeform-style orchestrator with debounced auto-save + error banner + human-approval gate), `ActivityScheduleForm` (Handout 1 — weekly grid on desktop, day-accordion on mobile), `ThreeCsForm` (Handout 10 — progressive-disclosure 3-step thought record). All are `"use client"` and call the Worker via `apiFetch` — never Supabase directly |
+| `components/canvas/` | Reflection canvas module: `ReflectionCanvas` (HTML5 Canvas with native Pointer Events, stylus detection, palm rejection, Bézier rendering, undo/redo, background variants); `canvasUtils.ts` (rendering + compression pipeline — PNG then JPEG fallback to enforce ≤ 2 MB / ≤ 1 200 px); `canvasTypes.ts` (types + constants). Uploads go through `POST /reflections/upload` via `apiFetch` |
 | `components/ui/` | Generated shadcn/ui primitives (new-york style). Treat as vendored — regenerate rather than hand-edit |
 | `hooks/` | `use-clinical-workspace.ts` (local-only workspace — see §8), `use-mobile.ts`, `use-toast.ts` |
 | `lib/` | API base constant, auth helpers, Supabase tripwire, session/hierarchy models, the session-hydration guard (§8.2), utils |
 | `stores/` | `useClientNavStore.ts` — the **authoritative** zustand store for client/case/session state |
-| `types/` | Shared types (`Client`) |
+| `types/` | Shared types: `Client` (`types/index.ts`); practice-task domain types in `types/tasks.ts` (DB row interfaces, JSONB shapes, normalised app-state types, action I/O shapes) |
 | `styles/globals.css` | Duplicate of the Tailwind theme (the canonical copy per `components.json` is `app/globals.css`) |
 | `public/` | Icons, logos, placeholders |
 
@@ -287,7 +290,7 @@ Phase 3      └─ POST /generate/practice-package { sessionNotes, clientId, se
                    → { homework[], scenario{title,difficulty,situation,objectives,coachTips}, quiz[] }
                    → server-side: sessions.practice_package (+ a session_versions snapshot)
              │
-             └─ store.saveSessionContent(caseId, sessionId, { sessionNotes, analysis, practicePackage })
+             └─ store.saveSessionContent(caseId, sessionId, { sessionNotes, analysis })
                    → PATCH /sessions/:sessionId  (optimistic UI, then reconcile with response)
 ```
 
@@ -548,6 +551,30 @@ npx wrangler tail --format pretty
 rather than exposed for anonymous probes. If an unauthenticated uptime check is ever needed, add a
 static, zero-cost `GET /ping` and exempt only that.
 
+### 5.8 Practice-task submission routes
+
+All practitioner task routes require a clinician bearer token and verify `checkClientAccess` before touching any
+row. They are declared **above** the catch-all `if (method === "POST")` AI block in `backend/CloudFlare.js`.
+Frontend callers use the server-action wrappers in `lib/tasks.ts`; types live in `types/tasks.ts`.
+
+| Method | Path | Body / notes | Response |
+| --- | --- | --- | --- |
+| `POST` | `/tasks/submissions` | `{ id?, client_id, practitioner_id, task_type, form_data }` — omit `id` to create, supply it to update a draft | Upserted `practice_task_submissions` row. `409` if `id` exists with status ≠ `draft` |
+| `POST` | `/tasks/submissions/:id/commit` | Empty body — `id` is in the path | Updated row with `status: "pending_practitioner_review"`. Appends a `status_audit_log` row (best-effort). `409` if status ≠ `draft` |
+| `GET` | `/tasks/submissions/:id/bundle` | — | `{ submission, reflections[], practitioner_notes[], audit_log[] }` — all related rows in one round-trip. `audit_log` is best-effort (empty array on failure) |
+| `POST` | `/tasks/submissions/:id/notes` | `{ practitioner_id?, notes }` | Newly created `submission_practitioner_notes` row. Notes are append-only |
+| `POST` | `/tasks/submissions/:id/approve` | Empty body — `id` is in the path | Updated row with `status: "approved"`, `reviewed_at: ISO timestamp`. Immutability lock applies. Appends `status_audit_log` row. `409` if already approved |
+| `POST` | `/tasks/submissions/:id/request-revision` | Empty body — `id` is in the path | Updated row with `status: "revision_requested"`. Appends `status_audit_log` row. `409` if status is approved |
+| `PATCH` | `/tasks/submissions/:id/label` | `{ label: string }` (max 200 chars) | Updated row with label merged into `form_data.label`. `409` if status is approved |
+
+### 5.9 Reflection image upload
+
+Requires a clinician bearer token. Enforces 2 MB server-side as a defence-in-depth layer on top of the client-side compression already applied by `ReflectionCanvas`.
+
+| Method | Path | Body | Response |
+| --- | --- | --- | --- |
+| `POST` | `/reflections/upload` | `multipart/form-data`: `file` (PNG/JPEG ≤ 2 MB), `submission_id`, `client_id` | `{ imageUrl, sizeBytes }`. Storage path: `reflections/<clientId>/<submissionId>/<timestamp>.ext`. Also inserts a `client_reflections` row (best-effort). `413` if > 2 MB; `415` for non-image MIME |
+
 ---
 
 ## 6. Data model
@@ -565,6 +592,10 @@ or read the tables. What follows is the contract the current code actually depen
 | `sessions` | `id`, `case_id`, `client_id`, `name`, `session_notes`, `vignette`, `homework` (jsonb), `quiz` (jsonb), `practice_package` (jsonb), `analysis` (jsonb), `modality` (text), `created_at`, `updated_at` | every session route |
 | `session_versions` | `session_id`, `session_notes`, `vignette`, `homework`, `quiz`, `practice_package`, `modality`, `analysis`, `created_at` (written only — nothing reads it yet) | `saveSessionVersion` |
 | `profiles` | `id`, `*` | `GET /auth/me` |
+| `practice_task_submissions` | `id`, `client_id`, `practitioner_id`, `task_type`, `form_data` (jsonb), `status`, `reviewed_at`, `created_at`, `updated_at` | `POST /tasks/submissions`, `POST /tasks/submissions/:id/commit`, `GET /tasks/submissions/:id/bundle` |
+| `submission_practitioner_notes` | `id`, `submission_id`, `practitioner_id`, `notes`, `created_at` | `POST /tasks/submissions/:id/notes`, `GET /tasks/submissions/:id/bundle` |
+| `client_reflections` | `id`, `submission_id`, `client_id`, `canvas_data` (jsonb), `image_url`, `notes`, `created_at` | `GET /tasks/submissions/:id/bundle` (read-only from the Worker; written by client pages) |
+| `status_audit_log` | `id`, `submission_id`, `previous_status`, `new_status`, `changed_by_user_id`, `changed_at` | Written by `POST /tasks/submissions/:id/commit`, `:id/approve`, and `:id/request-revision` (best-effort, non-fatal). **Read** by `GET /tasks/submissions/:id/bundle` — exposed as `audit_log[]` in the bundle and used by the Practitioner Review Gateway to surface the true reviewer identity from `changed_by_user_id` |
 
 Notes:
 
@@ -608,6 +639,30 @@ This migration does **not** cover `practice_package` (written by the Worker) and
 | `analysis` | `{ rationale: string, inferredModality: string, riskFlags: { label, severity, confidence, evidence[] }[] }` |
 | `practice_package` | `{ homework: string[], scenario: { title, difficulty: "easy"\|"medium"\|"hard", situation, objectives: string[], coachTips: string[] }, quiz: { question, answer, rationale }[] }` (see `lib/practice-package.ts`) |
 | `vignette` | Plain string (scenario text) |
+
+### 6.4 `form_data` JSONB shapes on `practice_task_submissions`
+
+The `task_type` column is the discriminant; `types/tasks.ts` exports a `FormData` discriminated union.
+
+| `task_type` | Key fields |
+| --- | --- |
+| `activity_log` | `activity_date` (YYYY-MM-DD), `activity_description` (either plain text **or** `JSON.stringify(WeeklySchedule)` when submitted by `DynamicTaskForm`), `pleasure_rating` (0–10), `mastery_rating` (0–10), `notes?` |
+| `thought_record` | `situation`, `automatic_thought`, `emotions: [{label, intensity}]` (0–100), `evidence_for`, `evidence_against`, `balanced_thought`, `outcome_emotion_intensity` (0–100), `notes?` |
+| `behavioural_experiment` | `hypothesis`, `experiment_description`, `predicted_outcome`, `actual_outcome`, `what_i_learned`, `notes?` |
+
+> **`activity_log` detail.** `DynamicTaskForm` stores the full weekly grid as `JSON.stringify(WeeklySchedule)` in `activity_description`, where `WeeklySchedule` is `Record<"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun", Record<string, { activity: string; moodRating: number }>>`. The Practitioner Review Gateway detects the JSON prefix and renders it as a day-by-day grid rather than raw text.
+
+### 6.5 Practice-task TypeScript types (`types/tasks.ts`)
+
+Key composite types used in app state (all camelCase per AGENTS.md normalisation convention):
+
+| Type | Shape | Notes |
+| --- | --- | --- |
+| `SubmissionBundle` | `{ submission: NormalisedSubmission, reflections: NormalisedReflection[], practitionerNotes: NormalisedPractitionerNote[], auditLog: NormalisedAuditLogEntry[] }` | Assembled by `fetchSubmissionBundle` in `lib/tasks.ts`; returned by `GET /tasks/submissions/:id/bundle` |
+| `NormalisedAuditLogEntry` | `{ id, submissionId, previousStatus, newStatus, changedByUserId, changedAt }` | Normalised camelCase form of `status_audit_log` rows. The Practitioner Review Gateway uses `changedByUserId` from the `approved` entry to surface the true reviewer identity (not a heuristic) |
+| `NormalisedSubmission` | `{ id, clientId, practitionerId, taskType, formData, status, reviewedAt, createdAt, updatedAt }` | Normalised form of `practice_task_submissions` |
+| `NormalisedReflection` | `{ id, submissionId, clientId, canvasData, imageUrl, notes, createdAt }` | Normalised form of `client_reflections` |
+| `NormalisedPractitionerNote` | `{ id, submissionId, practitionerId, notes, createdAt }` | Normalised form of `submission_practitioner_notes` |
 
 ---
 

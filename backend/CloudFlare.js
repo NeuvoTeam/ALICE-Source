@@ -1272,6 +1272,612 @@ if (method === "GET" && cleanPath === "/auth/me") {
       }
 
       /* =========================
+   ✅ TASK SUBMISSION ROUTES
+   New routes MUST stay above the catch-all "if (method === 'POST')" AI block.
+   ========================= */
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions
+         Upsert a practice-task submission in `draft` status.
+
+         Body (JSON):
+           { id?, client_id, practitioner_id, task_type, form_data }
+
+         • `id` omitted  → INSERT with status = 'draft'
+         • `id` present  → UPDATE where status = 'draft' (refuses other statuses)
+         Returns the upserted row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && cleanPath === "/tasks/submissions") {
+        const body = await safeJson(request)
+
+        if (!body?.client_id || !body?.practitioner_id || !body?.task_type || !body?.form_data) {
+          return respond({ error: "Missing required fields: client_id, practitioner_id, task_type, form_data" }, cors, 400)
+        }
+
+        if (!(await checkClientAccess(body.client_id))) {
+          return respond({ error: "Client not found or access denied" }, cors, 404)
+        }
+
+        let row
+
+        if (body.id) {
+          // UPDATE: only allow overwriting drafts
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!checkRes.ok) throw new Error(await checkRes.text())
+          const existing = await checkRes.json()
+
+          if (!existing?.length) {
+            return respond({ error: "Submission not found" }, cors, 404)
+          }
+          if (existing[0].status !== "draft") {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+
+          const patchRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify({
+                task_type: body.task_type,
+                form_data: body.form_data,
+                updated_at: new Date().toISOString(),
+              }),
+            }
+          )
+          if (!patchRes.ok) throw new Error(await patchRes.text())
+          const patchData = await patchRes.json()
+          row = Array.isArray(patchData) ? patchData[0] : patchData
+        } else {
+          // INSERT new draft
+          const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              client_id: body.client_id,
+              practitioner_id: body.practitioner_id,
+              task_type: body.task_type,
+              form_data: body.form_data,
+              status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }),
+          })
+          if (!insertRes.ok) throw new Error(await insertRes.text())
+          const insertData = await insertRes.json()
+          row = Array.isArray(insertData) ? insertData[0] : insertData
+        }
+
+        return respond(row, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/commit
+         Transition draft → pending_practitioner_review.
+         Writes a status_audit_log row atomically.
+         Body: (empty — submissionId is in the path)
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/commit$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        // Load existing row for access check and status gate
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "draft") {
+          return respond(
+            { error: `Cannot commit: status is '${submission.status}', expected 'draft'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        // Write status transition
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: HEADERS,
+            body: JSON.stringify({
+              status: "pending_practitioner_review",
+              updated_at: now,
+            }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Append audit log row (best-effort — failure does NOT roll back the status change)
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "draft",
+              new_status: "pending_practitioner_review",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         GET /tasks/submissions/:id/bundle
+         Returns the full review bundle:
+           { submission, reflections[], practitioner_notes[] }
+         The practitioner must have access to the submission's owning client.
+      ------------------------------------------------------------------ */
+      if (method === "GET" && /^\/tasks\/submissions\/[^/]+\/bundle$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        const submissionRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!submissionRes.ok) throw new Error(await submissionRes.text())
+        const submissionData = await submissionRes.json()
+
+        if (!submissionData?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = submissionData[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        // Fetch reflections, notes, and audit log in parallel
+        const [reflectionsRes, notesRes, auditRes] = await Promise.all([
+          fetch(
+            `${SUPABASE_URL}/client_reflections?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=created_at.asc`,
+            { headers: HEADERS }
+          ),
+          fetch(
+            `${SUPABASE_URL}/submission_practitioner_notes?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=created_at.asc`,
+            { headers: HEADERS }
+          ),
+          fetch(
+            `${SUPABASE_URL}/status_audit_log?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=changed_at.asc`,
+            { headers: HEADERS }
+          ),
+        ])
+
+        if (!reflectionsRes.ok) throw new Error(await reflectionsRes.text())
+        if (!notesRes.ok) throw new Error(await notesRes.text())
+
+        const reflections = await reflectionsRes.json()
+        const practitioner_notes = await notesRes.json()
+        // audit log is best-effort — don't fail the whole bundle if it errors
+        const audit_log = auditRes.ok ? await auditRes.json() : []
+
+        return respond({ submission, reflections, practitioner_notes, audit_log }, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/notes
+         Append a practitioner note to a submission (append-only).
+
+         Body (JSON): { practitioner_id, notes }
+         Returns the newly created note row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/notes$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        if (!body?.notes || typeof body.notes !== "string" || !body.notes.trim()) {
+          return respond({ error: "Missing or empty 'notes' field" }, cors, 400)
+        }
+
+        // Load submission to gate on client access
+        const submissionRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=client_id`,
+          { headers: HEADERS }
+        )
+        if (!submissionRes.ok) throw new Error(await submissionRes.text())
+        const submissionData = await submissionRes.json()
+
+        if (!submissionData?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        if (!(await checkClientAccess(submissionData[0].client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        const insertRes = await fetch(`${SUPABASE_URL}/submission_practitioner_notes`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            submission_id: submissionId,
+            practitioner_id: body.practitioner_id ?? authUser.id,
+            notes: body.notes.trim(),
+            created_at: new Date().toISOString(),
+          }),
+        })
+        if (!insertRes.ok) throw new Error(await insertRes.text())
+        const noteData = await insertRes.json()
+        const note = Array.isArray(noteData) ? noteData[0] : noteData
+
+        return respond(note, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/approve
+         Practitioner Gateway — approve a submission.
+
+         Transitions status: pending_practitioner_review → approved
+         Sets reviewed_at to the current timestamp.
+         Appends a status_audit_log row (best-effort).
+
+         The DB trigger enforces immutability after this transition:
+         any subsequent PATCH on an approved row is rejected at the Postgres
+         level. This route does NOT attempt to write the row again after the
+         PATCH succeeds.
+
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/approve$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "pending_practitioner_review") {
+          return respond(
+            { error: `Cannot approve: status is '${submission.status}', expected 'pending_practitioner_review'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({
+              status: "approved",
+              reviewed_at: now,
+              updated_at: now,
+            }),
+          }
+        )
+        if (!patchRes.ok) {
+          const errText = await patchRes.text()
+          console.error("Approve PATCH failed:", errText)
+          return respond({ error: "Failed to approve submission", detail: errText }, cors, 502)
+        }
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Best-effort audit log
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "pending_practitioner_review",
+              new_status: "approved",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/request-revision
+         Practitioner Gateway — send back to client for revision.
+
+         Transitions: pending_practitioner_review → revision_requested
+         Optionally accepts { reason } in the JSON body to record a
+         practitioner note explaining what needs changing.
+
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/request-revision$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "pending_practitioner_review") {
+          return respond(
+            { error: `Cannot request revision: status is '${submission.status}'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({ status: "revision_requested", updated_at: now }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Optionally persist the reason as a practitioner note
+        if (body?.reason && typeof body.reason === "string" && body.reason.trim()) {
+          try {
+            await fetch(`${SUPABASE_URL}/submission_practitioner_notes`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify({
+                submission_id: submissionId,
+                practitioner_id: authUser.id,
+                notes: `[Revision requested] ${body.reason.trim()}`,
+                created_at: now,
+              }),
+            })
+          } catch (noteErr) {
+            console.error("Revision note insert failed (non-fatal):", noteErr)
+          }
+        }
+
+        // Best-effort audit log
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "pending_practitioner_review",
+              new_status: "revision_requested",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         PATCH /tasks/submissions/:id/label
+         Practitioner Gateway — update the exercise label on a submission.
+
+         Body: { label: string }   (max 200 chars)
+         Stored in form_data.label (JSONB merge).
+
+         Only allowed when status is NOT 'approved' (immutability guard).
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "PATCH" && /^\/tasks\/submissions\/[^/]+\/label$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        if (!body?.label || typeof body.label !== "string" || !body.label.trim()) {
+          return respond({ error: "Missing or empty 'label' field" }, cors, 400)
+        }
+        if (body.label.length > 200) {
+          return respond({ error: "'label' must be 200 characters or fewer" }, cors, 400)
+        }
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=client_id,status,form_data`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status === "approved") {
+          return respond({ error: "Cannot modify an approved (locked) record" }, cors, 409)
+        }
+
+        const updatedFormData = { ...(submission.form_data || {}), label: body.label.trim() }
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({
+              form_data: updatedFormData,
+              updated_at: new Date().toISOString(),
+            }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /reflections/upload
+         Upload a reflection image (multipart/form-data) to Supabase Storage
+         bucket "client-reflections", then INSERT a client_reflections row.
+
+         Form fields:
+           file          — the PNG/JPEG blob (already compressed client-side ≤ 2 MB)
+           submission_id — UUID of the owning practice_task_submission
+           client_id     — UUID of the client
+
+         Returns: { imageUrl, sizeBytes }
+
+         The client has already enforced the 1 200 px / 2 MB constraints; the
+         Worker also rejects anything over 2 MB as a defence-in-depth check.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && cleanPath === "/reflections/upload") {
+        let formData
+        try {
+          formData = await request.formData()
+        } catch {
+          return respond({ error: "Invalid multipart body" }, cors, 400)
+        }
+
+        const file         = formData.get("file")
+        const submissionId = formData.get("submission_id")
+        const clientId     = formData.get("client_id")
+
+        if (!(file instanceof File)) {
+          return respond({ error: "Missing file field" }, cors, 400)
+        }
+        if (typeof submissionId !== "string" || !submissionId.trim()) {
+          return respond({ error: "Missing submission_id" }, cors, 400)
+        }
+        if (typeof clientId !== "string" || !clientId.trim()) {
+          return respond({ error: "Missing client_id" }, cors, 400)
+        }
+
+        // Defence-in-depth: enforce 2 MB server-side
+        const MAX_BYTES = 2 * 1024 * 1024
+        if (file.size > MAX_BYTES) {
+          return respond(
+            { error: `File too large (${(file.size / (1024 * 1024)).toFixed(2)} MB). Maximum is 2 MB.` },
+            cors,
+            413
+          )
+        }
+
+        // Validate MIME
+        const allowedMimes = ["image/png", "image/jpeg"]
+        if (!allowedMimes.includes(file.type)) {
+          return respond({ error: "Only image/png and image/jpeg are accepted" }, cors, 415)
+        }
+
+        // Access guard: practitioner must own the client
+        if (!(await checkClientAccess(clientId))) {
+          return respond({ error: "Client not found or access denied" }, cors, 403)
+        }
+
+        // Build a namespaced Storage path: reflections/<clientId>/<submissionId>/<timestamp>.ext
+        const ext       = file.type === "image/jpeg" ? "jpg" : "png"
+        const timestamp = Date.now()
+        const storagePath = `reflections/${clientId}/${submissionId}/${timestamp}.${ext}`
+
+        // ── Upload to Supabase Storage ──────────────────────────────────
+        const storageUrl = env.SUPABASE_URL.endsWith("/")
+          ? env.SUPABASE_URL.slice(0, -1)
+          : env.SUPABASE_URL
+
+        const uploadRes = await fetch(
+          `${storageUrl}/storage/v1/object/client-reflections/${storagePath}`,
+          {
+            method: "POST",
+            headers: {
+              "apikey":        env.SUPABASE_SERVICE_ROLE_KEY,
+              "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              "Content-Type":  file.type,
+              "x-upsert":      "true",
+            },
+            body: await file.arrayBuffer(),
+          }
+        )
+
+        if (!uploadRes.ok) {
+          const detail = await uploadRes.text().catch(() => "Unknown storage error")
+          console.error("Supabase Storage upload failed:", detail)
+          return respond({ error: "Image upload failed", detail }, cors, 502)
+        }
+
+        // ── Derive the public URL ───────────────────────────────────────
+        const imageUrl = `${storageUrl}/storage/v1/object/public/client-reflections/${storagePath}`
+
+        // ── Insert client_reflections row (best-effort) ─────────────────
+        try {
+          await fetch(`${SUPABASE_URL}/client_reflections`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              client_id:     clientId,
+              image_url:     imageUrl,
+              canvas_data:   null,   // client sets this separately if vector data is needed
+              notes:         null,
+              created_at:    new Date().toISOString(),
+            }),
+          })
+        } catch (rowErr) {
+          console.error("client_reflections row insert failed (non-fatal):", rowErr)
+        }
+
+        return respond({ imageUrl, sizeBytes: file.size }, cors)
+      }
+
+      /* =========================
    ✅ AI ROUTES
    ========================= */
 if (method === "POST") {
@@ -1396,6 +2002,18 @@ if (method === "POST") {
   /* =========================
      GENERATE PRACTICE PACKAGE
      ========================= */
+
+  /* =========================
+     GENERATE STRUCTURED TASK
+     ========================= */
+  if (cleanPath === "/generate/structured-task") {
+    const { sessionContext, activityFormat } = body;
+    if (!sessionContext || !activityFormat) return respond({ error: "Missing context or format" }, cors, 400);
+    const generated = await handleGenerateStructuredTask(sessionContext, activityFormat, env, cors, allowDegraded);
+    if (generated instanceof Response) return generated;
+    return respond(generated, cors);
+  }
+
   if (cleanPath === "/generate/practice-package") {
     const modality =
       body.verifiedModality ||
@@ -1965,6 +2583,46 @@ ${input}
 
   return respond(payload, cors)
 }
+
+async function handleGenerateStructuredTask(sessionContext, activityFormat, env, cors, allowDegraded = false, debug = null) {
+  const formatInstructions = activityFormat === 'activity_log' ? 'Weekly Activity Schedule: Guide the client on what to schedule (activity_description), set pleasure_rating/mastery_rating to 0, provide any clinical notes.'
+    : activityFormat === 'thought_record' ? "The 3 C's (Catch, Check, Correct): Identify the situation, automatic thought, expected emotions, and instructions for evidence_for, evidence_against, and balanced_thought. outcome_emotion_intensity should be 0."
+    : 'Reflection Canvas: Provide a journaling/drawing prompt and a suggested_background (blank, lined, or dotted).';
+
+  const messages = [
+    {
+      role: 'system',
+      content: `You are a senior clinical psychologist acting as a clinical translation engine.
+Convert the practitioner's session context into a structured interactive CBT task worksheet.
+Return ONLY JSON matching the requested activity format schema.
+Format rules:
+${formatInstructions}
+Strictly anchor the generated payload to the session context provided to guarantee output variability. Do NOT regurgitate generic CBT handouts.`
+    },
+    {
+      role: 'user',
+      content: `Requested Format: ${activityFormat}
+
+Session Context / Clinical Focus:
+${sessionContext}`
+    }
+  ];
+
+  const attempt = await generateJson(messages, env, 0.6, {
+    debug,
+    contract: 'structured-task',
+    isValid: (json) => json && typeof json.task_type === 'string',
+    schema: STRUCTURED_TASK_SCHEMA,
+    schemaName: 'structured_cbt_task',
+  });
+
+  if (!attempt.result.ok) {
+    return new Response(JSON.stringify({ error: 'Failed to generate task' }), { status: 500, headers: cors });
+  }
+
+  return attempt.result.payload;
+}
+
 async function handleGeneratePracticePackage(
   input,
   modality,
@@ -2674,6 +3332,29 @@ const VIGNETTE_SCHEMA = {
     homework: { type: "array", items: { type: "string" } },
   },
 }
+
+
+const STRUCTURED_TASK_SCHEMA = {
+  type: "object",
+  required: ["task_type"],
+  properties: {
+    task_type: { type: "string", enum: ["activity_log", "thought_record", "reflection_prompt"] },
+    activity_date: { type: "string" },
+    activity_description: { type: "string" },
+    pleasure_rating: { type: "number" },
+    mastery_rating: { type: "number" },
+    situation: { type: "string" },
+    automatic_thought: { type: "string" },
+    emotions: { type: "array", items: { type: "object", properties: { label: { type: "string" }, intensity: { type: "number" } }, required: ["label", "intensity"] } },
+    evidence_for: { type: "string" },
+    evidence_against: { type: "string" },
+    balanced_thought: { type: "string" },
+    outcome_emotion_intensity: { type: "number" },
+    prompt: { type: "string" },
+    suggested_background: { type: "string", enum: ["blank", "lined", "dotted"] },
+    notes: { type: "string" }
+  }
+};
 
 const PRACTICE_PACKAGE_SCHEMA = {
   type: "object",
