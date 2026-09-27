@@ -84,6 +84,7 @@ export default function VignetteGenerator({
   const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt">("thought_record")
   const [sessionContext, setSessionContext] = useState("")
   const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
+  const [generatedTaskData, setGeneratedTaskData] = useState<any>(null)
   const [reflectionPrompt, setReflectionPrompt] = useState<any>(null)
 
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
@@ -285,13 +286,11 @@ export default function VignetteGenerator({
         setDegradedWarning(analyzeData.warning || "AI analysis was unavailable.")
       }
 
-      // 2. Generate Practice Package
-      const genUrl = `${API_BASE}/generate/practice-package`
+// 2. Generate Structured Task
+      const genUrl = `${API_BASE}/generate/structured-task`
       const genPayload = {
-        sessionNotes: sessionInput,
-        modality: analyzeData?.inferredModality,
-        clientId,
-        sessionId,
+        sessionContext: sessionInput,
+        activityFormat,
       }
 
       console.log("➡️ POST", genUrl, genPayload)
@@ -301,37 +300,45 @@ export default function VignetteGenerator({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(genPayload),
       })
-      const genData = await genRes.json()
+      const taskData = await genRes.json()
 
-      console.log("⬅️ RESPONSE", genUrl, genRes.status, genData)
+      console.log("⬅️ RESPONSE", genUrl, genRes.status, taskData)
       if (!genRes.ok) {
         throw new Error(
-          genData?.detail ||
-            genData?.error ||
-            "Practice package generation failed"
+          taskData?.detail ||
+            taskData?.error ||
+            "Structured task generation failed"
         )
       }
 
-      setPracticePackage(genData)
+      setGeneratedTaskData(taskData)
 
-      if (genData?.degraded) {
-        setDegradedWarning(genData.warning || "AI generation was unavailable.")
+      if (taskData?.degraded) {
+        setDegradedWarning(taskData.warning || "AI generation was unavailable.")
       }
 
+      // 3. Database Persistence: save draft
+      const draft = await upsertTaskDraft({
+        clientId,
+        practitionerId: "00000000-0000-0000-0000-000000000000",
+        taskType: activityFormat as any,
+        formData: taskData as any,
+      })
+
+      setGeneratedSubmissionId(draft.id)
       setStep(3)
 
-      // 3. Save practice package to session
+      // 4. Save session content
       await saveSessionContent(caseId, sessionId, {
         sessionNotes: sessionInput,
         analysis: analyzeData,
-        practicePackage: genData,
         modality: analyzeData?.inferredModality,
       })
     } catch (err) {
       console.error(err)
 
       const message =
-        err instanceof Error ? err.message : "Failed to generate practice package"
+        err instanceof Error ? err.message : "Failed to generate structured task"
 
       /**
        * Groq's 429 body already says how long to wait ("Please try again in
@@ -458,6 +465,26 @@ export default function VignetteGenerator({
                 ? `"${analysis.rationale}"`
                 : `"No formulation yet — run Analyze & Generate. (An earlier run stored no usable analysis.)"`}
             </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                Activity Format
+              </label>
+              <Select
+                value={activityFormat}
+                onValueChange={(val: "activity_log" | "thought_record" | "reflection_prompt") =>
+                  setActivityFormat(val)
+                }
+              >
+                <SelectTrigger className="w-full h-12 rounded-xl bg-white border-zinc-200">
+                  <SelectValue placeholder="Select activity format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="activity_log">Activity Log (activity_log)</SelectItem>
+                  <SelectItem value="thought_record">Thought Record (thought_record)</SelectItem>
+                  <SelectItem value="reflection_prompt">Reflection Prompt (reflection_prompt)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex gap-3 pt-4">
               <Button
                 variant="ghost"
@@ -477,7 +504,7 @@ export default function VignetteGenerator({
                 ) : (
                   <Sparkles className="mr-2" />
                 )}
-                Analyze & Generate Practice Package
+                Analyze & Generate
               </Button>
             </div>
           </div>
@@ -500,42 +527,18 @@ export default function VignetteGenerator({
                 </div>
               </div>
 
-              {!practicePackage ? (
-                <div className="text-center py-10 text-zinc-400 italic text-lg font-bold">
-                  No Practice Package generated.
-                </div>
+              {activityFormat === "reflection_prompt" ? (
+                <ReflectionCanvas
+                  clientId={clientId}
+                  submissionId={generatedSubmissionId}
+                />
               ) : (
-                <div className="space-y-8">
-                  {/* Section 1: Homework */}
-                  <section>
-                  <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">
-  Please complete the following tasks before your next session
-</h4>
-                    {practicePackage?.homework && practicePackage.homework.length > 0 ? (
-                      <div className="space-y-4">
-                      {practicePackage?.homework?.map((item: any, i) => (
-                        <div
-                          key={i}
-                          className="flex items-start gap-3"
-                        >
-                          <span className="text-lg leading-6 shrink-0">
-                            ☐
-                          </span>
-                    
-                          <span className="text-sm text-zinc-700 font-medium leading-6">
-                            {typeof item === "string"
-                              ? item
-                              : item.task || JSON.stringify(item)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    ) : (
-                      <div className="text-sm text-zinc-400 italic">No homework tasks found.</div>
-                    )}
-                  </section>
-
-                </div>
+                <DynamicTaskForm
+                  clientId={clientId}
+                  taskType={activityFormat}
+                  initialData={generatedTaskData}
+                  submissionId={generatedSubmissionId}
+                />
               )}
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">

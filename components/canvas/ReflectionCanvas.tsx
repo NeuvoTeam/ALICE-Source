@@ -98,6 +98,10 @@ interface ReflectionCanvasProps {
   onStrokeCommit?: (data: CanvasVectorData) => void;
   /** CSS class forwarded to the root container. */
   className?: string;
+  /** Identifies the owning client for the reflection. */
+  clientId?: string;
+  /** Optional submissionId linking this reflection to a practice task submission. */
+  submissionId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +217,7 @@ function StatusPill({ status, error }: { status: UploadStatus; error?: string })
 const ReflectionCanvas = React.forwardRef<
   ReflectionCanvasHandle,
   ReflectionCanvasProps
->(function ReflectionCanvas({ initialData, onStrokeCommit, className }, ref) {
+>(function ReflectionCanvas({ initialData, onStrokeCommit, className, clientId, submissionId }, ref) {
   // ── Canvas refs ──────────────────────────────────────────────────────────
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -507,9 +511,14 @@ const ReflectionCanvas = React.forwardRef<
     },
 
     async uploadReflection(
-      submissionId: string,
-      clientId: string
+      submissionIdParam?: string,
+      clientIdParam?: string
     ): Promise<UploadResult> {
+      const activeSubmissionId = submissionIdParam || submissionId;
+      const activeClientId = clientIdParam || clientId;
+      if (!activeSubmissionId || !activeClientId) {
+        throw new Error("Missing submissionId or clientId for reflection upload");
+      }
       setUploadError(undefined);
       setUploadStatus("compressing");
 
@@ -528,8 +537,8 @@ const ReflectionCanvas = React.forwardRef<
       try {
         const formData = new FormData();
         formData.append("file", blob, `reflection-${Date.now()}.png`);
-        formData.append("submission_id", submissionId);
-        formData.append("client_id",     clientId);
+        formData.append("submission_id", activeSubmissionId);
+        formData.append("client_id",     activeClientId);
 
         const res = await apiFetch(
           `${CLINICAL_AI_API_BASE}/reflections/upload`,

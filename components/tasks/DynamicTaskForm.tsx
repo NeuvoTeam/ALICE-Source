@@ -85,13 +85,17 @@ export type TaskVariant = "activity_log" | "thought_record";
 
 interface DynamicTaskFormProps {
   /** Identifies the owning client for the submission. */
-  clientId: UUID;
+  clientId?: UUID;
   /** Practitioner to attribute the submission to. */
-  practitionerId: UUID;
+  practitionerId?: UUID;
   /** Which handout to render. */
   taskType: TaskVariant;
   /** Optional existing submissionId — pass when resuming a saved draft. */
   initialSubmissionId?: UUID;
+  /** Optional submissionId alias matching initialSubmissionId. */
+  submissionId?: string | null;
+  /** Pre-populated task payload from the AI generator. */
+  initialData?: any;
   /** Called after a successful final commit. */
   onSubmitted?: (submission: NormalisedSubmission) => void;
   /** Called when the user cancels. */
@@ -258,10 +262,12 @@ const ACTIVITY_STEPS = [
 // DynamicTaskForm (main export)
 // ---------------------------------------------------------------------------
 export function DynamicTaskForm({
-  clientId,
-  practitionerId,
+  clientId = "",
+  practitionerId = "00000000-0000-0000-0000-000000000000",
   taskType,
   initialSubmissionId,
+  submissionId: externalSubmissionId,
+  initialData,
   onSubmitted,
   onCancel,
 }: DynamicTaskFormProps) {
@@ -271,13 +277,43 @@ export function DynamicTaskForm({
   const totalSteps = taskType === "activity_log" ? ACTIVITY_STEPS.length : 1;
 
   // ── Form data ─────────────────────────────────────────────────────────────
-  const [schedule, setSchedule] = useState<WeeklySchedule>(createEmptySchedule);
-  const [threeCsData, setThreeCsData] = useState<ThreeCsData>(createEmptyThreeCsData);
+  const [schedule, setSchedule] = useState<WeeklySchedule>(() => {
+    const empty = createEmptySchedule();
+    if (initialData?.activity_description) {
+      try {
+        const parsed = JSON.parse(initialData.activity_description);
+        return { ...empty, ...parsed };
+      } catch {
+        return empty;
+      }
+    }
+    return empty;
+  });
+
+  const [threeCsData, setThreeCsData] = useState<ThreeCsData>(() => {
+    const empty = createEmptyThreeCsData();
+    if (!initialData) return empty;
+    return {
+      situation: initialData.situation ?? empty.situation,
+      automaticThought: initialData.automatic_thought ?? initialData.automaticThought ?? empty.automaticThought,
+      emotions: initialData.emotions?.length ? initialData.emotions : empty.emotions,
+      evidenceFor: initialData.evidence_for ?? initialData.evidenceFor ?? empty.evidenceFor,
+      evidenceAgainst: initialData.evidence_against ?? initialData.evidenceAgainst ?? empty.evidenceAgainst,
+      balancedThought: initialData.balanced_thought ?? initialData.balancedThought ?? empty.balancedThought,
+      outcomeEmotionIntensity: initialData.outcome_emotion_intensity ?? initialData.outcomeEmotionIntensity ?? empty.outcomeEmotionIntensity,
+    };
+  });
 
   // ── Persistence state ─────────────────────────────────────────────────────
   const [submissionId, setSubmissionId] = useState<UUID | undefined>(
-    initialSubmissionId
+    initialSubmissionId ?? (externalSubmissionId || undefined)
   );
+
+  useEffect(() => {
+    if (externalSubmissionId) {
+      setSubmissionId(externalSubmissionId);
+    }
+  }, [externalSubmissionId]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
