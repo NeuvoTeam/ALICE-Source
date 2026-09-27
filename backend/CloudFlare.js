@@ -452,20 +452,30 @@ if (method === "GET" && cleanPath === "/auth/me") {
     if (!mappingRes.ok) throw new Error(await mappingRes.text())
     
     const mappingData = await mappingRes.json()
-    const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+    const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id).filter(Boolean)
 
     if (clientIds.length === 0) {
       return respond([], cors)
     }
 
-    const res = await fetch(
+    let res = await fetch(
       `${SUPABASE_URL}/clients?id=in.(${clientIds.join(",")})&select=id,full_name`,
       { headers: HEADERS }
     )
   
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(text)
+      if (isMissingColumnError(text)) {
+        res = await fetch(
+          `${SUPABASE_URL}/clients?id=in.(${clientIds.join(",")})&select=id,first_name,last_name`,
+          { headers: HEADERS }
+        )
+        if (!res.ok) {
+          throw new Error(await res.text())
+        }
+      } else {
+        throw new Error(text)
+      }
     }
   
     let data
@@ -478,7 +488,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
     return respond(
       (Array.isArray(data) ? data : []).map(c => ({
         id: c.id,
-        name: c.full_name || `Client ${c.id.slice(0, 6)}`
+        name: c.full_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || `Client ${c.id.slice(0, 6)}`
       })),
       cors
     )
@@ -962,7 +972,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
             )
             if (!mappingRes.ok) throw new Error(await mappingRes.text())
             const mappingData = await mappingRes.json()
-            const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+            const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id).filter(Boolean)
             
             if (clientIds.length === 0) {
               return respond([], cors)
