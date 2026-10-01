@@ -1291,7 +1291,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
          Upsert a practice-task submission in `draft` status.
 
          Body (JSON):
-           { id?, client_id, practitioner_id, task_type, form_data }
+           { id?, client_id, task_type, form_data }
+           (practitioner_id is enforced from authUser.id)
 
          • `id` omitted  → INSERT with status = 'draft'
          • `id` present  → UPDATE where status = 'draft' (refuses other statuses)
@@ -1300,8 +1301,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
       if (method === "POST" && cleanPath === "/tasks/submissions") {
         const body = await safeJson(request)
 
-        if (!body?.client_id || !body?.practitioner_id || !body?.task_type || !body?.form_data) {
-          return respond({ error: "Missing required fields: client_id, practitioner_id, task_type, form_data" }, cors, 400)
+        if (!body?.client_id || !body?.task_type || !body?.form_data) {
+          return respond({ error: "Missing required fields: client_id, task_type, form_data" }, cors, 400)
         }
 
         if (!(await checkClientAccess(body.client_id))) {
@@ -1348,7 +1349,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
             headers: HEADERS,
             body: JSON.stringify({
               client_id: body.client_id,
-              practitioner_id: body.practitioner_id,
+              practitioner_id: authUser.id,
               task_type: body.task_type,
               form_data: body.form_data,
               status: "draft",

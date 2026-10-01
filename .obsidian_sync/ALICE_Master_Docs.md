@@ -568,7 +568,7 @@ Frontend callers use the server-action wrappers in `lib/tasks.ts`; types live in
 
 | Method | Path | Body / notes | Response |
 | --- | --- | --- | --- |
-| `POST` | `/tasks/submissions` | `{ id?, client_id, practitioner_id, task_type, form_data }` — omit `id` to create, supply it to update a draft | Upserted `practice_task_submissions` row. `409` if `id` exists with status ≠ `draft` |
+| `POST` | `/tasks/submissions` | `{ id?, client_id, practitioner_id?, task_type, form_data }` — omit `id` to create, supply it to update a draft (`practitioner_id` is enforced from `authUser.id` on INSERT) | Upserted `practice_task_submissions` row. `409` if `id` exists with status ≠ `draft` |
 | `POST` | `/tasks/submissions/:id/commit` | Empty body — `id` is in the path | Updated row with `status: "pending_practitioner_review"`. Appends a `status_audit_log` row (best-effort). `409` if status ≠ `draft` |
 | `GET` | `/tasks/submissions/:id/bundle` | — | `{ submission, reflections[], practitioner_notes[], audit_log[] }` — all related rows in one round-trip. `audit_log` is best-effort (empty array on failure) |
 | `POST` | `/tasks/submissions/:id/notes` | `{ practitioner_id?, notes }` | Newly created `submission_practitioner_notes` row. Notes are append-only |
