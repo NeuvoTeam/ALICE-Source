@@ -1,0 +1,106 @@
+﻿[16:06:38] Skipped (no matching tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:07:59] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:07:59] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:11:38] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:11:38] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:13:26] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:13:26] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:16:37] SKIP (age 26.8851917s): ALICE Inbox Dispatch - Scheduled Task.md
+[16:16:37] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:21:38]   -> Backlog OK: Gemini Run book update.md
+[16:21:38] ARCHIVED: Gemini Run book update.md
+[16:21:38] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:21:38] RUN SUMMARY: files=2 dispatched=1 partial=0 skipped=1 failed=0
+[16:26:38] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:26:38] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:31:38] SKIP (no tags): ALICE Inbox Dispatch - Scheduled Task.md
+[16:31:38] RUN SUMMARY: files=1 dispatched=0 partial=0 skipped=1 failed=0
+[16:36:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[16:41:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[16:46:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[16:51:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[16:56:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:01:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:06:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:11:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:16:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:21:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:26:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:31:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:36:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:41:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:46:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:51:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[17:56:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:01:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:06:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:11:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:16:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:21:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:26:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:31:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:36:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:41:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:46:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:51:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[18:56:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:01:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:06:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:11:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:16:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:21:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:26:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:31:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:36:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:41:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:46:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:51:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[19:56:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:01:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:06:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:11:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:16:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:21:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:26:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:31:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:36:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:41:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:46:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:51:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[20:56:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:01:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:06:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:11:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:16:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:21:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:26:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:31:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:36:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:41:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:46:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:51:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[21:56:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:01:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:06:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:11:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:16:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:21:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:26:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:31:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:36:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:41:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:46:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:51:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[22:56:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:01:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:06:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:11:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:16:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:21:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:26:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:31:38] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:36:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:41:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:46:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:51:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0
+[23:56:37] RUN SUMMARY: files=0 dispatched=0 partial=0 skipped=0 failed=0

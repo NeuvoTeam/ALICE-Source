@@ -23,3 +23,6 @@ backend/deployed/
 .wrangler/
 .dev.vars
 tsconfig.tsbuildinfo
+
+# Local junctions/sync
+.obsidian_sync/

@@ -1004,9 +1004,11 @@ gradle build        # compiles nothing today — all modules and src/main/java a
   `npx tsc --noEmit` for a real check (`tsconfig.json` already has `noEmit: true`).
 - **Styling:** Tailwind v4 utility classes with `cn()` from `lib/utils.ts`
   (`clsx` + `tailwind-merge`). No Tailwind config file — the theme lives in `app/globals.css` via
-  `@theme`/CSS variables. Auth screens (`login`, `signup`, `forgot-password`, `ClientLanding`) instead
-  use inline `style` objects for a legacy look; match the surrounding file rather than converting
-  styles mid-feature.
+  `@theme`/CSS variables. Scanned sources are explicitly bounded using `@import 'tailwindcss' source(none);`
+  and `@source` paths (`app`, `components`, `lib`, `hooks`, `stores`) to prevent PostCSS/Turbopack
+  from traversing workspace junctions (e.g. `.obsidian_sync`) outside the root. Auth screens (`login`,
+  `signup`, `forgot-password`, `ClientLanding`) instead use inline `style` objects for a legacy look;
+  match the surrounding file rather than converting styles mid-feature.
 - **UI primitives:** shadcn/ui, new-york style, neutral base, RSC + TS enabled, lucide icons
   (`components.json`). Add new primitives with the shadcn CLI into `components/ui/`; do not hand-roll
   equivalents.
