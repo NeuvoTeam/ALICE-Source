@@ -923,36 +923,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
         practiceHomework = extractHomeworkFromPracticePackage(row.practice_package)
       }
 
-      // Fallback: check practice_task_submissions if row had no homework populated
-      if (!practiceHomework.length) {
-        try {
-          const sessionMetaRes = await fetch(
-            `${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`,
-            { headers: HEADERS }
-          )
-          if (sessionMetaRes.ok) {
-            const meta = await sessionMetaRes.json()
-            const clientId =
-              meta?.[0]?.client_id || meta?.[0]?.case_formulations?.client_id
-            if (clientId) {
-              const subRes = await fetch(
-                `${SUPABASE_URL}/practice_task_submissions?client_id=eq.${clientId}&order=created_at.desc&limit=1`,
-                { headers: HEADERS }
-              )
-              if (subRes.ok) {
-                const subData = await subRes.json()
-                if (subData?.[0]?.form_data) {
-                  practiceHomework = extractHomeworkFromPracticePackage(
-                    subData[0].form_data
-                  )
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("Failed to check practice_task_submissions fallback:", e)
-        }
-      }
+      // No other source is consulted: `practice_task_submissions` has no
+      // session_id, so any lookup there can only be client-scoped and could
+      // surface another session's content through this session's link.
 
       return respond({
         sessionId: row.id,
@@ -963,6 +936,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
         // Deliberately narrow: this route is public, so it must never carry
         // session_notes, analysis or riskFlags.
         practiceHomework,
+        // The clinician's chosen activity, from THIS row only (allowlisted).
+        practiceTask: projectClientPracticeTask(row.practice_package),
       }, cors)
     }
 
@@ -2421,6 +2396,47 @@ function extractHomeworkFromPracticePackage(pkg) {
     if (pkg.prompt) items.push(pkg.prompt)
   }
   return items.length > 0 ? items : ["Complete assigned practice task"]
+}
+
+/**
+ * Client-facing fields per structured activity, mirroring the
+ * `/generate/structured-task` output schemas (ACTIVITY_LOG_SCHEMA etc.).
+ * Anything not listed here — including `homework`, `degraded`, `warning` or a
+ * field added to `practice_package` later — never reaches the public route.
+ */
+const CLIENT_PRACTICE_TASK_FIELDS = {
+  activity_log: ["activity_date", "activity_description", "pleasure_rating", "mastery_rating", "notes"],
+  thought_record: [
+    "situation",
+    "automatic_thought",
+    "emotions",
+    "evidence_for",
+    "evidence_against",
+    "balanced_thought",
+    "outcome_emotion_intensity",
+    "notes",
+  ],
+  two_choice_worksheet: ["title", "prompts", "reflection_prompt", "notes"],
+  reflection_prompt: ["prompt", "suggested_background", "notes"],
+}
+
+/**
+ * Projects a session's own `practice_package` into `{ task_type, ...fields }`
+ * for `GET /client-homework/:id`, or `null` when it holds no recognised activity.
+ */
+function projectClientPracticeTask(pkg) {
+  if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return null
+
+  const taskType = pkg.task_type
+  if (!Object.prototype.hasOwnProperty.call(CLIENT_PRACTICE_TASK_FIELDS, taskType)) {
+    return null
+  }
+
+  const task = { task_type: taskType }
+  for (const field of CLIENT_PRACTICE_TASK_FIELDS[taskType]) {
+    if (pkg[field] !== undefined) task[field] = pkg[field]
+  }
+  return task
 }
 
 /**

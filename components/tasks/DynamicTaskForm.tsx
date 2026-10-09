@@ -15,6 +15,10 @@
  * On failure the save-error banner is shown and form progression is blocked
  * until a subsequent auto-save succeeds (connection restored).
  *
+ * `persist={false}` opts out entirely: no auto-save, no save badge, no
+ * "Submit for review" and no network calls at all. Used by the signed-link
+ * client page (app/practice/[sessionId]), whose caller has no bearer token.
+ *
  * ─── Clinical safeguards ─────────────────────────────────────────────────
  * "Submit for review" is disabled until:
  *   (a) at least one auto-save has succeeded (submissionId is established)
@@ -107,6 +111,12 @@ interface DynamicTaskFormProps {
   onSubmitted?: (submission: NormalisedSubmission) => void;
   /** Called when the user cancels. */
   onCancel?: () => void;
+  /**
+   * Defaults to `true`. When `false` the form is fill-in only: no auto-save,
+   * no save badge, no submission id required to navigate, and no
+   * "Submit for review" — nothing is sent anywhere.
+   */
+  persist?: boolean;
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -277,6 +287,7 @@ export function DynamicTaskForm({
   initialData,
   onSubmitted,
   onCancel,
+  persist = true,
 }: DynamicTaskFormProps) {
 
   // ── Wizard state ──────────────────────────────────────────────────────────
@@ -395,6 +406,9 @@ export function DynamicTaskForm({
   // ── Core save function ────────────────────────────────────────────────────
   const performSave = useCallback(
     async (formData: FormData): Promise<boolean> => {
+      // Fill-in-only mode: never touch the network.
+      if (!persist) return false;
+
       setSaveStatus("saving");
       setSaveError(null);
 
@@ -428,7 +442,7 @@ export function DynamicTaskForm({
         return false;
       }
     },
-    [submissionId, clientId, practitionerId, taskType]
+    [submissionId, clientId, practitionerId, taskType, persist]
   );
 
   // ── Debounced auto-save ───────────────────────────────────────────────────
@@ -443,6 +457,7 @@ export function DynamicTaskForm({
 
   // Schedule save whenever data changes
   useEffect(() => {
+    if (!persist) return;
     triggerAutoSave();
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -458,12 +473,13 @@ export function DynamicTaskForm({
   }, [buildFormData, performSave]);
 
   // ── Navigation guards ─────────────────────────────────────────────────────
-  const canProgress = saveStatus !== "error";
+  // Without persistence there is no save state to wait on.
+  const canProgress = !persist || saveStatus !== "error";
   const isLastStep = wizardStep === totalSteps - 1;
 
   // ── Final commit ──────────────────────────────────────────────────────────
   const handleCommit = useCallback(() => {
-    if (!submissionId) return;
+    if (!persist || !submissionId) return;
     setIsCommitting(true);
 
     startCommitTransition(async () => {
@@ -490,7 +506,7 @@ export function DynamicTaskForm({
         setIsCommitting(false);
       }
     });
-  }, [submissionId, onSubmitted, startCommitTransition]);
+  }, [submissionId, onSubmitted, startCommitTransition, persist]);
 
   // ── Progress bar ──────────────────────────────────────────────────────────
   const progressValue = useMemo(
@@ -546,7 +562,7 @@ export function DynamicTaskForm({
             <h1 className="text-2xl font-bold tracking-tight">{taskTitle}</h1>
             <p className="text-sm text-muted-foreground">{taskSubtitle}</p>
           </div>
-          <SaveStatusBadge status={saveStatus} />
+          {persist && <SaveStatusBadge status={saveStatus} />}
         </div>
 
         {/* Progress bar */}
@@ -611,21 +627,26 @@ export function DynamicTaskForm({
       {/* ── Navigation row ───────────────────────────────────── */}
       {!showApprovalGate && (
         <div className="flex items-center justify-between border-t border-border pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (wizardStep > 0) {
-                setWizardStep((s) => s - 1);
-              } else {
-                onCancel?.();
-              }
-            }}
-            className="gap-1.5"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {wizardStep === 0 ? "Cancel" : "Back"}
-          </Button>
+          {!persist && wizardStep === 0 && !onCancel ? (
+            // Fill-in-only with no cancel handler: a "Cancel" would do nothing.
+            <span aria-hidden="true" />
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (wizardStep > 0) {
+                  setWizardStep((s) => s - 1);
+                } else {
+                  onCancel?.();
+                }
+              }}
+              className="gap-1.5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {wizardStep === 0 ? "Cancel" : "Back"}
+            </Button>
+          )}
 
           <div className="flex items-center gap-2">
             {/* Dot pagination (multi-step only) */}
@@ -643,7 +664,12 @@ export function DynamicTaskForm({
               ))}
           </div>
 
-          {isLastStep ? (
+          {isLastStep && !persist ? (
+            // Fill-in-only: there is nothing to submit, so say so plainly.
+            <p className="text-xs text-muted-foreground text-right">
+              Answers on this page are not saved or sent.
+            </p>
+          ) : isLastStep ? (
             <Button
               size="sm"
               disabled={

@@ -4,15 +4,42 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
 import { CheckCircle2, Circle, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { DynamicTaskForm, type TaskVariant } from "@/components/tasks/DynamicTaskForm";
+import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
 
 type PracticePackage = {
   homework: any[];
 };
 
+/** The clinician's chosen activity, as projected by GET /client-homework/:id. */
+type PracticeTask = {
+  task_type: TaskVariant | "reflection_prompt";
+  [field: string]: unknown;
+};
+
+const FORM_TASK_TYPES: readonly TaskVariant[] = [
+  "activity_log",
+  "thought_record",
+  "two_choice_worksheet",
+];
+
+function readPracticeTask(value: unknown): PracticeTask | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const taskType = (value as { task_type?: unknown }).task_type;
+  if (
+    taskType === "reflection_prompt" ||
+    (FORM_TASK_TYPES as readonly unknown[]).includes(taskType)
+  ) {
+    return value as PracticeTask;
+  }
+  return null;
+}
+
 type SessionData = {
   id?: string;
   name?: string;
   practicePackage?: PracticePackage | null;
+  practiceTask?: PracticeTask | null;
 };
 
 function getTaskLabel(item: any): string {
@@ -90,6 +117,7 @@ export default function PracticePage() {
           practicePackage: {
             homework: homeworkList,
           },
+          practiceTask: readPracticeTask(data.practiceTask),
         });
 
         setError(null);
@@ -130,6 +158,67 @@ export default function PracticePage() {
           <p className="text-sm text-zinc-600 mb-6">{error}</p>
           <div className="text-xs text-zinc-400">
             Please ask your clinician for a renewed link if your current session has expired.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // The clinician's chosen activity. The type is fixed by the clinician — this
+  // page renders no picker and nothing here can change it. Nothing is saved:
+  // the form runs with persist={false}, and the canvas is mounted without a
+  // ref, so its upload handle is unreachable.
+  const practiceTask = session?.practiceTask ?? null;
+
+  if (practiceTask) {
+    const reflectionPrompt =
+      practiceTask.task_type === "reflection_prompt" &&
+      typeof practiceTask.prompt === "string"
+        ? practiceTask.prompt
+        : null;
+
+    return (
+      <div className="min-h-screen bg-zinc-50/60 py-12 px-4 sm:px-6 flex justify-center">
+        <div className="w-full max-w-4xl space-y-6">
+          <div className="bg-white border rounded-[2rem] p-4 sm:p-8 shadow-sm space-y-6">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-2">
+                <Sparkles className="h-3.5 w-3.5" /> ALICE Practice
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">
+                Client Practice Task
+              </h1>
+              {session?.name && (
+                <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                  {session.name}
+                </p>
+              )}
+              <p className="text-sm text-zinc-500 max-w-md mx-auto pt-1">
+                Please complete the activity your clinician has prepared before your next session.
+              </p>
+            </div>
+
+            {practiceTask.task_type === "reflection_prompt" ? (
+              <div className="space-y-4">
+                {reflectionPrompt && (
+                  <p className="text-sm sm:text-base font-medium text-zinc-800 leading-relaxed">
+                    {reflectionPrompt}
+                  </p>
+                )}
+                <ReflectionCanvas />
+              </div>
+            ) : (
+              <DynamicTaskForm
+                taskType={practiceTask.task_type}
+                initialData={practiceTask}
+                persist={false}
+              />
+            )}
+
+            <div className="pt-6 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-400">
+              <span>Powered by Neuvo ALICE</span>
+              <span>Confidential &amp; Secure</span>
+            </div>
           </div>
         </div>
       </div>

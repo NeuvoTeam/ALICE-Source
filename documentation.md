@@ -326,18 +326,15 @@ the list. The newly created client is *not* auto-opened — the clinician clicks
 ### 4.7 Client-facing material pages (public)
 
 There is **one client link**: `/practice/<sessionId>?exp=…&sig=…`. It is the only page that reads the
-narrow projection `GET /client-homework/:sessionId`, and it renders `practiceHomework` as a checklist.
+narrow projection `GET /client-homework/:sessionId`.
 
-- `app/practice/[sessionId]/page.tsx` → renders the `practiceHomework` checklist from
-  `GET /client-homework/:id?exp=…&sig=…`. Includes interactive client-side task completion checkboxes and progress tracking.
+- `app/practice/[sessionId]/page.tsx` → renders the clinician's chosen activity via the `practiceTask` object (using `DynamicTaskForm` or `ReflectionCanvas`). The client cannot change the activity type, and client-side persistence is deliberately disabled (`persist={false}`). If no structured activity is found, it falls back to the `practiceHomework` checklist.
 - `app/homework/[sessionId]/page.tsx` → **legacy shim only**. Links minted before the consolidation
   (or bookmarked) still work: the page fetches nothing and forwards to `/practice/<id>` with
   `window.location.replace` plus `window.location.search` verbatim, so the signed `exp`+`sig` pair —
   the page's only credential — survives untouched and the dead URL stays out of the history.
-- The projection still returns `{ sessionId, title, homework, quiz, vignette, practiceHomework }` —
-  never `session_notes`, `analysis` or `riskFlags`. `practiceHomework` is extracted from `practice_package`
-  (both legacy arrays and structured tasks like `two_choice_worksheet`, `thought_record`, `activity_log`,
-  and `reflection_prompt`), `homework`, or recent `practice_task_submissions` records if unpersisted in `sessions`.
+- The projection returns `{ sessionId, title, homework, quiz, vignette, practiceHomework, practiceTask }` —
+  never `session_notes`, `analysis` or `riskFlags`. `practiceTask` carries the structured activity fields, whilst `practiceHomework` is the fallback array. The previous cross-session `practice_task_submissions` query has been removed.
 - The clinician obtains the URL from `GET /client-link/:sessionId` (§5.2), from the **Copy Client
   Link** button in step 2 of `components/vignette-generator.tsx`, or from the session row's
   **Copy client link** / **Open client link** actions in the sidebar (§4.4). The Worker signs
@@ -1040,8 +1037,8 @@ gradle build        # compiles nothing today — all modules and src/main/java a
 - **Auth is default-on.** Every Worker route sits behind `requireUser` (§5.0) unless it is explicitly on
   the public list. Adding a public route requires a justification in §5.0 *and* a §13.1 entry.
 - **Never widen the public projection.** The only token-free read is `/client-homework/:id`, returning
-  `{ sessionId, title, homework, quiz, vignette, practiceHomework }` and gated by a signed link (§5.2).
-  Adding `session_notes`, `analysis` or `riskFlags` to it would recreate the enumeration leak.
+  `{ sessionId, title, homework, quiz, vignette, practiceHomework, practiceTask }` and gated by a signed link (§5.2).
+  The addition of `practiceTask` is a narrow, activity-only widening that strictly filters allowed keys and excludes all clinical fields. Adding `session_notes`, `analysis` or `riskFlags` to it would recreate the enumeration leak.
 - **Secrets never reach the browser.** Verification happens in the Worker; the client only ever receives a
   finished URL. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY` and `CLIENT_LINK_SECRET` exist on the Worker
   runtime only.
@@ -1131,7 +1128,7 @@ local development, but several are user-visible or security-relevant.
 | Gateway package manifest | `workers/mcp-gateway/package.json` declares no dependencies and no scripts, so there is no `dev`/`deploy` shortcut |
 | Schema not fully migrated | `session_versions` (written on every save) and `sessions.practice_package` exist only in the live database — no migration in-repo |
 | Legacy Ollama route | `app/api/analyze/session/route.ts` (§7.4) |
-| Unrendered client projection fields | `GET /client-homework/:id` still returns `vignette`, `quiz` and `homework`, but since the two client pages were consolidated (§4.7) no UI renders them — the client sees only the `practiceHomework` checklist. The worker test asserts the full key set, so the fields are deliberate for now; decide whether to surface them again or narrow the projection |
+| Unrendered client projection fields | `GET /client-homework/:id` now projects the chosen structured activity via the `practiceTask` field, rendered on the signed-link page with no client-side persistence. It still returns `vignette`, `quiz` and `homework` unused. The unscoped `practice_task_submissions` fallback was removed to close a cross-session disclosure. |
 | Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` |
 | Empty README | `README.md` is zero bytes; this document is not linked from anywhere in the repo |
 

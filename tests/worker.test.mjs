@@ -113,8 +113,12 @@ const worker = (await import(pathToFileURL(workerFile).href)).default
 let calls = []
 let groqSteps = []
 
-/** Stubs Groq *and* Supabase REST, recording every outbound request. */
-function installFetch(steps) {
+/**
+ * Stubs Groq *and* Supabase REST, recording every outbound request.
+ * `supabaseRows(href)` may return the rows for a given Supabase URL; returning
+ * `undefined` (or omitting it) falls back to the default owned session row.
+ */
+function installFetch(steps, { supabaseRows } = {}) {
   groqSteps = steps
   calls = []
 
@@ -149,6 +153,15 @@ function installFetch(steps) {
     }
 
     if (!isGroq) {
+      const override = supabaseRows ? supabaseRows(href) : undefined
+
+      if (override !== undefined) {
+        return new Response(JSON.stringify(override), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      }
+
       // Supabase REST with `Prefer: return=representation` answers with an array.
       // The row carries the ownership chain the Worker walks before any
       // session-scoped work: `checkSessionAccess` reads `client_id` (or the
@@ -682,6 +695,7 @@ async function main() {
   assert.deepEqual(Object.keys(r.body).sort(), [
     "homework",
     "practiceHomework",
+    "practiceTask",
     "quiz",
     "sessionId",
     "title",
@@ -814,6 +828,50 @@ async function main() {
   )
   assert.equal(r.status, 403)
   pass("links: missing CLIENT_LINK_SECRET fails closed")
+
+  /* 34. Regression: cross-session disclosure via practice_task_submissions fallback is removed. */
+  const regressionExp = inAnHour()
+  const regressionSig = await signLink("session-empty", regressionExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      // Return a session row with NO homework/practice package
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: "session-empty",
+            client_id: "client-1",
+            name: "Empty Session",
+            practice_package: null,
+            homework: [],
+          }
+        ]
+      }
+      // If the removed fallback query were still made, it would return this cross-session row
+      if (href.includes("practice_task_submissions")) {
+        return [
+          {
+            task_type: "thought_record",
+            content: { notes: "Another session's very private thoughts" }
+          }
+        ]
+      }
+      return undefined
+    }
+  })
+
+  r = await call(
+    "GET",
+    `/client-homework/session-empty?exp=${regressionExp}&sig=${regressionSig}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.deepEqual(r.body.practiceHomework, [])
+  assert.equal(r.body.practiceTask, null)
+  assert.ok(!JSON.stringify(r.body).includes("private thoughts"), "must not surface other session's content")
+  pass("regression: no cross-session disclosure via submissions fallback")
 
   /* 33. /generate/structured-task normalizes nested 3 C's thought_record from Groq */
   const NESTED_THOUGHT_RECORD = JSON.stringify({

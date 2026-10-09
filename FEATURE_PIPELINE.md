@@ -59,9 +59,10 @@ To maximize velocity during feature development and local troubleshooting, execu
   * Clinicians can toggle up to 3 therapeutic modalities (`ACT`, `CBT`, `DBT`) before worksheet generation.
   * Defaults strictly to `CBT` to reduce friction while leaving final override authority with clinician.
   * Strict canonical upper-casing (`"CBT" | "ACT" | "DBT"`) and `Set` deduplication prevents selection counter mismatch.
-* **1.2 Client-Facing Worksheet Constraints (`components/client-view.tsx`, `components/tasks/DynamicTaskForm.tsx`, `components/tasks/TwoChoiceWorksheetForm.tsx`) — [COMPLETED]**
+* **1.2 Client-Facing Worksheet Constraints (`components/client-view.tsx`, `components/tasks/DynamicTaskForm.tsx`, `components/tasks/TwoChoiceWorksheetForm.tsx`, `app/practice/[sessionId]/page.tsx`) — [COMPLETED]**
   * Constrains client interface strictly to **one interactive worksheet at a time** to prevent cognitive overload.
   * Formats dual-choice worksheets with exactly two response options per prompt, plus a persistent free-form reflection area (`components/tasks/ReflectionField.tsx`).
+  * Renders the chosen activity for unauthenticated clients via a signed link without saving (persistence disabled).
 * **1.3 Out-of-Session Care & Touchpoints — [IN PROGRESS]**
   * Add notification / email reminder touchpoints targeting uncompleted homework assignments.
 * **1.4 Centralised Asset Library Integration — [COMPLETED]**
@@ -106,7 +107,7 @@ To maximize velocity during feature development and local troubleshooting, execu
 | Date | Verification Step | Command | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-10-10 | TypeScript compilation | `npx tsc --noEmit` | PASS | Exit 0 — zero type errors |
-| 2026-10-10 | Test suite execution | `npm test` | PASS | All 61 checks green (worker, PDF, hydration) |
+| 2026-10-10 | Test suite execution | `npm test` | PASS | All 62 checks green (worker, PDF, hydration) |
 | 2026-10-10 | Documentation compliance | `npm run docs:check` | PASS | Exit 0 — `documentation.md` in sync |
 | 2026-10-10 | Cloudflare Worker Deployment | `npx wrangler deploy` | DEPLOYED | Version ID: `fb3c098b-5bf5-4887-8e75-c2da66d3562f` |
 | 2026-10-10 | Client Link Homework Task Display | `/practice/:id` | PASS | Structured task extraction & interactive checklist |
