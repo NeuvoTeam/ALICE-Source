@@ -329,16 +329,17 @@ There is **one client link**: `/practice/<sessionId>?exp=…&sig=…`. It is the
 narrow projection `GET /client-homework/:sessionId`, and it renders `practiceHomework` as a checklist.
 
 - `app/practice/[sessionId]/page.tsx` → renders the `practiceHomework` checklist from
-  `GET /client-homework/:id?exp=…&sig=…`.
+  `GET /client-homework/:id?exp=…&sig=…`. Includes interactive client-side task completion checkboxes and progress tracking.
 - `app/homework/[sessionId]/page.tsx` → **legacy shim only**. Links minted before the consolidation
   (or bookmarked) still work: the page fetches nothing and forwards to `/practice/<id>` with
   `window.location.replace` plus `window.location.search` verbatim, so the signed `exp`+`sig` pair —
   the page's only credential — survives untouched and the dead URL stays out of the history.
 - The projection still returns `{ sessionId, title, homework, quiz, vignette, practiceHomework }` —
-  never `session_notes`, `analysis` or `riskFlags`. `vignette`, `quiz` and `homework` are no longer
-  rendered by any page (§13.3); only `practiceHomework` reaches the client today.
+  never `session_notes`, `analysis` or `riskFlags`. `practiceHomework` is extracted from `practice_package`
+  (both legacy arrays and structured tasks like `two_choice_worksheet`, `thought_record`, `activity_log`,
+  and `reflection_prompt`), `homework`, or recent `practice_task_submissions` records if unpersisted in `sessions`.
 - The clinician obtains the URL from `GET /client-link/:sessionId` (§5.2), from the **Copy Client
-  Link** button in step 3 of `components/vignette-generator.tsx`, or from the session row's
+  Link** button in step 2 of `components/vignette-generator.tsx`, or from the session row's
   **Copy client link** / **Open client link** actions in the sidebar (§4.4). The Worker signs
   `v1|sessionId|exp` with HMAC-SHA256 and still returns `homeworkUrl`, `practiceUrl` and
   `expiresAt`; every UI consumer now uses `practiceUrl`.
@@ -1200,6 +1201,15 @@ and §13.4 (CI, lint config, dead code).
 | Cause 2 | Reasoning model tokens (`<think>...</think>`) polluted JSON extraction when curly braces appeared within reasoning text. Furthermore, direct uncaught generation errors failed hard instead of leveraging the degraded graceful fallback |
 | Fix 2 | Stripped `<think>...</think>` tags in `stripMarkdown`, passed `?allowDegraded=1` on analyze and generate endpoints to guarantee graceful fallback degraded payloads, and deployed live worker version `54c03287-95c4-43fe-be7f-134409664e1c` |
 | Evidence | `npx tsc --noEmit` exit 0; `npm test` all 61 checks green (34 worker, 12 PDF, 15 hydration); Worker deployed to Cloudflare production |
+
+### 13.9 Closure record — Client Link Homework Task Display (2026-10-10)
+
+| Item | Detail |
+| --- | --- |
+| Symptom | Opening the signed client link (`/practice/:sessionId?exp=…&sig=…`) rendered "No practice tasks available." even after structured tasks were generated |
+| Causes | 1. In `vignette-generator.tsx`, `saveSessionContent` was called without `practicePackage` or `homework`, leaving the session row in Supabase devoid of practice package content.<br>2. In `CloudFlare.js`, `GET /client-homework/:sessionId` only read `row.practice_package.homework` as an array. When structured tasks (`two_choice_worksheet`, `thought_record`, `activity_log`, `reflection_prompt`) were present without an explicit `.homework` array, it defaulted to `[]` and ignored `row.homework` and `practice_task_submissions`.<br>3. In `app/practice/[sessionId]/page.tsx`, the client page strictly expected `data.practiceHomework` and did not fall back to `data.homework`, and lacked interactive task completion. |
+| Fix | 1. In `vignette-generator.tsx`, enriched generated tasks with `homework` arrays via `extractHomeworkList`, persisting `practicePackage` and `homework` during both initial generation and regeneration, and restored step 2 hydration on existing sessions.<br>2. In `CloudFlare.js`, implemented `extractHomeworkFromPracticePackage` to extract human-readable task items from structured task schemas, with cascading fallbacks to `row.homework` and `practice_task_submissions` records.<br>3. In `app/practice/[sessionId]/page.tsx`, added cascading fallback to `data.homework`, structured object task formatting, and an interactive client checkbox tracker with progress bar. |
+| Evidence | `npx tsc --noEmit` exit 0; `npm test` all 61 checks green (34 worker, 12 PDF, 15 hydration); `npm run docs:check` exit 0 |
 
 ---
 

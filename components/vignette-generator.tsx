@@ -51,6 +51,43 @@ const getDefaultActivity = (modalities: Modality[]): "activity_log" | "thought_r
   return "thought_record"
 }
 
+function extractHomeworkList(task: any): string[] {
+  if (!task || typeof task !== "object") return []
+  if (Array.isArray(task.homework) && task.homework.length > 0) {
+    return task.homework
+  }
+
+  const items: string[] = []
+  if (task.task_type === "two_choice_worksheet") {
+    if (task.title) items.push(task.title)
+    if (Array.isArray(task.prompts)) {
+      task.prompts.forEach((p: any, idx: number) => {
+        const q = typeof p === "string" ? p : p?.question
+        if (q) items.push(`${idx + 1}. ${q}`)
+      })
+    }
+    if (task.reflection_prompt) {
+      items.push(`Reflection: ${task.reflection_prompt}`)
+    }
+  } else if (task.task_type === "thought_record") {
+    items.push("Complete 3 C's Thought Record")
+    if (task.situation) items.push(`Situation: ${task.situation}`)
+    if (task.automatic_thought) items.push(`Catch It (Automatic Thought): ${task.automatic_thought}`)
+    if (task.evidence_for || task.evidence_against) items.push("Check It: Review evidence for and against")
+    if (task.balanced_thought) items.push(`Correct It (Balanced Thought): ${task.balanced_thought}`)
+  } else if (task.task_type === "activity_log") {
+    items.push("Weekly Activity Schedule")
+    if (task.activity_description) items.push(`Scheduled Activity: ${task.activity_description}`)
+    if (task.activity_date) items.push(`Target Date: ${task.activity_date}`)
+    if (task.notes) items.push(`Notes: ${task.notes}`)
+  } else if (task.task_type === "reflection_prompt") {
+    items.push("Values & Defusion Canvas Reflection")
+    if (task.prompt) items.push(task.prompt)
+  }
+
+  return items.length > 0 ? items : ["Complete assigned practice task"]
+}
+
 export default function VignetteGenerator({
   clientId,
   caseId,
@@ -171,10 +208,16 @@ export default function VignetteGenerator({
 
     // Try to load practice package if in session (from GET /sessions/:id)
     if (session.practicePackage) {
+      const pkg = session.practicePackage as any
       setPracticePackage(session.practicePackage)
-      setStep(3)
+      setGeneratedTaskData(pkg)
+      if (pkg.task_type) {
+        setActivityFormat(pkg.task_type)
+      }
+      setStep(2)
     } else {
       setPracticePackage(null)
+      setGeneratedTaskData(null)
       setStep(1)
     }
   }, [session, sessionHydratedId])
@@ -354,7 +397,14 @@ export default function VignetteGenerator({
         )
       }
 
-      setGeneratedTaskData(taskData)
+      const derivedHomework = extractHomeworkList(taskData)
+      const enrichedTaskData = {
+        ...taskData,
+        homework: derivedHomework,
+      }
+
+      setGeneratedTaskData(enrichedTaskData)
+      setPracticePackage(enrichedTaskData as any)
 
       if (taskData?.degraded) {
         setDegradedWarning(taskData.warning || "AI generation was unavailable.")
@@ -365,7 +415,7 @@ export default function VignetteGenerator({
         clientId,
         practitionerId: "00000000-0000-0000-0000-000000000000",
         taskType: activityFormat as any,
-        formData: taskData as any,
+        formData: enrichedTaskData as any,
       })
 
       setGeneratedSubmissionId(draft.id)
@@ -376,6 +426,8 @@ export default function VignetteGenerator({
       await saveSessionContent(caseId, sessionId, {
         sessionNotes: sessionInput,
         analysis: analyzeData,
+        practicePackage: enrichedTaskData,
+        homework: derivedHomework,
         modality: selectedModalities.join(", "),
       })
     } catch (err) {
@@ -433,7 +485,14 @@ export default function VignetteGenerator({
         throw new Error(taskData?.detail || taskData?.error || "Structured task generation failed")
       }
 
-      setGeneratedTaskData(taskData)
+      const derivedHomework = extractHomeworkList(taskData)
+      const enrichedTaskData = {
+        ...taskData,
+        homework: derivedHomework,
+      }
+
+      setGeneratedTaskData(enrichedTaskData)
+      setPracticePackage(enrichedTaskData as any)
 
       if (taskData?.degraded) {
         setDegradedWarning(taskData.warning || "AI generation was unavailable.")
@@ -443,10 +502,15 @@ export default function VignetteGenerator({
         clientId,
         practitionerId: "00000000-0000-0000-0000-000000000000",
         taskType: activityFormat as any,
-        formData: taskData as any,
+        formData: enrichedTaskData as any,
       })
 
       setGeneratedSubmissionId(draft.id)
+
+      await saveSessionContent(caseId, sessionId, {
+        practicePackage: enrichedTaskData,
+        homework: derivedHomework,
+      })
     } catch (err) {
       console.error(err)
       const message = err instanceof Error ? err.message : "Failed to generate structured task"

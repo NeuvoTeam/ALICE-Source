@@ -909,10 +909,50 @@ if (method === "GET" && cleanPath === "/auth/me") {
         return respond({ error: "Session not found" }, cors, 404)
       }
 
-      const practiceHomework =
-        row.practice_package && Array.isArray(row.practice_package.homework)
-          ? row.practice_package.homework
-          : []
+      let practiceHomework = []
+
+      if (
+        row.practice_package &&
+        Array.isArray(row.practice_package.homework) &&
+        row.practice_package.homework.length > 0
+      ) {
+        practiceHomework = row.practice_package.homework
+      } else if (Array.isArray(row.homework) && row.homework.length > 0) {
+        practiceHomework = row.homework
+      } else if (row.practice_package && typeof row.practice_package === "object") {
+        practiceHomework = extractHomeworkFromPracticePackage(row.practice_package)
+      }
+
+      // Fallback: check practice_task_submissions if row had no homework populated
+      if (!practiceHomework.length) {
+        try {
+          const sessionMetaRes = await fetch(
+            `${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`,
+            { headers: HEADERS }
+          )
+          if (sessionMetaRes.ok) {
+            const meta = await sessionMetaRes.json()
+            const clientId =
+              meta?.[0]?.client_id || meta?.[0]?.case_formulations?.client_id
+            if (clientId) {
+              const subRes = await fetch(
+                `${SUPABASE_URL}/practice_task_submissions?client_id=eq.${clientId}&order=created_at.desc&limit=1`,
+                { headers: HEADERS }
+              )
+              if (subRes.ok) {
+                const subData = await subRes.json()
+                if (subData?.[0]?.form_data) {
+                  practiceHomework = extractHomeworkFromPracticePackage(
+                    subData[0].form_data
+                  )
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to check practice_task_submissions fallback:", e)
+        }
+      }
 
       return respond({
         sessionId: row.id,
@@ -2346,6 +2386,41 @@ function buildSessionPatch(body) {
   }
 
   return patch
+}
+
+/**
+ * Extracts a client-facing list of practice tasks from a structured task / practice package.
+ */
+function extractHomeworkFromPracticePackage(pkg) {
+  if (!pkg || typeof pkg !== "object") return []
+  if (Array.isArray(pkg.homework) && pkg.homework.length > 0) return pkg.homework
+
+  const items = []
+  if (pkg.task_type === "two_choice_worksheet") {
+    if (pkg.title) items.push(pkg.title)
+    if (Array.isArray(pkg.prompts)) {
+      pkg.prompts.forEach((p, idx) => {
+        const q = typeof p === "string" ? p : p?.question
+        if (q) items.push(`${idx + 1}. ${q}`)
+      })
+    }
+    if (pkg.reflection_prompt) items.push(`Reflection: ${pkg.reflection_prompt}`)
+  } else if (pkg.task_type === "thought_record") {
+    items.push("Complete 3 C's Thought Record")
+    if (pkg.situation) items.push(`Situation: ${pkg.situation}`)
+    if (pkg.automatic_thought) items.push(`Catch It: ${pkg.automatic_thought}`)
+    if (pkg.evidence_for || pkg.evidence_against) items.push("Check It: Review evidence for and against")
+    if (pkg.balanced_thought) items.push(`Correct It: ${pkg.balanced_thought}`)
+  } else if (pkg.task_type === "activity_log") {
+    items.push("Weekly Activity Schedule")
+    if (pkg.activity_description) items.push(`Activity: ${pkg.activity_description}`)
+    if (pkg.activity_date) items.push(`Date: ${pkg.activity_date}`)
+    if (pkg.notes) items.push(`Instructions: ${pkg.notes}`)
+  } else if (pkg.task_type === "reflection_prompt") {
+    items.push("Values & Defusion Canvas Reflection")
+    if (pkg.prompt) items.push(pkg.prompt)
+  }
+  return items.length > 0 ? items : ["Complete assigned practice task"]
 }
 
 /**

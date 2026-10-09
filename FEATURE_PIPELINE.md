@@ -108,4 +108,5 @@ To maximize velocity during feature development and local troubleshooting, execu
 | 2026-10-10 | TypeScript compilation | `npx tsc --noEmit` | PASS | Exit 0 — zero type errors |
 | 2026-10-10 | Test suite execution | `npm test` | PASS | All 61 checks green (worker, PDF, hydration) |
 | 2026-10-10 | Documentation compliance | `npm run docs:check` | PASS | Exit 0 — `documentation.md` in sync |
-| 2026-10-10 | Cloudflare Worker Deployment | `npx wrangler deploy` | DEPLOYED | Version ID: `54c03287-95c4-43fe-be7f-134409664e1c` |
+| 2026-10-10 | Cloudflare Worker Deployment | `npx wrangler deploy` | DEPLOYED | Version ID: `fb3c098b-5bf5-4887-8e75-c2da66d3562f` |
+| 2026-10-10 | Client Link Homework Task Display | `/practice/:id` | PASS | Structured task extraction & interactive checklist |
