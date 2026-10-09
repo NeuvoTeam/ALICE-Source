@@ -31,10 +31,35 @@ export const ReflectionPromptSchema = z.object({
   notes: z.string().optional().describe("Any additional clinician notes")
 });
 
+export const MODALITIES = ["CBT", "ACT", "DBT"] as const;
+export const ModalitySchema = z.enum(MODALITIES);
+export const ModalitiesSchema = z.array(ModalitySchema).min(1).max(3)
+  .refine((a) => new Set(a).size === a.length, "duplicate modality")
+  .default(["CBT"]);
+
+export const TwoChoiceWorksheetSchema = z.object({
+  task_type: z.literal("two_choice_worksheet"),
+  title: z.string().min(1),
+  prompts: z.array(z.object({
+    question: z.string().min(1),
+    options: z.tuple([z.string().min(1), z.string().min(1)]), // exactly 2
+  })).min(1).max(5),
+  reflection_prompt: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+export const StructuredTaskRequestSchema = z.object({
+  sessionContext: z.string().min(1).max(20000),
+  activityFormat: z.enum(["auto", "activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"]),
+  modalities: ModalitiesSchema,
+  sessionId: z.string().uuid().optional(),
+});
+
 export const StructuredTaskSchema = z.discriminatedUnion("task_type", [
   WeeklyActivityScheduleSchema,
   ThreeCsSchema,
-  ReflectionPromptSchema
+  ReflectionPromptSchema,
+  TwoChoiceWorksheetSchema
 ]);
 
 export type StructuredTask = z.infer<typeof StructuredTaskSchema>;

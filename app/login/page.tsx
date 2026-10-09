@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -9,7 +11,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     try {
       const res = await fetch(
-        "https://clinical-ai-backend.neuvoteam.workers.dev/auth/login",
+        `${CLINICAL_AI_API_BASE}/auth/login`,
         {
           method: "POST",
           headers: {

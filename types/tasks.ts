@@ -50,7 +50,8 @@ export type TaskStatus =
 export type FormData =
   | ActivityLogFormData
   | ThoughtRecordFormData
-  | BehaviouralExperimentFormData;
+  | BehaviouralExperimentFormData
+  | TwoChoiceWorksheetFormData;
 
 export interface ActivityLogFormData {
   task_type: "activity_log";
@@ -60,6 +61,7 @@ export interface ActivityLogFormData {
   pleasure_rating: number;       // 0–10
   mastery_rating: number;        // 0–10
   notes?: string;
+  reflection?: string;
 }
 
 export interface ThoughtRecordFormData {
@@ -72,6 +74,7 @@ export interface ThoughtRecordFormData {
   balanced_thought: string;
   outcome_emotion_intensity: number; // 0–100
   notes?: string;
+  reflection?: string;
 }
 
 export interface BehaviouralExperimentFormData {
@@ -83,6 +86,18 @@ export interface BehaviouralExperimentFormData {
   what_i_learned: string;
   notes?: string;
 }
+
+export interface TwoChoiceWorksheetFormData {
+  task_type: "two_choice_worksheet";
+  title: string;
+  prompts: Array<{ question: string; options: [string, string] }>;
+  answers: Array<0 | 1 | null>;
+  reflection: string;
+  reflection_prompt: string;
+  notes?: string;
+}
+
+export type Modality = "CBT" | "ACT" | "DBT";
 
 /**
  * `canvas_data` column on `client_reflections`.

@@ -1,3 +1,20 @@
+# ============================================================================
+# DEPRECATED 2026-10-05 — DO NOT RE-ENABLE.
+#
+# Superseded by the 2026-10-05 "Write Separation Architecture" decision
+# (vault: 10_Projects/ALICE/GEMINI X DEEPSEEK 2026-10-05 Hermes stack.md):
+# automated edge writes go EXCLUSIVELY to 10_Projects/ALICE/Backlog_Auto.md;
+# 10_Projects/ALICE/Backlog.md is the manual-planning file.
+#
+# $aliceTarget below still points at Backlog.md, so re-enabling this task
+# would silently resume writing automated captures into the manual file.
+# Automated capture is now owned by the Hermes Edge Worker (hermes-courier),
+# which writes Backlog_Auto.md and dead-letters failures to
+# 00_Inbox/_failed_routes.md.
+#
+# Last observed run: 2026-10-05 17:30 (see scripts/logs/dispatch-2026-10-05.log).
+# Kept for reference only.
+# ============================================================================
 # Obsidian Loki Inbox -> Backlog & Action Log Dispatcher
 # Silent-safe for Task Scheduler via run-silent.vbs (wscript.exe)
 # Hardened: empty-file guard + auto-archive, OneDrive sync detection,

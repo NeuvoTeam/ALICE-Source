@@ -12,7 +12,8 @@ import assert from "node:assert/strict"
 import { copyFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
+import * as esbuild from "esbuild"
 
 const WORKER_SOURCE = new URL("../backend/CloudFlare.js", import.meta.url)
 
@@ -100,7 +101,12 @@ const inAnHour = () => Math.floor(Date.now() / 1000) + 3600
 const tempDir = await mkdtemp(join(tmpdir(), "alice-worker-test-"))
 const workerFile = join(tempDir, "CloudFlare.mjs")
 
-await copyFile(WORKER_SOURCE, workerFile)
+await esbuild.build({
+  entryPoints: [fileURLToPath(WORKER_SOURCE)],
+  bundle: true,
+  outfile: workerFile,
+  format: "esm",
+})
 
 const worker = (await import(pathToFileURL(workerFile).href)).default
 
@@ -747,7 +753,7 @@ async function main() {
   const tamperExp = inAnHour()
   const tamperSig = await signLink("session-0001", tamperExp)
   const tampered =
-    tamperSig.slice(0, -1) + (tamperSig.endsWith("A") ? "B" : "A")
+    (tamperSig[0] === "a" ? "b" : "a") + tamperSig.slice(1)
 
   installFetch([{ content: VALID }])
   r = await call(
@@ -808,9 +814,52 @@ async function main() {
   )
   assert.equal(r.status, 403)
   pass("links: missing CLIENT_LINK_SECRET fails closed")
+
+  /* 33. /generate/structured-task normalizes nested 3 C's thought_record from Groq */
+  const NESTED_THOUGHT_RECORD = JSON.stringify({
+    type: "thought_record",
+    catch: {
+      situation: "Overwhelmed in session",
+      automatic_thought: "I cannot do therapy",
+      emotions: [{ label: "Anxiety", intensity: 75 }]
+    },
+    check: {
+      evidence_for: ["Felt tired"],
+      evidence_against: ["Made progress before"]
+    },
+    correct: {
+      balanced_thought: "Therapy takes time"
+    },
+    outcome_emotion_intensity: 35
+  });
+
+  installFetch([{ content: NESTED_THOUGHT_RECORD }]);
+  r = await call("POST", "/generate/structured-task", {
+    sessionContext: "Client felt overwhelmed and tired during therapy",
+    activityFormat: "thought_record",
+    modalities: ["CBT"]
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.task_type, "thought_record");
+  assert.equal(r.body.situation, "Overwhelmed in session");
+  assert.equal(r.body.automatic_thought, "I cannot do therapy");
+  assert.equal(r.body.evidence_for, "Felt tired");
+  assert.equal(r.body.evidence_against, "Made progress before");
+  assert.equal(r.body.balanced_thought, "Therapy takes time");
+  assert.equal(r.body.outcome_emotion_intensity, 35);
+  pass("structured-task: normalizes nested 3 C's output from LLM");
+
+  /* 34. /generate/structured-task rejects invalid request payload with 400 */
+  r = await call("POST", "/generate/structured-task", {
+    sessionContext: "",
+    activityFormat: "thought_record"
+  });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, "INVALID_REQUEST");
+  pass("structured-task: invalid request schema returns 400");
 }
 
-const TOTAL_CHECKS = 32
+const TOTAL_CHECKS = 34
 
 main()
   .then(() => console.log(`\n${passed}/${TOTAL_CHECKS} checks passed`))
@@ -819,4 +868,5 @@ main()
     process.exitCode = 1
   })
   .finally(() => rm(tempDir, { recursive: true, force: true }))
+
 

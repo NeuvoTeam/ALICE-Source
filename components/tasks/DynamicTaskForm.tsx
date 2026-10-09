@@ -69,10 +69,17 @@ import {
   type ThreeCsData,
 } from "./ThreeCsForm";
 
+import {
+  TwoChoiceWorksheetForm,
+  createEmptyTwoChoiceData,
+  type TwoChoiceData,
+} from "./TwoChoiceWorksheetForm";
+
 import type {
   FormData,
   ActivityLogFormData,
   ThoughtRecordFormData,
+  TwoChoiceWorksheetFormData,
   NormalisedSubmission,
   UUID,
 } from "@/types/tasks";
@@ -81,7 +88,7 @@ import type {
 // Internal types
 // ---------------------------------------------------------------------------
 
-export type TaskVariant = "activity_log" | "thought_record";
+export type TaskVariant = "activity_log" | "thought_record" | "two_choice_worksheet";
 
 interface DynamicTaskFormProps {
   /** Identifies the owning client for the submission. */
@@ -304,6 +311,19 @@ export function DynamicTaskForm({
     };
   });
 
+  const [twoChoiceData, setTwoChoiceData] = useState<TwoChoiceData>(() => {
+    const empty = createEmptyTwoChoiceData();
+    if (!initialData || taskType !== "two_choice_worksheet") return empty;
+    return {
+      title: initialData.title ?? empty.title,
+      prompts: initialData.prompts ?? empty.prompts,
+      answers: initialData.answers ?? initialData.prompts?.map(() => null) ?? empty.answers,
+      reflection: initialData.reflection ?? empty.reflection,
+      reflection_prompt: initialData.reflection_prompt ?? empty.reflection_prompt,
+      notes: initialData.notes ?? empty.notes,
+    };
+  });
+
   // ── Persistence state ─────────────────────────────────────────────────────
   const [submissionId, setSubmissionId] = useState<UUID | undefined>(
     initialSubmissionId ?? (externalSubmissionId || undefined)
@@ -343,7 +363,7 @@ export function DynamicTaskForm({
         notes: "Weekly activity schedule — see activity_description for grid.",
       };
       return payload;
-    } else {
+    } else if (taskType === "thought_record") {
       const payload: ThoughtRecordFormData = {
         task_type: "thought_record",
         situation: threeCsData.situation,
@@ -358,8 +378,19 @@ export function DynamicTaskForm({
         outcome_emotion_intensity: threeCsData.outcomeEmotionIntensity,
       };
       return payload;
+    } else {
+      const payload: TwoChoiceWorksheetFormData = {
+        task_type: "two_choice_worksheet",
+        title: twoChoiceData.title,
+        prompts: twoChoiceData.prompts,
+        answers: twoChoiceData.answers,
+        reflection: twoChoiceData.reflection,
+        reflection_prompt: twoChoiceData.reflection_prompt,
+        notes: twoChoiceData.notes,
+      };
+      return payload;
     }
-  }, [taskType, schedule, threeCsData]);
+  }, [taskType, schedule, threeCsData, twoChoiceData]);
 
   // ── Core save function ────────────────────────────────────────────────────
   const performSave = useCallback(
@@ -417,7 +448,7 @@ export function DynamicTaskForm({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedule, threeCsData]);
+  }, [schedule, threeCsData, twoChoiceData]);
 
   // ── Manual retry ─────────────────────────────────────────────────────────
   const handleRetry = useCallback(async () => {
@@ -494,12 +525,16 @@ export function DynamicTaskForm({
   const taskTitle =
     taskType === "activity_log"
       ? "Weekly Activity Schedule"
-      : "The 3 C's Practice Worksheet";
+      : taskType === "thought_record" 
+      ? "The 3 C's Practice Worksheet"
+      : "Interactive Worksheet";
 
   const taskSubtitle =
     taskType === "activity_log"
       ? "Track your activities and mood ratings across the week"
-      : "Identify, examine, and reframe automatic thoughts";
+      : taskType === "thought_record"
+      ? "Identify, examine, and reframe automatic thoughts"
+      : "Make choices and reflect on your task";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
@@ -551,6 +586,14 @@ export function DynamicTaskForm({
           <ThreeCsForm
             data={threeCsData}
             onChange={setThreeCsData}
+            disabled={saveStatus === "error" || isCommitting}
+          />
+        )}
+
+        {taskType === "two_choice_worksheet" && (
+          <TwoChoiceWorksheetForm
+            data={twoChoiceData}
+            onChange={setTwoChoiceData}
             disabled={saveStatus === "error" || isCommitting}
           />
         )}

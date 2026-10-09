@@ -29,6 +29,8 @@ import { generateStructuredTask, upsertTaskDraft } from "@/lib/tasks"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
 import ReflectionCanvas from "@/components/canvas/ReflectionCanvas"
+import { ModalitySelector } from "@/components/modality-selector"
+import type { Modality } from "@/types/tasks"
 
 type StepId = 1 | 2 | 3
 
@@ -41,6 +43,13 @@ interface AnalysisResult {
 
 /** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
 const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
+
+const getDefaultActivity = (modalities: Modality[]): "activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet" => {
+  if (modalities.includes("CBT")) return "thought_record"
+  if (modalities.includes("DBT")) return "two_choice_worksheet"
+  if (modalities.includes("ACT")) return "reflection_prompt"
+  return "thought_record"
+}
 
 export default function VignetteGenerator({
   clientId,
@@ -81,7 +90,8 @@ export default function VignetteGenerator({
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
 
-  const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt">("thought_record")
+  const [selectedModalities, setSelectedModalities] = useState<Modality[]>(["CBT"])
+  const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet">("thought_record")
   const [sessionContext, setSessionContext] = useState("")
   const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
   const [generatedTaskData, setGeneratedTaskData] = useState<any>(null)
@@ -130,6 +140,28 @@ export default function VignetteGenerator({
 
     const storedAnalysis = session.analysis as AnalysisResult | null
     setAnalysis(storedAnalysis)
+
+    const parseModalities = (raw?: string | null): Modality[] => {
+      if (!raw) return ["CBT"];
+      const valid: Modality[] = ["CBT", "ACT", "DBT"];
+      const parsed = Array.from(
+        new Set(
+          raw
+            .split(",")
+            .map((m) => m.trim().toUpperCase() as Modality)
+            .filter((m): m is Modality => valid.includes(m))
+        )
+      );
+      return parsed.length > 0 ? parsed : ["CBT"];
+    };
+
+    if (session.modality) {
+      setSelectedModalities(parseModalities(session.modality));
+    } else if (storedAnalysis?.inferredModality) {
+      setSelectedModalities(parseModalities(storedAnalysis.inferredModality));
+    } else {
+      setSelectedModalities(["CBT"]);
+    }
 
     if (storedAnalysis?.rationale === PLACEHOLDER_RATIONALE) {
       setDegradedWarning(
@@ -257,7 +289,7 @@ export default function VignetteGenerator({
     setDegradedWarning(null)
     try {
       // 1. Analyze
-      const analyzeUrl = `${API_BASE}/analyze/session`
+      const analyzeUrl = `${API_BASE}/analyze/session?allowDegraded=1`
       const analyzePayload = {
         sessionNotes: sessionInput,
         clientId,
@@ -271,12 +303,17 @@ export default function VignetteGenerator({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(analyzePayload),
       })
-      const analyzeData = await analyzeRes.json()
+      const analyzeText = await analyzeRes.text()
+      if (!analyzeText) {
+        throw new Error(`Server returned ${analyzeRes.status} with empty response`)
+      }
+      const analyzeData = JSON.parse(analyzeText)
 
       console.log("⬅️ RESPONSE", analyzeUrl, analyzeRes.status, analyzeData)
       if (!analyzeRes.ok) {
         throw new Error(
-          analyzeData?.detail || analyzeData?.error || "Analysis failed"
+          (analyzeData?.detail || analyzeData?.error || "Analysis failed") +
+          " (Status: " + analyzeRes.status + ", Data: " + JSON.stringify(analyzeData) + ")"
         )
       }
 
@@ -286,11 +323,13 @@ export default function VignetteGenerator({
         setDegradedWarning(analyzeData.warning || "AI analysis was unavailable.")
       }
 
-// 2. Generate Structured Task
-      const genUrl = `${API_BASE}/generate/structured-task`
+      // 2. Generate Structured Task
+      const genUrl = `${API_BASE}/generate/structured-task?allowDegraded=1`
+      const cleanModalities = selectedModalities.map((m) => m.toUpperCase() as Modality)
       const genPayload = {
         sessionContext: sessionInput,
-        activityFormat,
+        activityFormat: "auto",
+        modalities: cleanModalities,
       }
 
       console.log("➡️ POST", genUrl, genPayload)
@@ -300,7 +339,11 @@ export default function VignetteGenerator({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(genPayload),
       })
-      const taskData = await genRes.json()
+      const genText = await genRes.text()
+      if (!genText) {
+        throw new Error(`Server returned ${genRes.status} with empty response`)
+      }
+      const taskData = JSON.parse(genText)
 
       console.log("⬅️ RESPONSE", genUrl, genRes.status, taskData)
       if (!genRes.ok) {
@@ -326,13 +369,14 @@ export default function VignetteGenerator({
       })
 
       setGeneratedSubmissionId(draft.id)
-      setStep(3)
+      setActivityFormat(taskData.task_type || activityFormat)
+      setStep(2)
 
       // 4. Save session content
       await saveSessionContent(caseId, sessionId, {
         sessionNotes: sessionInput,
         analysis: analyzeData,
-        modality: analyzeData?.inferredModality,
+        modality: selectedModalities.join(", "),
       })
     } catch (err) {
       console.error(err)
@@ -353,6 +397,61 @@ export default function VignetteGenerator({
             )} seconds, or shorten the notes.`
           : message
       )
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleRegenerateExplicit = async () => {
+    console.log("🚀 REGENERATE CLICK", {
+      activityFormat,
+    })
+
+    setIsProcessing(true)
+    setDegradedWarning(null)
+    try {
+      const genUrl = `${API_BASE}/generate/structured-task?allowDegraded=1`
+      const cleanModalities = selectedModalities.map((m) => m.toUpperCase() as Modality)
+      const genPayload = {
+        sessionContext: sessionInput,
+        activityFormat,
+        modalities: cleanModalities,
+      }
+
+      const genRes = await apiFetch(genUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(genPayload),
+      })
+      const genText = await genRes.text()
+      if (!genText) {
+        throw new Error(`Server returned ${genRes.status} with empty response`)
+      }
+      const taskData = JSON.parse(genText)
+
+      if (!genRes.ok) {
+        throw new Error(taskData?.detail || taskData?.error || "Structured task generation failed")
+      }
+
+      setGeneratedTaskData(taskData)
+
+      if (taskData?.degraded) {
+        setDegradedWarning(taskData.warning || "AI generation was unavailable.")
+      }
+
+      const draft = await upsertTaskDraft({
+        clientId,
+        practitionerId: "00000000-0000-0000-0000-000000000000",
+        taskType: activityFormat as any,
+        formData: taskData as any,
+      })
+
+      setGeneratedSubmissionId(draft.id)
+    } catch (err) {
+      console.error(err)
+      const message = err instanceof Error ? err.message : "Failed to generate structured task"
+      const retryIn = /try again in ([\d.]+)s/i.exec(message)
+      alert(retryIn ? `Groq rate limit reached. Try again in about ${Math.ceil(Number(retryIn[1]))} seconds.` : message)
     } finally {
       setIsProcessing(false)
     }
@@ -447,12 +546,27 @@ export default function VignetteGenerator({
               )}
             </div>
 
+            <div className="space-y-4 py-4">
+              <ModalitySelector 
+                selectedModalities={selectedModalities}
+                onChange={(mods) => {
+                  setSelectedModalities(mods);
+                }}
+                disabled={isProcessing}
+              />
+            </div>
+
             <Button
-              onClick={() => setStep(2)}
+              onClick={handleAnalyzeAndGenerate}
               className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
               disabled={!sessionInput || isProcessing || notesTooLong}
             >
-              Next
+              {isProcessing ? (
+                <Loader2 className="animate-spin mr-2" />
+              ) : (
+                <Sparkles className="mr-2" />
+              )}
+              Analyze & Recommend
             </Button>
           </div>
         )}
@@ -463,67 +577,59 @@ export default function VignetteGenerator({
               {analysis?.rationale &&
               analysis.rationale !== PLACEHOLDER_RATIONALE
                 ? `"${analysis.rationale}"`
-                : `"No formulation yet — run Analyze & Generate. (An earlier run stored no usable analysis.)"`}
+                : `"No formulation yet — run Analyze & Recommend. (An earlier run stored no usable analysis.)"`}
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                Activity Format
-              </label>
-              <Select
-                value={activityFormat}
-                onValueChange={(val: "activity_log" | "thought_record" | "reflection_prompt") =>
-                  setActivityFormat(val)
-                }
-              >
-                <SelectTrigger className="w-full h-12 rounded-xl bg-white border-zinc-200">
-                  <SelectValue placeholder="Select activity format" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="activity_log">Activity Log (activity_log)</SelectItem>
-                  <SelectItem value="thought_record">Thought Record (thought_record)</SelectItem>
-                  <SelectItem value="reflection_prompt">Reflection Prompt (reflection_prompt)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setStep(1)}
-                className="flex-1 h-12 rounded-xl"
-                disabled={isProcessing}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={handleAnalyzeAndGenerate}
-                className="flex-[2] h-12 rounded-xl text-md font-bold"
-                disabled={!sessionInput || isProcessing}
-              >
-                {isProcessing ? (
-                  <Loader2 className="animate-spin mr-2" />
-                ) : (
-                  <Sparkles className="mr-2" />
-                )}
-                Analyze & Generate
-              </Button>
-            </div>
-          </div>
-        )}
 
-        {step === 3 && (
-          <div className="space-y-6 animate-in zoom-in-95">
             <div className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm">
-              <div className="flex justify-between items-start border-b pb-8">
-                <div>
-                  <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
-                    Client Practice Task
-                  </h3>
-                  <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
-                    ALICE
-                  </p>
+              <div className="flex flex-col gap-6 border-b pb-8">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
+                      Client Practice Task
+                    </h3>
+                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
+                      ALICE
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
+                    <CheckCircle2 className="text-green-600 h-6 w-6" />
+                  </div>
                 </div>
-                <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
-                  <CheckCircle2 className="text-green-600 h-6 w-6" />
+
+                <div className="flex flex-col gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                      Override Activity Format
+                    </label>
+                  </div>
+                  <div className="flex gap-3">
+                    <Select
+                      value={activityFormat}
+                      onValueChange={(val: any) =>
+                        setActivityFormat(val)
+                      }
+                      disabled={isProcessing}
+                    >
+                      <SelectTrigger className="flex-1 h-12 rounded-xl bg-white border-zinc-200">
+                        <SelectValue placeholder="Select activity format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="activity_log">Activity Log (activity_log)</SelectItem>
+                        <SelectItem value="thought_record">Thought Record (thought_record)</SelectItem>
+                        <SelectItem value="two_choice_worksheet">Dual-Response Skills (two_choice_worksheet)</SelectItem>
+                        <SelectItem value="reflection_prompt">Reflection Prompt (reflection_prompt)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      onClick={handleRegenerateExplicit}
+                      disabled={isProcessing}
+                      variant="outline"
+                      className="h-12 px-6 rounded-xl border-zinc-200 bg-white"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2 text-primary" />}
+                      {isProcessing ? "Generating..." : "Regenerate"}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -541,6 +647,7 @@ export default function VignetteGenerator({
                 />
               )}
             </div>
+            
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
               <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
                 Client link · signed &amp; expiring
@@ -566,10 +673,10 @@ export default function VignetteGenerator({
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(1)}
                 className="h-12 rounded-2xl"
               >
-                Adjust
+                Back to Notes
               </Button>
               <Button
                 onClick={handleDownloadPdf}

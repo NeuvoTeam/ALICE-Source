@@ -276,39 +276,42 @@ routed to `/login` rather than failing silently — and a `confirm()`-gated dele
 `components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
 (see §13).
 
-### 4.5 The AI workflow (notes → analysis → structured task)
+### 4.5 The AI workflow (notes + modalities → analysis → structured task)
 
 ```
-Phase 1  clinician writes notes in components/vignette-generator.tsx
+Step 1       clinician enters session notes & selects 1-3 modalities (CBT, ACT, DBT) in components/vignette-generator.tsx
              │
-Phase 2      ├─ Activity Format selection: "activity_log" | "thought_record" | "reflection_prompt"
-             ├─ POST /analyze/session  { sessionNotes, clientId, sessionId }
+             ├─ POST /analyze/session?allowDegraded=1  { sessionNotes, clientId, sessionId }
              │     → { rationale, inferredModality, riskFlags[] }
              │
-Phase 3      ├─ POST /generate/structured-task  { sessionContext: sessionNotes, activityFormat }
-             │     → returns task JSON schema payload
+             ├─ POST /generate/structured-task?allowDegraded=1  { sessionContext: sessionNotes, activityFormat: "auto", modalities: selectedModalities }
+             │     → returns recommended task JSON schema payload (auto-selected from notes and modalities)
+             │
              ├─ lib/tasks.ts upsertTaskDraft() → persists draft to practice_task_submissions
              │     → updates generatedSubmissionId
              │
+             └─ store.saveSessionContent(caseId, sessionId, { sessionNotes, analysis, modality })
+                   → PATCH /sessions/:sessionId  (optimistic UI, then reconcile with response)
+             │
+Step 2       Clinician reviews formulation & recommended task
+             ├─ Option to override Activity Format and trigger targeted regeneration
              ├─ Interactive dynamic render:
              │     • reflection_prompt → <ReflectionCanvas clientId={clientId} submissionId={generatedSubmissionId} />
              │     • otherwise → <DynamicTaskForm taskType={activityFormat} initialData={...} submissionId={generatedSubmissionId} />
-             │
-             └─ store.saveSessionContent(caseId, sessionId, { sessionNotes, analysis, modality })
-                   → PATCH /sessions/:sessionId  (optimistic UI, then reconcile with response)
+             └─ Copy signed client link for assignment
 ```
 
-Phase 1 does not become authoritative until the session payload has landed.
+Phase 1 (Step 1) does not become authoritative until the session payload has landed.
 `components/vignette-generator.tsx` hydrates exactly once per session, keyed on
 `[session, sessionHydratedId]` (§8.2) and latched in a `useRef`: `GET /client/:id` embeds only
 `sessions(id,name)`, so the row that mounts the component is a content-less stub. A later store
 write — blur-save, rename, the `PATCH` echo — therefore cannot reset the phase or discard unsaved
 notes, and a failed `GET /sessions/:id` leaves Phase 1 empty rather than showing the stub.
 
-In Phase 2, clinicians configure the target `activityFormat` before generating. In Phase 3, the legacy
-`practicePackage.homework` list is replaced with interactive component mounts: `ReflectionCanvas` for
-`reflection_prompt` reflections and `DynamicTaskForm` with pre-populated `initialData` and auto-save
-draft sync for `activity_log` and `thought_record`.
+In Step 1, clinicians choose up to 3 evidence-based modalities (`CBT`, `ACT`, `DBT`) alongside session notes.
+Clicking **Analyze & Recommend** automatically infers the formulation and generates the most fitting structured activity.
+In Step 2, clinicians review the formulation and generated activity, with an override dropdown to re-generate into
+alternative formats (`activity_log`, `thought_record`, `two_choice_worksheet`, `reflection_prompt`) if desired.
 
 `POST /generate/vignette` is the lighter alternative (`{ scenario, quiz, homework }`) used for the
 plain vignette flow; it persists `vignette`, `homework`, `quiz` and `modality`.
@@ -487,6 +490,7 @@ match, so a missing field returns `400 { error: "Missing sessionNotes" }` even f
 | `POST` | `/analyze/session` | `{ sessionNotes, clientId?, sessionId? }` | `{ rationale, inferredModality, riskFlags[] }` |
 | `POST` | `/generate/vignette` | `{ sessionNotes, modality?, verifiedModality?, clientId?, sessionId? }` | `{ scenario, quiz[], homework[] }` |
 | `POST` | `/generate/practice-package` | `{ sessionNotes, modality?, verifiedModality?, clientId?, sessionId? }` | `{ homework[], scenario{ title, difficulty, situation, objectives[], coachTips[] }, quiz[{ question, answer, rationale }] }` |
+| `POST` | `/generate/structured-task` | `{ sessionContext, activityFormat, modalities, sessionId? }` | `{ task_type, ... }` matching the `StructuredTask` Zod schema |
 
 - Modality resolution is `verifiedModality ?? modality ?? "cbt"`; the value is passed to the prompt
   verbatim and stored in `sessions.modality`. `components/vignette-generator.tsx` sends the analysed
@@ -658,6 +662,7 @@ The `task_type` column is the discriminant; `types/tasks.ts` exports a `FormData
 | `activity_log` | `activity_date` (YYYY-MM-DD), `activity_description` (either plain text **or** `JSON.stringify(WeeklySchedule)` when submitted by `DynamicTaskForm`), `pleasure_rating` (0–10), `mastery_rating` (0–10), `notes?` |
 | `thought_record` | `situation`, `automatic_thought`, `emotions: [{label, intensity}]` (0–100), `evidence_for`, `evidence_against`, `balanced_thought`, `outcome_emotion_intensity` (0–100), `notes?` |
 | `behavioural_experiment` | `hypothesis`, `experiment_description`, `predicted_outcome`, `actual_outcome`, `what_i_learned`, `notes?` |
+| `two_choice_worksheet` | `title`, `prompts: [{ question, options: [string, string] }]`, `answers: [0\|1\|null]`, `reflection`, `reflection_prompt`, `notes?` |
 
 > **`activity_log` detail.** `DynamicTaskForm` stores the full weekly grid as `JSON.stringify(WeeklySchedule)` in `activity_description`, where `WeeklySchedule` is `Record<"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun", Record<string, { activity: string; moodRating: number }>>`. The Practitioner Review Gateway detects the JSON prefix and renders it as a day-by-day grid rather than raw text.
 
@@ -700,6 +705,7 @@ modality (where relevant) and the clinician's notes.
 | `handleAnalyze` | `{ rationale, inferredModality: "CBT"\|"DBT"\|"ACT", riskFlags[{ label, severity, confidence, evidence[] }] }`. Prompt rules: focus on underlying mechanisms, extract verbatim evidence phrases, include only real risks |
 | `handleGenerate` | `{ scenario, quiz[], homework[] }`. Rules: real psychological mechanisms, insight questions (not recall), precise/measurable homework, match modality strictly |
 | `handleGeneratePracticePackage` | `{ homework[], scenario{ title, difficulty, situation, objectives[], coachTips[] }, quiz[{ question, answer, rationale }] }`. Rules: actionable measurable homework, role-play-supporting scenario, insight-reinforcing quiz |
+| `handleGenerateStructuredTask` | `{ task_type, ... }` matching the `StructuredTask` schema (`activity_log`, `thought_record`, `reflection_prompt`, `two_choice_worksheet`). Prompt provides strict flat JSON skeletons; pre-Zod normalisation (`normalizeStructuredTask`) flattens nested hallucinations (e.g. `catch`/`check`/`correct` or `type` vs `task_type`) |
 
 ### 7.2 Robustness
 
@@ -712,9 +718,8 @@ modality (where relevant) and the clinician's notes.
   retry; handlers then translate the outcome: **`502` by default**, or with `?allowDegraded=1` a `200`
   placeholder payload tagged `degraded: true` + `warning`. The router recognises a failure by checking
   for a `Response` and returns it **before** any persistence runs.
-- `stripMarkdown` **unwraps** a fenced ```json block instead of deleting it. Deleting caused a real
-  incident: any model that fenced its JSON had the answer thrown away, and the handler silently served
-  the placeholder as though it were the formulation.
+- `stripMarkdown` **unwraps** a fenced ```json block instead of deleting it, and strips reasoning/thinking tags (`<think>...</think>`) emitted by reasoning models before extracting curly braces. Deleting caused a real
+  incident: any model that fenced its JSON had the answer thrown away, and curly braces inside thought blocks previously corrupted root object slicing.
 - `extractJsonObject` slices from the first `{` to the last `}`, parses, and — when that fails — runs
   `repairJson`, which escapes the JSON the model should have escaped: an inner `"` inside a string value,
   plus raw control characters. The in-string rule is that a `"` only *closes* a string when the next
@@ -722,6 +727,10 @@ modality (where relevant) and the clinician's notes.
   succeeded as `strategy: "strict" | "repaired" | "failed"`. Measured on 20b this was the largest single
   residual fix: 3 of 10 runs died with `Expected ',' or ']' after array element in JSON at position 1395`
   — an unescaped quote inside a task string — and none fail that way after it.
+- `normalizeStructuredTask` resolves common model discrepancies for structured task generation (such as
+  an open-source model emitting `type` instead of `task_type`, nesting 3 C's keys under `catch`/`check`/`correct`
+  sub-objects, emitting arrays of strings for `evidence_for`/`evidence_against`, or omitting default emotion keys)
+  prior to `StructuredTaskSchema.safeParse` validation so legitimate generations are safely accepted without 502 bad_shape failures.
 - Hard-coded fallbacks (`"Clinical synthesis unavailable."`, `"Scenario unavailable."`, the default
   `Practice Scenario` object) are used **only** on the `?allowDegraded=1` path. They are never used to
   paper over a partial answer: a shape-invalid response becomes `BAD_AI_SHAPE` and nothing is written. A
@@ -1180,10 +1189,17 @@ and §13.4 (CI, lint config, dead code).
 | Cause | `components/vignette-generator.tsx` read `useClientNavStore.getState()` once, with deps `[sessionId, caseId]`, while `selectSession` sets the selection *before* `GET /sessions/:id` resolves (§8.2). `GET /client/:id` embeds only `sessions(id,name)`, so the row that mounted the component was a stub sharing the session's id — the arriving payload changed no dependency, so the effect never re-ran |
 | Fix | `sessionHydratedId` on the store (set only after the merge) plus `lib/session-hydration.ts`, consumed by the effect with a `useRef` latch: hydration is one-shot per session, so a later write cannot re-derive the phase or discard unsaved notes |
 | Evidence | `npx tsc --noEmit` exit 0; `npm test` green — including `tests/hydration-guard.test.mjs` (15 checks: the guard table, the race, the blur-save bounce, the placeholder advisory, the failed fetch, remount, re-select), which imports the real guard rather than a copy; commit `c902331` |
-| Note | `c902331` also carried an unrelated client-link documentation rewrite, so its diff is not a record of this change |
+| ### 13.8 Closure record — Modality Multi-Select & Analyze Resilience (2026-10-10)
 
-Anything that changes the store's shape or the hydration contract must update §8.2 (and §4.5/§8.5 if
-the phases change) — see §14.
+| Item | Detail |
+| --- | --- |
+| Symptom 1 | Clinicians unable to select more than 2 modalities (capped at 2 instead of 3 in Step 1) |
+| Cause 1 | Lowercase modality values in DB or inferred session state (`"cbt"`) caused casing mismatch with uppercase constants (`"CBT"`). As a result, `"cbt"` did not match `"CBT"`, rendering button unselected while counting towards `length`. Clicking added `"CBT"`, creating invisible duplicates that capped visible selections at 2 |
+| Fix 1 | Strict canonical uppercase normalisation in `ModalitySelector` and `vignette-generator.tsx` hydration via a dedicated parser and Set deduplication, supporting full 1-3 modality multi-select |
+| Symptom 2 | `POST /analyze/session` failing with invalid request error during analysis |
+| Cause 2 | Reasoning model tokens (`<think>...</think>`) polluted JSON extraction when curly braces appeared within reasoning text. Furthermore, direct uncaught generation errors failed hard instead of leveraging the degraded graceful fallback |
+| Fix 2 | Stripped `<think>...</think>` tags in `stripMarkdown`, passed `?allowDegraded=1` on analyze and generate endpoints to guarantee graceful fallback degraded payloads, and deployed live worker version `54c03287-95c4-43fe-be7f-134409664e1c` |
+| Evidence | `npx tsc --noEmit` exit 0; `npm test` all 61 checks green (34 worker, 12 PDF, 15 hydration); Worker deployed to Cloudflare production |
 
 ---
 

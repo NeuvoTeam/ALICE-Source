@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { StructuredTaskSchema, StructuredTaskRequestSchema } from "../lib/ai/schemas.ts";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 const GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
 /** Last-resort default. `env.GROQ_MODEL` (wrangler.jsonc var) always wins. */
@@ -237,9 +238,11 @@ export default {
     console.log("REQUEST", method, cleanPath)
 
     // ✅ Normalize base URL (prevents // issues)
-    const baseUrl = env.SUPABASE_URL.endsWith("/")
-      ? env.SUPABASE_URL.slice(0, -1)
-      : env.SUPABASE_URL
+    const baseUrl = env.SUPABASE_URL
+      ? env.SUPABASE_URL.endsWith("/")
+        ? env.SUPABASE_URL.slice(0, -1)
+        : env.SUPABASE_URL
+      : "http://localhost"
 
     const SUPABASE_URL = `${baseUrl}/rest/v1`
 
@@ -265,14 +268,33 @@ export default {
       cleanPath === "/client-homework" ||
       cleanPath.startsWith("/client-homework/")
 
-    let authUser = null
-    if (!isPublicRoute) {
-      const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
-
-      if (errorResponse) return errorResponse
-      authUser = user
+    function devBypassUser(env, url) {
+      const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"
+      if (env.DEV_AUTH_BYPASS === "1" && env.ENVIRONMENT === "development" && local) {
+        console.warn("⚠️ DEV_AUTH_BYPASS active — synthetic user", env.DEV_AUTH_USER_ID)
+        return { id: env.DEV_AUTH_USER_ID, email: "dev@localhost", dev_bypass: true }
+      }
+      return null
     }
 
+    let authUser = null
+    if (!isPublicRoute) {
+      authUser = devBypassUser(env, url)
+      if (!authUser) {
+        const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
+        if (errorResponse) return errorResponse
+        authUser = user
+      }
+    }
+    async function checkSessionAccess(sessionId) {
+      if (!sessionId) return false;
+      const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+      if (!sessionRes.ok) return false;
+      const sessionData = await sessionRes.json()
+      if (!sessionData || !sessionData.length) return false;
+      const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+      return await checkClientAccess(sessionClientId);
+    }
     async function checkClientAccess(clientId) {
       if (!clientId || !authUser?.id) return false
       const res = await fetch(`${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&client_id=eq.${clientId}&select=id`, { headers: HEADERS })
@@ -1891,6 +1913,24 @@ if (method === "GET" && cleanPath === "/auth/me") {
       /* =========================
    ✅ AI ROUTES
    ========================= */
+if (method === "POST" && cleanPath === "/generate/structured-task") {
+  try {
+    const parsed = StructuredTaskRequestSchema.safeParse(await safeJson(request));
+    if (!parsed.success) return respond({ error: "INVALID_REQUEST", issues: parsed.error.issues }, cors, 400);
+    const { sessionContext, activityFormat, modalities, sessionId } = parsed.data;
+    
+    if (sessionId && !(await checkSessionAccess(sessionId))) return respond({ error: "Access denied" }, cors, 403);
+    const allowDegraded = url.searchParams.get("allowDegraded") === "1";
+    
+    const generated = await handleGenerateStructuredTask(sessionContext, activityFormat, modalities, env, cors, allowDegraded);
+    if (generated instanceof Response) return generated;
+    return respond(generated, cors);
+  } catch (err) {
+    console.error("Failed to generate structured task:", err);
+    return respond({ error: err.message || "Generation failed" }, cors, 500);
+  }
+}
+
 if (method === "POST") {
   const body = await safeJson(request)
 
@@ -1906,15 +1946,7 @@ if (method === "POST") {
   // `?allowDegraded=1` restores the legacy 200 + placeholder payload + `degraded: true`.
   const allowDegraded = url.searchParams.get("allowDegraded") === "1"
 
-  async function checkSessionAccess(sessionId) {
-    if (!sessionId) return false;
-    const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
-    if (!sessionRes.ok) return false;
-    const sessionData = await sessionRes.json()
-    if (!sessionData || !sessionData.length) return false;
-    const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
-    return await checkClientAccess(sessionClientId);
-  }
+
 
   if (body.sessionId && !(await checkSessionAccess(body.sessionId))) {
     return respond({ error: "Access denied" }, cors, 403)
@@ -2010,20 +2042,6 @@ if (method === "POST") {
     return respond(generated, cors)
   }
 
-  /* =========================
-     GENERATE PRACTICE PACKAGE
-     ========================= */
-
-  /* =========================
-     GENERATE STRUCTURED TASK
-     ========================= */
-  if (cleanPath === "/generate/structured-task") {
-    const { sessionContext, activityFormat } = body;
-    if (!sessionContext || !activityFormat) return respond({ error: "Missing context or format" }, cors, 400);
-    const generated = await handleGenerateStructuredTask(sessionContext, activityFormat, env, cors, allowDegraded);
-    if (generated instanceof Response) return generated;
-    return respond(generated, cors);
-  }
 
   if (cleanPath === "/generate/practice-package") {
     const modality =
@@ -2353,6 +2371,7 @@ function formatClientMaterial(row) {
     worksheetQuestions: questions,
     createdAt: row.created_at || null,
     modality: row.modality || null,
+    practice_package: pkg,
   }
 }
 
@@ -2595,20 +2614,242 @@ ${input}
   return respond(payload, cors)
 }
 
-async function handleGenerateStructuredTask(sessionContext, activityFormat, env, cors, allowDegraded = false, debug = null) {
-  const formatInstructions = activityFormat === 'activity_log' ? 'Weekly Activity Schedule: Guide the client on what to schedule (activity_description), set pleasure_rating/mastery_rating to 0, provide any clinical notes.'
-    : activityFormat === 'thought_record' ? "The 3 C's (Catch, Check, Correct): Identify the situation, automatic thought, expected emotions, and instructions for evidence_for, evidence_against, and balanced_thought. outcome_emotion_intensity should be 0."
-    : 'Reflection Canvas: Provide a journaling/drawing prompt and a suggested_background (blank, lined, or dotted).';
+function normalizeStructuredTask(json, expectedFormat) {
+  if (!json || typeof json !== 'object') return json;
+
+  // 1. Resolve task_type (handle missing, type instead of task_type, or mismatched)
+  if (!json.task_type) {
+    if (json.type && ['activity_log', 'thought_record', 'reflection_prompt', 'two_choice_worksheet'].includes(json.type)) {
+      json.task_type = json.type;
+    } else if (expectedFormat && expectedFormat !== 'auto') {
+      json.task_type = expectedFormat;
+    } else if (expectedFormat === 'auto') {
+      json.task_type = json.situation ? 'thought_record' : (json.prompts ? 'two_choice_worksheet' : (json.activity_date ? 'activity_log' : 'two_choice_worksheet'));
+    }
+  }
+  if (expectedFormat && expectedFormat !== 'auto' && json.task_type !== expectedFormat) {
+    json.task_type = expectedFormat;
+  }
+  delete json.type;
+
+  // 2. Normalization for thought_record (The 3 C's)
+  if (json.task_type === 'thought_record') {
+    // Unpack nested catch/check/correct if hallucinated
+    if (json.catch && typeof json.catch === 'object') {
+      if (!json.situation && json.catch.situation) json.situation = json.catch.situation;
+      if (!json.automatic_thought && json.catch.automatic_thought) json.automatic_thought = json.catch.automatic_thought;
+      if ((!json.emotions || !json.emotions.length) && json.catch.emotions) json.emotions = json.catch.emotions;
+      delete json.catch;
+    }
+    if (json.check && typeof json.check === 'object') {
+      if (!json.evidence_for && json.check.evidence_for) json.evidence_for = json.check.evidence_for;
+      if (!json.evidence_against && json.check.evidence_against) json.evidence_against = json.check.evidence_against;
+      delete json.check;
+    }
+    if (json.correct && typeof json.correct === 'object') {
+      if (!json.balanced_thought && json.correct.balanced_thought) json.balanced_thought = json.correct.balanced_thought;
+      if (json.outcome_emotion_intensity === undefined && json.correct.outcome_emotion_intensity !== undefined) {
+        json.outcome_emotion_intensity = json.correct.outcome_emotion_intensity;
+      }
+      delete json.correct;
+    }
+
+    // Ensure situation and automatic_thought are non-empty strings
+    json.situation = typeof json.situation === 'string' && json.situation.trim() ? json.situation : (json.situation ? String(json.situation) : "Identified situation");
+    json.automatic_thought = typeof json.automatic_thought === 'string' && json.automatic_thought.trim() ? json.automatic_thought : (json.automatic_thought ? String(json.automatic_thought) : "Automatic thought to evaluate");
+
+    // Flatten evidence_for / evidence_against if arrays or non-strings
+    if (Array.isArray(json.evidence_for)) {
+      json.evidence_for = json.evidence_for.map(String).join("\n");
+    } else if (typeof json.evidence_for !== 'string' || !json.evidence_for.trim()) {
+      json.evidence_for = json.evidence_for ? String(json.evidence_for) : "Evidence supporting this thought";
+    }
+
+    if (Array.isArray(json.evidence_against)) {
+      json.evidence_against = json.evidence_against.map(String).join("\n");
+    } else if (typeof json.evidence_against !== 'string' || !json.evidence_against.trim()) {
+      json.evidence_against = json.evidence_against ? String(json.evidence_against) : "Evidence challenging this thought";
+    }
+
+    if (Array.isArray(json.balanced_thought)) {
+      json.balanced_thought = json.balanced_thought.map(String).join("\n");
+    } else if (typeof json.balanced_thought !== 'string' || !json.balanced_thought.trim()) {
+      json.balanced_thought = json.balanced_thought ? String(json.balanced_thought) : "Alternative balanced perspective";
+    }
+
+    // Normalize emotions array: [{ label: string, intensity: number (0-100) }]
+    if (!Array.isArray(json.emotions)) {
+      json.emotions = [];
+    } else {
+      json.emotions = json.emotions.map(e => {
+        if (!e || typeof e !== 'object') return null;
+        const label = String(e.label || e.type || e.name || e.emotion || "Emotion").trim();
+        let intensity = typeof e.intensity === 'number' ? e.intensity : Number(e.intensity);
+        if (isNaN(intensity)) intensity = 50;
+        intensity = Math.max(0, Math.min(100, Math.round(intensity)));
+        return { label: label || "Emotion", intensity };
+      }).filter(Boolean);
+    }
+
+    // outcome_emotion_intensity: 0-100 number
+    let outcomeIntensity = typeof json.outcome_emotion_intensity === 'number'
+      ? json.outcome_emotion_intensity
+      : Number(json.outcome_emotion_intensity);
+    if (isNaN(outcomeIntensity)) outcomeIntensity = 0;
+    json.outcome_emotion_intensity = Math.max(0, Math.min(100, Math.round(outcomeIntensity)));
+  }
+
+  // 3. Normalization for activity_log
+  if (json.task_type === 'activity_log') {
+    json.activity_date = typeof json.activity_date === 'string' && json.activity_date.trim()
+      ? json.activity_date.trim()
+      : new Date().toISOString().slice(0, 10);
+    json.activity_description = typeof json.activity_description === 'string' && json.activity_description.trim()
+      ? json.activity_description.trim()
+      : "Scheduled activity plan";
+    let pleasure = typeof json.pleasure_rating === 'number' ? json.pleasure_rating : Number(json.pleasure_rating);
+    if (isNaN(pleasure)) pleasure = 0;
+    json.pleasure_rating = Math.max(0, Math.min(10, Math.round(pleasure)));
+    let mastery = typeof json.mastery_rating === 'number' ? json.mastery_rating : Number(json.mastery_rating);
+    if (isNaN(mastery)) mastery = 0;
+    json.mastery_rating = Math.max(0, Math.min(10, Math.round(mastery)));
+  }
+
+  // 4. Normalization for reflection_prompt
+  if (json.task_type === 'reflection_prompt') {
+    json.prompt = typeof json.prompt === 'string' && json.prompt.trim() ? json.prompt.trim() : "Reflect on today's session insights";
+    if (!["blank", "lined", "dotted"].includes(json.suggested_background)) {
+      json.suggested_background = "blank";
+    }
+  }
+
+  // 5. Normalization for two_choice_worksheet
+  if (json.task_type === 'two_choice_worksheet') {
+    json.title = typeof json.title === 'string' && json.title.trim() ? json.title.trim() : "Two-Choice Worksheet";
+    json.reflection_prompt = typeof json.reflection_prompt === 'string' && json.reflection_prompt.trim()
+      ? json.reflection_prompt.trim()
+      : "Reflect on how your choices support your therapeutic goals:";
+    if (!Array.isArray(json.prompts) || json.prompts.length === 0) {
+      json.prompts = [{ question: "Consider this scenario", options: ["Option A", "Option B"] }];
+    } else {
+      json.prompts = json.prompts.slice(0, 5).map((p, idx) => {
+        const question = typeof p?.question === 'string' && p.question.trim() ? p.question.trim() : `Scenario ${idx + 1}`;
+        let options = Array.isArray(p?.options) ? p.options.map(o => String(o).trim()).filter(Boolean) : [];
+        if (options.length < 2) {
+          options = [options[0] || "Option 1", "Option 2"];
+        } else if (options.length > 2) {
+          options = [options[0], options[1]];
+        }
+        return { question, options: [options[0], options[1]] };
+      });
+    }
+  }
+
+  // Clean notes
+  if (json.notes === null || json.notes === undefined) {
+    delete json.notes;
+  } else if (typeof json.notes !== 'string') {
+    json.notes = String(json.notes);
+  }
+
+  return json;
+}
+
+async function handleGenerateStructuredTask(sessionContext, activityFormat, modalities, env, cors, allowDegraded = false, debug = null) {
+  const safeModalities = Array.isArray(modalities) && modalities.length ? modalities : ['CBT'];
+
+  let formatInstructions = '';
+  if (activityFormat === 'auto') {
+    formatInstructions = `You must dynamically select the most clinically appropriate task format from the following list, OR generate a custom worksheet if none fit perfectly.
+
+Available Formats:
+1. "thought_record" - The 3 C's (Catch, Check, Correct)
+2. "activity_log" - Weekly Activity Schedule
+3. "reflection_prompt" - Open-ended journaling/drawing
+4. "two_choice_worksheet" - Custom Q&A Worksheet
+
+If generating a custom worksheet, use the "two_choice_worksheet" schema with your own custom title and custom prompts.
+
+Return ONLY a flat JSON object with a "task_type" key matching the chosen format, and the corresponding fields.
+
+Schema for "thought_record": { "task_type": "thought_record", "situation": "...", "automatic_thought": "...", "emotions": [{"label":"Anxiety", "intensity":70}], "evidence_for": "...", "evidence_against": "...", "balanced_thought": "...", "outcome_emotion_intensity": 0, "notes": "..." }
+
+Schema for "activity_log": { "task_type": "activity_log", "activity_date": "YYYY-MM-DD", "activity_description": "...", "pleasure_rating": 0, "mastery_rating": 0, "notes": "..." }
+
+Schema for "reflection_prompt": { "task_type": "reflection_prompt", "prompt": "...", "suggested_background": "blank", "notes": "..." }
+
+Schema for "two_choice_worksheet" (Custom Worksheet): { "task_type": "two_choice_worksheet", "title": "Custom Title", "prompts": [ { "question": "...", "options": ["...", "..."] } ], "reflection_prompt": "...", "notes": "..." }
+
+CRITICAL RULE: Choose ONE format and return ONLY its JSON object. DO NOT wrap the object in another key.`;
+  } else if (activityFormat === 'activity_log') {
+    formatInstructions = `Weekly Activity Schedule.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "activity_log",
+  "activity_date": "YYYY-MM-DD",
+  "activity_description": "detailed schedule guidance and timeslots",
+  "pleasure_rating": 0,
+  "mastery_rating": 0,
+  "notes": "clinical instructions"
+}`;
+  } else if (activityFormat === 'thought_record') {
+    formatInstructions = `The 3 C's (Catch, Check, Correct) Thought Record.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "thought_record",
+  "situation": "the specific situation or trigger to monitor",
+  "automatic_thought": "the automatic thought to catch",
+  "emotions": [
+    { "label": "Anxiety", "intensity": 70 }
+  ],
+  "evidence_for": "prompt or evidence supporting the thought",
+  "evidence_against": "prompt or evidence challenging the thought",
+  "balanced_thought": "a grounded, balanced alternative perspective",
+  "outcome_emotion_intensity": 0,
+  "notes": "clinical instructions"
+}
+CRITICAL RULES for thought_record:
+- DO NOT nest fields inside "catch", "check", or "correct" objects. All fields MUST be top-level keys.
+- "task_type" MUST be literally "thought_record".
+- "evidence_for" and "evidence_against" MUST be strings, not arrays of strings.
+- "emotions" items MUST have "label" (string) and "intensity" (number 0-100).`;
+  } else if (activityFormat === 'two_choice_worksheet') {
+    formatInstructions = `Two-Choice Worksheet.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "two_choice_worksheet",
+  "title": "worksheet title",
+  "prompts": [
+    {
+      "question": "scenario or question",
+      "options": ["Option 1", "Option 2"]
+    }
+  ],
+  "reflection_prompt": "open-ended reflection prompt",
+  "notes": "clinical instructions"
+}
+Rules: 1 to 5 prompts, exactly 2 short options per prompt, no diagnostic or outcome-interpretation language.`;
+  } else {
+    formatInstructions = `Reflection Canvas.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "reflection_prompt",
+  "prompt": "journaling or drawing prompt",
+  "suggested_background": "blank",
+  "notes": "clinical instructions"
+}
+"suggested_background" must be one of: "blank", "lined", "dotted".`;
+  }
 
   const messages = [
     {
       role: 'system',
       content: `You are a senior clinical psychologist acting as a clinical translation engine.
-Convert the practitioner's session context into a structured interactive CBT task worksheet.
+Convert the practitioner's session context into a structured interactive worksheet grounded in ${safeModalities.join(' + ')}.
 Return ONLY JSON matching the requested activity format schema.
 Format rules:
 ${formatInstructions}
-Strictly anchor the generated payload to the session context provided to guarantee output variability. Do NOT regurgitate generic CBT handouts.`
+Strictly anchor the generated payload to the session context provided to guarantee output variability. Do NOT regurgitate generic handouts.`
     },
     {
       role: 'user',
@@ -2619,19 +2860,40 @@ ${sessionContext}`
     }
   ];
 
+  const schema = activityFormat === 'auto' ? undefined :
+    activityFormat === 'activity_log' ? ACTIVITY_LOG_SCHEMA
+    : activityFormat === 'thought_record' ? THOUGHT_RECORD_SCHEMA
+    : activityFormat === 'two_choice_worksheet' ? TWO_CHOICE_WORKSHEET_SCHEMA
+    : REFLECTION_PROMPT_SCHEMA;
+
   const attempt = await generateJson(messages, env, 0.6, {
     debug,
     contract: 'structured-task',
-    isValid: (json) => json && typeof json.task_type === 'string',
-    schema: STRUCTURED_TASK_SCHEMA,
+    isValid: (json) => {
+      normalizeStructuredTask(json, activityFormat);
+      const parsed = StructuredTaskSchema.safeParse(json);
+      if (!parsed.success) {
+        console.error("Zod validation failed for structured-task. Issues:", JSON.stringify(parsed.error.issues), "JSON:", JSON.stringify(json).substring(0, 500));
+        return false;
+      }
+      return activityFormat === 'auto' ? true : json.task_type === activityFormat;
+    },
+    schema: schema,
     schemaName: 'structured_cbt_task',
   });
 
   if (!attempt.result.ok) {
-    return new Response(JSON.stringify({ error: 'Failed to generate task' }), { status: 500, headers: cors });
+    if (allowDegraded) {
+      return respond(degradedGroqPayload({ task_type: activityFormat }, attempt.result), cors)
+    }
+    return groqFailureResponse(attempt.result, cors)
   }
 
-  return attempt.result.payload;
+  if (!attempt.parsed) {
+    return unparseableAiResponse(attempt, { task_type: activityFormat }, attempt.result, cors, allowDegraded);
+  }
+
+  return normalizeStructuredTask(attempt.parsed, activityFormat);
 }
 
 async function handleGeneratePracticePackage(
@@ -3040,7 +3302,7 @@ function unparseableAiResponse(attempt, fallback, result, cors, degrade) {
     reason: diagnosis.reason,
     parseError: diagnosis.parseError,
     finishReason: result.finishReason || null,
-    length: content.length,
+    length: content?.length || 0,
     attempts,
   }
 
@@ -3092,13 +3354,15 @@ function unparseableAiResponse(attempt, fallback, result, cors, degrade) {
 function stripMarkdown(text) {
   if (!text) return ""
 
-  const fenced = String(text).match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const withoutThinking = String(text).replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+
+  const fenced = withoutThinking.match(/```(?:json)?\s*([\s\S]*?)```/i)
 
   if (fenced && fenced[1] && fenced[1].trim()) {
     return fenced[1].trim()
   }
 
-  return String(text).replace(/```/g, "").trim()
+  return withoutThinking.replace(/```/g, "").trim()
 }
 
 /* ===============================
@@ -3345,24 +3609,58 @@ const VIGNETTE_SCHEMA = {
 }
 
 
-const STRUCTURED_TASK_SCHEMA = {
+const ACTIVITY_LOG_SCHEMA = {
   type: "object",
-  required: ["task_type"],
+  additionalProperties: false,
+  required: ["task_type", "activity_date", "activity_description", "pleasure_rating", "mastery_rating", "notes"],
   properties: {
-    task_type: { type: "string", enum: ["activity_log", "thought_record", "reflection_prompt"] },
+    task_type: { type: "string", enum: ["activity_log"] },
     activity_date: { type: "string" },
     activity_description: { type: "string" },
     pleasure_rating: { type: "number" },
     mastery_rating: { type: "number" },
+    notes: { type: "string" }
+  }
+};
+
+const THOUGHT_RECORD_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "situation", "automatic_thought", "emotions", "evidence_for", "evidence_against", "balanced_thought", "outcome_emotion_intensity", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["thought_record"] },
     situation: { type: "string" },
     automatic_thought: { type: "string" },
-    emotions: { type: "array", items: { type: "object", properties: { label: { type: "string" }, intensity: { type: "number" } }, required: ["label", "intensity"] } },
+    emotions: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: { type: "string" }, intensity: { type: "number" } }, required: ["label", "intensity"] } },
     evidence_for: { type: "string" },
     evidence_against: { type: "string" },
     balanced_thought: { type: "string" },
     outcome_emotion_intensity: { type: "number" },
+    notes: { type: "string" }
+  }
+};
+
+const REFLECTION_PROMPT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "prompt", "suggested_background", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["reflection_prompt"] },
     prompt: { type: "string" },
     suggested_background: { type: "string", enum: ["blank", "lined", "dotted"] },
+    notes: { type: "string" }
+  }
+};
+
+const TWO_CHOICE_WORKSHEET_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "title", "prompts", "reflection_prompt", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["two_choice_worksheet"] },
+    title: { type: "string", description: "Title of the worksheet" },
+    prompts: { type: "array", items: { type: "object", additionalProperties: false, properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" } } }, required: ["question", "options"] } },
+    reflection_prompt: { type: "string" },
     notes: { type: "string" }
   }
 };

@@ -1,7 +1,7 @@
 /**
  * lib/tasks.ts
  *
- * Next.js server-action wrappers for the practice-task submission domain.
+ * Client API wrappers for the practice-task submission domain.
  *
  * ─── Architecture ───────────────────────────────────────────────────────────
  *   Browser → (apiFetch / authHeaders) → Cloudflare Worker → Supabase
@@ -10,22 +10,15 @@
  * Cloudflare Worker at CLINICAL_AI_API_BASE (lib/clinical-ai-api.ts).
  * lib/supabase.ts is a deliberate throwing proxy — do not import it here.
  *
- * ─── Server-action convention ───────────────────────────────────────────────
- * Every exported function is marked `"use server"` so Next.js bundles it only
- * on the server edge. Bearer tokens are forwarded by apiFetch (lib/auth.ts)
- * using the token stored in localStorage on the client; on the server edge
- * the caller must pass the token explicitly via the `Authorization` header
- * forwarded in the fetch init.
- *
  * ─── Normalisation ──────────────────────────────────────────────────────────
  * snake_case DB rows → camelCase app state happens only here.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-"use server";
-
 import { apiFetch } from "@/lib/auth";
 import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
+import { deidentify } from "@/lib/deidentify";
+import { StructuredTaskSchema, type StructuredTask } from "@/lib/ai/schemas";
 import type {
   UpsertTaskDraftInput,
   CommitTaskInput,
@@ -41,6 +34,7 @@ import type {
   StatusAuditLogRow,
   WorkerError,
   UUID,
+  Modality,
 } from "@/types/tasks";
 
 // ---------------------------------------------------------------------------
@@ -272,25 +266,34 @@ export async function insertPractitionerNote(
 /** Input to generateStructuredTask */
 export interface GenerateStructuredTaskInput {
   sessionContext: string;
-  activityFormat: "activity_log" | "thought_record" | "reflection_prompt";
+  activityFormat: "activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet";
+  modalities: Modality[];
 }
 
 export async function generateStructuredTask(
   input: GenerateStructuredTaskInput
-): Promise<FormData | { task_type: "reflection_prompt"; prompt: string; suggested_background: string; notes?: string }> {
+): Promise<StructuredTask> {
+  const { text: deidentifiedContext } = deidentify(input.sessionContext);
+
   const res = await apiFetch(
     `${CLINICAL_AI_API_BASE}/generate/structured-task`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sessionContext: input.sessionContext,
-        activityFormat: input.activityFormat
+        sessionContext: deidentifiedContext,
+        activityFormat: input.activityFormat,
+        modalities: input.modalities
       }),
     }
   );
 
   await assertOk(res, "generateStructuredTask");
 
-  return (await res.json()) as any;
+  const text = await res.text();
+  if (!text) {
+    throw new Error(`Server returned ${res.status} with empty response`);
+  }
+  const data = JSON.parse(text);
+  return StructuredTaskSchema.parse(data);
 }
