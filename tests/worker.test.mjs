@@ -9,6 +9,7 @@
  * `"type": "module"`, so Node would otherwise parse its ESM syntax as CommonJS.
  */
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { copyFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -851,9 +852,11 @@ async function main() {
       if (href.includes("practice_task_submissions")) {
         return [
           {
-            task_type: "thought_record",
-            content: { notes: "Another session's very private thoughts" }
-          }
+            form_data: {
+              task_type: "thought_record",
+              situation: "Another session's very private thoughts",
+            },
+          },
         ]
       }
       return undefined
@@ -917,7 +920,10 @@ async function main() {
   pass("structured-task: invalid request schema returns 400");
 }
 
-const TOTAL_CHECKS = 34
+// Derived from the number of pass() calls in this file so adding a check never stales the count.
+const TOTAL_CHECKS = (
+  readFileSync(fileURLToPath(import.meta.url), "utf8").match(/^\s*pass\(/gm) || []
+).length
 
 main()
   .then(() => console.log(`\n${passed}/${TOTAL_CHECKS} checks passed`))
