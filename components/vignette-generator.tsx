@@ -31,20 +31,34 @@ import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
 import ReflectionCanvas from "@/components/canvas/ReflectionCanvas"
 import { ModalitySelector } from "@/components/modality-selector"
 import type { Modality } from "@/types/tasks"
+import type { StructuredTask } from "@/lib/ai/schemas"
 
 type StepId = 1 | 2 | 3
+
+/**
+ * `generatedTaskData` holds either the freshly generated structured task (enriched
+ * with `homework` by `extractHomeworkList`) or the package hydrated from
+ * `session.practicePackage` — the `practice_package` column carries both shapes.
+ */
+type StoredPracticeTask = StructuredTask | PracticePackage
+
+const TASK_VARIANTS = ["activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"] as const
+
+function isTaskVariant(v: string): v is (typeof TASK_VARIANTS)[number] {
+  return (TASK_VARIANTS as readonly string[]).includes(v)
+}
 
 interface AnalysisResult {
   formulationId?: string
   inferredModality?: string
-  riskFlags: any[]
+  riskFlags: unknown[]
   rationale: string
 }
 
 /** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
 const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
 
-function extractHomeworkList(task: any): string[] {
+function extractHomeworkList(task: StructuredTask & { homework?: string[] }): string[] {
   if (!task || typeof task !== "object") return []
   if (Array.isArray(task.homework) && task.homework.length > 0) {
     return task.homework
@@ -54,7 +68,7 @@ function extractHomeworkList(task: any): string[] {
   if (task.task_type === "two_choice_worksheet") {
     if (task.title) items.push(task.title)
     if (Array.isArray(task.prompts)) {
-      task.prompts.forEach((p: any, idx: number) => {
+      task.prompts.forEach((p, idx: number) => {
         const q = typeof p === "string" ? p : p?.question
         if (q) items.push(`${idx + 1}. ${q}`)
       })
@@ -123,7 +137,7 @@ export default function VignetteGenerator({
   const [selectedModalities, setSelectedModalities] = useState<Modality[]>(["CBT"])
   const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet">("thought_record")
   const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
-  const [generatedTaskData, setGeneratedTaskData] = useState<any>(null)
+  const [generatedTaskData, setGeneratedTaskData] = useState<StoredPracticeTask | null>(null)
 
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
   const [linkStatus, setLinkStatus] = useState<string | null>(null)
@@ -660,9 +674,9 @@ export default function VignetteGenerator({
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Select
                       value={activityFormat}
-                      onValueChange={(val: any) =>
-                        setActivityFormat(val)
-                      }
+                      onValueChange={(val: string) => {
+                        if (isTaskVariant(val)) setActivityFormat(val)
+                      }}
                       disabled={isProcessing}
                     >
                       <SelectTrigger className="h-12 flex-1 rounded-md border-input bg-background">
