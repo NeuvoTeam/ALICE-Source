@@ -467,6 +467,15 @@ export function DynamicTaskForm({
     }, 1200);
   }, [buildFormData, performSave]);
 
+  // DELIBERATELY RETAINED (lint rank 8g, register row B12). This is an intended side effect, not
+  // state derived from props: `triggerAutoSave` marks the form "saving" and arms the 1200 ms
+  // debounce, so the write is what tells the clinician their edit is pending, and the 1200 ms
+  // timer is what stops every keystroke from hitting `POST /tasks/submissions`. The rule's real
+  // subject — a cascading render from a state write during the effect's synchronous prologue —
+  // does not apply to a debounce whose whole purpose is to defer the work. It is left visible
+  // rather than silenced with a scoped `eslint-disable`, because every other rule downgrade in
+  // `eslint.config.mjs` is deliberately kept in the totals: removing the autosave or its debounce
+  // is out of the question, so the honest record is a retained finding with this reason.
   // Schedule save whenever data changes
   useEffect(() => {
     if (!persist) return;

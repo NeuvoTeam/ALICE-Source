@@ -23,11 +23,16 @@ export default defineConfig([
       // these 8 are recorded findings rather than omissions, because removing them surfaces
       // genuine payload-shape errors, so the rule stays visible as a warning.
       "@typescript-eslint/no-explicit-any": "warn",
-      // 11 sites across 10 files as of lint rank 8f: the codebase syncs state from props/fetch
-      // inside useEffect. Real cascading-render risk, but every site needs a behavioural change
-      // (derived state or useEffectEvent), so it stays visible as a warning. Rank 8g works this
-      // list and will move the count again: read 11/10 as this commit's measurement, not a
-      // fixed baseline.
+      // 4 sites across 3 files after lint rank 8g (2026-10-10, card t_2d4d0225), all four
+      // DELIBERATELY RETAINED with a written reason in the source: components/tasks/
+      // DynamicTaskForm.tsx holds two (the externalSubmissionId mirror, register row B11, and
+      // the debounced autosave, B12), components/vignette-generator.tsx one (B13, the
+      // session-hydration latch the 15 hydration-guard checks pin) and hooks/
+      // use-clinical-workspace.ts one (B15, a guarded derived-default in a hook with zero
+      // importers). Rank 8g cleared the other 7 sites and row B10's exhaustive-deps finding
+      // (the four fetch-derived loaders, the drawer close, and the two matchMedia
+      // subscriptions), so the downgrade stays only while these four recorded findings remain:
+      // a rule may not stop being downgraded while any site is left.
       "react-hooks/set-state-in-effect": "warn",
       // 0 sites since lint rank 8c fixed the one read (components/canvas/ReflectionCanvas.tsx).
       // Dead downgrade; deleting it is a rule change that no card carries, so it stays and is

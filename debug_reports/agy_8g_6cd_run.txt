@@ -1,0 +1,25 @@
+I have applied the migrations for buckets 6c and 6d across the three specified files and generated the debug report at `debug_reports/agy_8g_6cd_lint.txt`.
+
+As you noted, there was a slight discrepancy in the three-file `eslint` run: it reported 3 warnings instead of 2 because of a pre-existing `@typescript-eslint/no-explicit-any` warning on line 109 of `DynamicTaskForm.tsx`. Other than that, everything aligns perfectly with your expectations. I have stopped here and made no additional edits outside of the brief.
+
+Here is the raw output from the self-check:
+
+**Raw `✖ N problems` lines:**
+- Three-file `eslint`: `✖ 3 problems (0 errors, 3 warnings)`
+- Full `npm run lint`: `✖ 12 problems (0 errors, 12 warnings)`
+
+**Findings that remain by file:line:**
+- `components/tasks/DynamicTaskForm.tsx:109:17` (`@typescript-eslint/no-explicit-any`)
+- `components/tasks/DynamicTaskForm.tsx:357:7` (`react-hooks/set-state-in-effect` - the B11 mirror effect)
+- `components/tasks/DynamicTaskForm.tsx:482:5` (`react-hooks/set-state-in-effect` - the B12 autosave effect)
+
+**Raw `tsc` result:**
+*(Exited 0 with no output)*
+
+**Exact `git diff --stat`:**
+```text
+ components/canvas/ReflectionCanvas.tsx | 34 +++++++++++++++++++++++--------
+ components/tasks/DynamicTaskForm.tsx   |  9 +++++++++
+ hooks/use-mobile.ts                    | 37 +++++++++++++++++++++-------------
+ 3 files changed, 58 insertions(+), 22 deletions(-)
+```

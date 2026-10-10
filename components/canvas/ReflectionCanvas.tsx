@@ -34,6 +34,7 @@ import React, {
   useImperativeHandle,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/auth";
@@ -212,6 +213,24 @@ function StatusPill({ status, error }: { status: UploadStatus; error?: string })
 // ReflectionCanvas
 // ---------------------------------------------------------------------------
 
+const DARK_MODE_QUERY = "(prefers-color-scheme: dark)";
+
+function subscribeDarkMode(onChange: () => void) {
+  const mq = window.matchMedia(DARK_MODE_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+function getDarkModeSnapshot() {
+  return window.matchMedia(DARK_MODE_QUERY).matches;
+}
+
+// The server and the first client render must agree; `false` is the value the old
+// `useState(false)` initial state produced, and it matches the light theme the server renders.
+function getDarkModeServerSnapshot() {
+  return false;
+}
+
 const ReflectionCanvas = React.forwardRef<
   ReflectionCanvasHandle,
   ReflectionCanvasProps
@@ -226,7 +245,6 @@ const ReflectionCanvas = React.forwardRef<
   const [background, setBackground] = useState<BackgroundType>(
     initialData?.background ?? "blank"
   );
-  const [isDark, setIsDark]         = useState(false);
 
   // Committed history + redo stack — kept in refs to avoid re-render churn.
   // DELIBERATE LIMITATION (lint rank 8c): `initialData` is read once, at mount, and never
@@ -255,13 +273,13 @@ const ReflectionCanvas = React.forwardRef<
   const [uploadError,  setUploadError]  = useState<string | undefined>();
 
   // ── Dark mode detection ──────────────────────────────────────────────────
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setIsDark(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  // An external-system subscription read through `useSyncExternalStore` rather than a mount
+  // effect that mirror-images `matchMedia` into state (lint rank 8g, register row B2): the media
+  // query IS the store, `getServerSnapshot` returns the same `false` the old initial state held so
+  // the server render and the first client render agree, and a change repaints without the
+  // cascading-render warning. The three helpers are module-scope constants so `subscribe` keeps a
+  // stable identity across renders.
+  const isDark = useSyncExternalStore(subscribeDarkMode, getDarkModeSnapshot, getDarkModeServerSnapshot);
 
   // ── Canvas sizing (ResizeObserver) ───────────────────────────────────────
   useEffect(() => {
