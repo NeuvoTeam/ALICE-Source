@@ -16,17 +16,19 @@ export default defineConfig([
   ...nextTs,
 
   // --- Rule exceptions (each one deliberate; see documentation.md section 13.4) ---
+  // Four dead downgrades were removed from this block on 2026-10-10 (lint rank 8k, card
+  // t_0c86d33b, operator-approved): `@typescript-eslint/no-explicit-any` (0 sites since rank 8h),
+  // `react-hooks/refs` (0 since rank 8c), `react-hooks/purity` (0 since rank 8d) and
+  // `react/no-unescaped-entities` (0 since rank 8f). Each sat at `warn` here where the extended
+  // configs assign `error`; the restored severity was measured, not assumed — `eslint
+  // --print-config` against a probe config without this block reports severity 2 for all four
+  // against 1 with it. Zero findings were reported by any of the four on the tree at removal, so
+  // deleting them restored the real severity without changing a single reported finding. The
+  // consequence is intended and is stated in documentation.md section 13.4: a future ref read
+  // during render, a `Math.random()` in render, an unescaped apostrophe in JSX text or a new
+  // `any` now FAILS `npm run lint` instead of warning.
   {
     rules: {
-      // 0 sites after lint rank 8h (2026-10-10, card t_75b9c1b0): the last 8 —
-      // components/vignette-generator.tsx (7) and components/tasks/DynamicTaskForm.tsx (1),
-      // recorded findings since rank 8e because removing them surfaced genuine payload-shape
-      // errors — were cleared by modelling `practice_package` and `form_data` as the unions the
-      // app already writes (`StoredPracticeTask` in lib/practice-package.ts, `SubmissionFormData`
-      // in types/tasks.ts). Dead downgrade; deleting it is a rule change that no card carries,
-      // so it stays and is an open operator decision, on the same standing as react-hooks/refs
-      // and react-hooks/purity below.
-      "@typescript-eslint/no-explicit-any": "warn",
       // 4 sites across 3 files after lint rank 8g (2026-10-10, card t_2d4d0225), all four
       // DELIBERATELY RETAINED with a written reason in the source: components/tasks/
       // DynamicTaskForm.tsx holds two (the externalSubmissionId mirror, register row B11, and
@@ -38,17 +40,6 @@ export default defineConfig([
       // subscriptions), so the downgrade stays only while these four recorded findings remain:
       // a rule may not stop being downgraded while any site is left.
       "react-hooks/set-state-in-effect": "warn",
-      // 0 sites since lint rank 8c fixed the one read (components/canvas/ReflectionCanvas.tsx).
-      // Dead downgrade; deleting it is a rule change that no card carries, so it stays and is
-      // an open operator decision.
-      "react-hooks/refs": "warn",
-      // 0 sites since lint rank 8d deleted components/ui/sidebar.tsx (the Math.random site).
-      // Dead downgrade, same standing as react-hooks/refs above.
-      "react-hooks/purity": "warn",
-      // 0 sites after lint rank 8f (2026-10-10) escaped both apostrophes (app/forgot-password/
-      // page.tsx and components/tasks/ThreeCsForm.tsx). Dead downgrade, same standing as the
-      // two above.
-      "react/no-unescaped-entities": "warn",
     },
   },
 
