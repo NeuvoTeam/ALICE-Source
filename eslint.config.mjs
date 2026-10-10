@@ -29,16 +29,19 @@ export default defineConfig([
   // `any` now FAILS `npm run lint` instead of warning.
   {
     rules: {
-      // 4 sites across 3 files after lint rank 8g (2026-10-10, card t_2d4d0225), all four
+      // 3 sites across 2 files after lint rank 8l (2026-10-10, card t_b32676c6), all three
       // DELIBERATELY RETAINED with a written reason in the source: components/tasks/
       // DynamicTaskForm.tsx holds two (the externalSubmissionId mirror, register row B11, and
-      // the debounced autosave, B12), components/vignette-generator.tsx one (B13, the
-      // session-hydration latch the 15 hydration-guard checks pin) and hooks/
-      // use-clinical-workspace.ts one (B15, a guarded derived-default in a hook with zero
-      // importers). Rank 8g cleared the other 7 sites and row B10's exhaustive-deps finding
-      // (the four fetch-derived loaders, the drawer close, and the two matchMedia
-      // subscriptions), so the downgrade stays only while these four recorded findings remain:
-      // a rule may not stop being downgraded while any site is left.
+      // the debounced autosave, B12) and components/vignette-generator.tsx one (B13, the
+      // session-hydration latch the 15 hydration-guard checks pin). The fourth was row B15,
+      // hooks/use-clinical-workspace.ts (a guarded derived-default in a hook with zero
+      // importers) — that file was archived as unreferenced at rank 8l, and its finding left
+      // the totals with it, because `archive/**` is in `globalIgnores` below. Nothing is hidden
+      // by this: the file is no longer linted as live source, which is the point of the archive.
+      // Rank 8g cleared the other 7 sites and row B10's exhaustive-deps finding (the four
+      // fetch-derived loaders, the drawer close, and the two matchMedia subscriptions), so the
+      // downgrade stays only while these three recorded findings remain: a rule may not stop
+      // being downgraded while any site is left.
       "react-hooks/set-state-in-effect": "warn",
     },
   },
