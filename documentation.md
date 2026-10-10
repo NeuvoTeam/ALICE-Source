@@ -104,7 +104,6 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `lib/` | API base constant, auth helpers, Supabase tripwire, session/hierarchy models, the session-hydration guard (§8.2), utils |
 | `stores/` | `useClientNavStore.ts` — the **authoritative** zustand store for client/case/session state |
 | `types/` | Shared types: `Client` (`types/index.ts`); practice-task domain types in `types/tasks.ts` (DB row interfaces, JSONB shapes, normalised app-state types, action I/O shapes) |
-| `styles/globals.css` | Duplicate of the Tailwind theme (the canonical copy per `components.json` is `app/globals.css`) |
 | `public/` | Icons, logos, placeholders |
 
 ### Backend and infrastructure
@@ -116,7 +115,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `workers/mcp-gateway/` | Second Worker (`alice-mcp`): MCP context/tools gateway with a service binding to the API Worker |
 | `supabase/migrations/` | `20260603_session_clinical_fields.sql` (clinical columns on `public.sessions`) and `20260914_worksheet_submissions.sql` (storage behind `POST /client/worksheet`) — see §6.2 |
 | `supabase/functions/` | Empty — reserved for Supabase edge functions |
-| `ai-config/` | `mcp.json` (MCP server registration; contains a placeholder subdomain) and `prompts/` (`intake.txt`, `session.txt` — both empty) |
+| `ai-config/` | `mcp.json` (MCP server registration; contains a placeholder subdomain, §13.3). `prompts/` was an empty directory holding two zero-byte files (`intake.txt`, `session.txt`), deleted in the 2026-10-10 dead-file sweep (zero-byte class) — §13.3 |
 | `.cursor/config.json` | Cursor MCP client config pointing at the deployed gateway |
 | `.github/copilot-instructions.md` | Agent rules: use the MCP gateway, never guess the DB schema |
 | `AGENTS.md` | The agent contract for **every** CLI in this repo: the documentation rule (§14) plus the project rules |
@@ -279,7 +278,7 @@ width when idle instead of being permanently truncated to make room for icons th
 drawn; every interactive element in the tree carries a visible `focus-visible` ring. The
 whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
 (`app/globals.css`) rather than hardcoded Tailwind greys, so it follows the dark theme.
-`components/clinical-folder-tree.tsx` is an unused alternate (see §13).
+`components/clinical-folder-tree.tsx` was an unused alternate; it was deleted on 2026-10-10 once the per-file reference search proved no consumer (see §13.3).
 
 The shell that hosts the sidebar — `components/dashboard-shell.tsx`, which
 `app/dashboard/page.tsx` renders in place of the old `<div className="flex h-screen">` row — is
@@ -862,7 +861,10 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   overrides it. `html2canvas` and the computed-style inlining shim it required were removed in favour of
   this approach; the hidden role-play/quiz blocks and the unreferenced `components/clinical-folder-tree.tsx`
   stub went with them, since neither had a consumer (the screen hid them and the PDF excludes them) and
-  both were the only `tsc` errors. `npm run test:pdf` guards geometry, pagination, glyph hygiene and naming.
+  both were the only `tsc` errors. (Corrected 2026-10-10: that change removed the hidden blocks and the stub's
+  *usage*, but the file itself stayed in the tree — `ClinicalFolderTreeProps` was defined in `ed4b794`, so the
+  type errors were fixed rather than removed by deletion. The file was deleted for real in the 2026-10-10
+  dead-file sweep, §13.3.) `npm run test:pdf` guards geometry, pagination, glyph hygiene and naming.
 - The generator's shell is token-based: the card surface is `bg-card`, the header band and inline
   notices use `border-border` / `bg-muted/50` with explicit `dark:` variants for the amber, red, blue
   and green callouts, and the action buttons normalise to `rounded-xl` (the two hero radii,
@@ -907,7 +909,9 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   renders — for example the "Could not open client" notice in `app/dashboard/page.tsx`.
   `components/ui/toaster.tsx` reads `@/hooks/use-toast`, the same module the call sites use.
   `components/ui/sonner.tsx` exports a second `Toaster`, but no call site uses sonner, so it is
-  deliberately not mounted. The Toaster is a client component, so the toast host mounts client-side
+  deliberately not mounted — the file was deleted in the 2026-10-10 dead-file sweep (§13.3), which leaves the
+  `sonner` dependency in `package.json` with no importer of any kind: recorded in §13.3, not removed, because a
+  dependency change is its own decision. The Toaster is a client component, so the toast host mounts client-side
   while `app/layout.tsx` stays a server component: the server-rendered HTML is unchanged.
   The destructive variant's foreground is `--destructive-foreground: oklch(1 0 0)` in **both** themes —
   the same white the `Button` and `Badge` destructive variants paint with a literal `text-white` —
@@ -963,7 +967,9 @@ Client registration lives in three places that must stay in sync: `.cursor/confi
 `https://alice-mcp.neuvoteam.workers.dev/context`).
 
 **Dead code in this Worker:** `src/tools.ts` (`get_client` only) and `src/context.ts` are never
-imported — `src/index.ts` inlines both; `src/memory.ts` is empty.
+imported — `src/index.ts` inlines both; those two are **kept**, because an unused non-empty module is a design
+decision rather than junk. The zero-byte `src/memory.ts` was deleted in the 2026-10-10 dead-file sweep
+(zero-byte class) — §13.3.
 
 ---
 
@@ -1236,17 +1242,20 @@ local development, but several are user-visible or security-relevant.
 | Item | Detail |
 | --- | --- |
 | Two hierarchy models | `stores/useClientNavStore.ts` (Worker-backed, in use) vs `lib/clinical-hierarchy.ts` + `hooks/use-clinical-workspace.ts` + `lib/vignette-restore.ts` (localStorage-only, unused by the dashboard). Keeping both invites edits to the wrong one |
-| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope. All four remaining members of this row are gone as of 2026-10-10: `components/clinical-folder-tree.tsx`, `components/ui/use-toast.ts` (dup of `hooks/use-toast.ts`), `components/ui/use-mobile.tsx` (dup of `hooks/use-mobile.ts`) and `components/ui/sonner.tsx` (a second `Toaster` no call site mounted) were each proved unreferenced by a per-file repo-wide search and deleted; the `sonner` dependency is now unused and is a listed recommendation, not a change. Full evidence: `debug_reports/DEAD_FILE_SWEEP_20261010.md` |
 | Hard-coded API URLs | `components/ClientLanding.tsx`, `app/login/page.tsx` and `app/signup/page.tsx` repeat the Worker URL instead of importing `CLINICAL_AI_API_BASE` |
-| Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both); `src/memory.ts` is empty |
-| Empty placeholders | `ai-config/prompts/intake.txt`, `ai-config/prompts/session.txt`, `supabase/functions/`, `public/placeholder-*` |
+| Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both) — **kept**, pending a decision on whether the gateway should use them; a non-empty unused module is not junk. The zero-byte `src/memory.ts` was deleted in the 2026-10-10 zero-byte sweep |
+| Empty placeholders | `supabase/functions/`, `public/placeholder-*`. The two zero-byte `ai-config/prompts/` files (`intake.txt`, `session.txt`) were deleted in the 2026-10-10 zero-byte sweep, leaving that directory empty on disk and untracked in Git; nothing in the repo ever read them |
 | Stale MCP config | `ai-config/mcp.json` still points at `alice-mcp.YOUR-SUBDOMAIN.workers.dev`, unlike `.cursor/config.json` |
 | Gateway package manifest | `workers/mcp-gateway/package.json` declares no dependencies and no scripts, so there is no `dev`/`deploy` shortcut |
 | Schema not fully migrated | `session_versions` (written on every save) and `sessions.practice_package` exist only in the live database — no migration in-repo |
 | Legacy Ollama route | `app/api/analyze/session/route.ts` (§7.4) |
 | Unrendered client projection fields | `GET /client-homework/:id` now projects the chosen structured activity via the `practiceTask` field, rendered on the signed-link page with no client-side persistence. It still returns `vignette`, `quiz` and `homework` unused. The unscoped `practice_task_submissions` fallback was removed to close a cross-session disclosure. |
-| Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` (verified 2026-10-10 as **dead**: no source file imports `styles/`, it is absent from `.next/static`, and the rendered `/login` computes `--background` `#f6f9fb` and `--radius` `.75rem` — `app/globals.css`'s values, not `#ffffff` / `.625rem`. It is left in place: deletion is a separate card) |
-| Empty README | `README.md` is zero bytes; this document is not linked from anywhere in the repo |
+| Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` (verified 2026-10-10 as **dead**: no source file imports `styles/`, it is absent from `.next/static`, and the rendered `/login` computes `--background` `#f6f9fb` and `--radius` `.75rem` — `app/globals.css`'s values, not `#ffffff` / `.625rem`. It was **deleted** on 2026-10-10 by the dead-file sweep that this row was waiting for — see `debug_reports/DEAD_FILE_SWEEP_20261010.md`) |
+| Empty README | The root `README.md` was zero bytes and was deleted in the 2026-10-10 zero-byte sweep; this document is not linked from anywhere in the repo, so a fresh clone now has no front door at all. That is deliberate, not an oversight: an empty file carries no information and the tracked copy is recoverable from history (`git show 3b191e4:README.md`) |
+| Root one-shot scripts | `patch-cloudflare.js`, `patch-tasks.js` and `patch-vignette.js` were one-shot source-patching utilities sitting in the repo root; no file imports or runs them. The only reference to any of them anywhere was the ESLint config's `files:` override (`eslint.config.mjs:41`), which now matches no file — that override is deliberately left in place for the lint triage. Deleted 2026-10-10 |
+| Editor backup | `scripts/dispatch-inbox.ps1.bak-20261001-161325` was an editor backup of `scripts/dispatch-inbox.ps1`, which is live (`scripts/run-silent.vbs` runs it hidden via PowerShell). The `.bak` copy was referenced by nothing. Deleted 2026-10-10 |
+| Tracked Gradle build state | `.gradle/` is tracked even though it is Gradle's own project cache (locks, hash bins, `cache.properties`). Its two zero-byte `gc.properties` files (`9.2.0/`, `vcs-1/`) were deleted in the 2026-10-10 zero-byte sweep; the remaining six files are build output that should arguably be untracked and git-ignored. That is an ignore/untrack decision rather than a dead-file deletion, so it is flagged here and left alone |
 
 ### 13.4 Tooling and process gaps
 
@@ -1255,7 +1264,7 @@ local development, but several are user-visible or security-relevant.
 | Tests | `npm test` → `node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs`: dependency-free harnesses. The worker one stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler; 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Its Supabase stub models the session→client ownership chain that `checkSessionAccess` walks, and asserts "nothing was persisted" against writes only, because every `sessionId`-bearing AI route reads the session and its owner first. `npm test` is green as of 2026-09-18 (32 worker + 12 PDF + 15 hydration checks). `tests/hydration-guard.test.mjs` imports the real guard (`lib/session-hydration.ts`) under Node's type stripping and locks the race, the blur-save bounce, the placeholder advisory and the failed-fetch fallback; no harness renders React, so component-level regressions still rely on review |
 | Partial CI | `.github/workflows/docs-check.yml` runs `npm run docs:check` on push and pull requests as a non-blocking warning (`continue-on-error: true`), posting PR comments detailing uncommitted documentation gaps, while `.github/workflows/weekly-docs-audit.yml` audits `DOCS: none` overrides weekly. Nothing builds, lints or runs `npm test` on push yet |
 | Docs gate | `scripts/check-docs.mjs` (`npm run docs:check`, the `.githooks/commit-msg` hook, and the workflow above) checks changes touching `app/ components/ stores/ lib/ hooks/ backend/ workers/ supabase/migrations/ tests/` or root configs against `documentation.md`. In local `.githooks/commit-msg`, the failure output explicitly directs callers to bypass via `DOCS: none`. In CI, the gate issues a non-blocking warning and comments on PRs without failing the build, while weekly cron audits log `DOCS: none` bypass debt. `DOCS: none` in the commit message is the bypass, `DOCS_CHECK=off` the local env override |
-| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extending `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`, with `eslint-config-next` pinned to the installed `next` 16.2.4. It lints 130 files and exits **0**: 0 errors / 98 warnings (tree `cb3ac3a`). The gate install deliberately did not remediate source — its first run was 73 errors / 29 warnings — so it encodes seven documented exceptions, each with a one-line reason in the config: `@typescript-eslint/no-explicit-any` → `warn` (51 sites of accumulated `any`), `react-hooks/set-state-in-effect` → `warn` (14 sites of the set-state-in-effect pattern), `react-hooks/refs` → `warn` (1 site, `ReflectionCanvas.tsx`), `react-hooks/purity` → `warn` (1 site, `Math.random` in `components/ui/sidebar.tsx`), `react/no-unescaped-entities` → `warn` (2 one-line apostrophe escapes), `@typescript-eslint/no-require-imports` off for the three root CommonJS `patch-*.js` maintenance scripts, and `@typescript-eslint/ban-ts-comment` off under `backend/` (the Worker's deliberate `@ts-nocheck`). Downgraded rules stay visible in every run rather than being ignored. Deliberately **not** wired into `.githooks`: a pre-commit lint step against this baseline would block every future commit |
+| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extending `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`, with `eslint-config-next` pinned to the installed `next` 16.2.4. It lints 130 files and exits **0**: 0 errors / 98 warnings (tree `cb3ac3a`). After the 2026-10-10 dead-file sweep (§13.3) the same command reports the same **0 errors** and **91 warnings** — every one of the seven removed findings sat in a deleted file. Its `patch-*.js` CommonJS override now matches no file; it is left for the lint triage, which owns `eslint.config.mjs`. The gate install deliberately did not remediate source — its first run was 73 errors / 29 warnings — so it encodes seven documented exceptions, each with a one-line reason in the config: `@typescript-eslint/no-explicit-any` → `warn` (51 sites of accumulated `any`), `react-hooks/set-state-in-effect` → `warn` (14 sites of the set-state-in-effect pattern), `react-hooks/refs` → `warn` (1 site, `ReflectionCanvas.tsx`), `react-hooks/purity` → `warn` (1 site, `Math.random` in `components/ui/sidebar.tsx`), `react/no-unescaped-entities` → `warn` (2 one-line apostrophe escapes), `@typescript-eslint/no-require-imports` off for the three root CommonJS `patch-*.js` maintenance scripts, and `@typescript-eslint/ban-ts-comment` off under `backend/` (the Worker's deliberate `@ts-nocheck`). Downgraded rules stay visible in every run rather than being ignored. Deliberately **not** wired into `.githooks`: a pre-commit lint step against this baseline would block every future commit |
 | Type errors not gated | `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; run `npx tsc --noEmit` manually |
 | Two lockfiles | `package-lock.json` and `pnpm-lock.yaml` are both tracked. npm is the operative manager for this clone — `node_modules/.package-lock.json` exists, there is no `node_modules/.pnpm/` or `.modules.yaml`, `pnpm` is not on PATH, and no `.npmrc`/`packageManager` field pins one — so the 2026-10-10 eslint install updated `package-lock.json` only. `pnpm-lock.yaml` is therefore stale and does not list the eslint toolchain; deciding which one to keep (and deleting the other) is an operator call, not a worker's |
 | No Gradle wrapper | `gradlew` and `gradle/wrapper/` are absent; a local Gradle install is required |

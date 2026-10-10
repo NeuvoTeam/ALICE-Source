@@ -1,4 +1,10 @@
-﻿# Audit Report: sonner.tsx
+﻿> **FILE DELETED 2026-10-10.** `components/ui/sonner.tsx` was removed from the tree: it exported a second
+> `Toaster` that no call site mounted (`sonner` appeared only in this file, `package.json` and the
+> lockfiles) — the repo-wide reference search found no importer. See `documentation.md` §13.3 and
+> `debug_reports/DEAD_FILE_SWEEP_20261010.md`. Retained as a point-in-time audit of the file as it stood
+> before deletion.
+
+# Audit Report: sonner.tsx
 
 Path: `D:\Work\Neuvo\ALICE\Source\components\ui\sonner.tsx`
 
