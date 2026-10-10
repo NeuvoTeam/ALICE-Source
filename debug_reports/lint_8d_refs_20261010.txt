@@ -1,0 +1,1290 @@
+# Lint 8d — reference proof for components/ui/sidebar.tsx and components/ui/carousel.tsx
+# Card t_eaef274e, branch alan, 2026-10-10. Searches run against the pre-deletion tree (HEAD 1c3cb44).
+# Question: does ANYTHING in this repo reference either file, in any way? Evidence below, per form.
+
+## 1. Every tracked file, case-insensitive, either name (relative imports, absolute imports, comments, prose)
+$ git grep -n -i -E "sidebar|carousel" -- .   [lockfiles filtered out of the display]
+  app/globals.css:37:  --sidebar: oklch(1 0 0);
+  app/globals.css:38:  --sidebar-foreground: oklch(0.35 0.02 250);
+  app/globals.css:39:  --sidebar-primary: oklch(0.65 0.12 200);
+  app/globals.css:40:  --sidebar-primary-foreground: oklch(1 0 0);
+  app/globals.css:41:  --sidebar-accent: oklch(0.94 0.03 200);
+  app/globals.css:42:  --sidebar-accent-foreground: oklch(0.35 0.02 250);
+  app/globals.css:43:  --sidebar-border: oklch(0.92 0.02 240);
+  app/globals.css:44:  --sidebar-ring: oklch(0.65 0.12 200);
+  app/globals.css:72:  --sidebar: oklch(0.205 0 0);
+  app/globals.css:73:  --sidebar-foreground: oklch(0.985 0 0);
+  app/globals.css:74:  --sidebar-primary: oklch(0.488 0.243 264.376);
+  app/globals.css:75:  --sidebar-primary-foreground: oklch(0.985 0 0);
+  app/globals.css:76:  --sidebar-accent: oklch(0.269 0 0);
+  app/globals.css:77:  --sidebar-accent-foreground: oklch(0.985 0 0);
+  app/globals.css:78:  --sidebar-border: oklch(0.269 0 0);
+  app/globals.css:79:  --sidebar-ring: oklch(0.439 0 0);
+  app/globals.css:113:  --color-sidebar: var(--sidebar);
+  app/globals.css:114:  --color-sidebar-foreground: var(--sidebar-foreground);
+  app/globals.css:115:  --color-sidebar-primary: var(--sidebar-primary);
+  app/globals.css:116:  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  app/globals.css:117:  --color-sidebar-accent: var(--sidebar-accent);
+  app/globals.css:118:  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  app/globals.css:119:  --color-sidebar-border: var(--sidebar-border);
+  app/globals.css:120:  --color-sidebar-ring: var(--sidebar-ring);
+  components/dashboard-shell.tsx:3:import { DashboardSidebar } from "@/components/dashboard-sidebar";
+  components/dashboard-shell.tsx:55:  const sidebar = (
+  components/dashboard-shell.tsx:56:    <DashboardSidebar
+  components/dashboard-shell.tsx:66:      {!isMobile && <div className="hidden lg:flex">{sidebar}</div>}
+  components/dashboard-shell.tsx:68:        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-sidebar-border bg-sidebar px-3 lg:hidden">
+  components/dashboard-shell.tsx:70:            <button type="button" aria-label="Open navigation" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+  components/dashboard-shell.tsx:80:          {sidebar}
+  components/dashboard-sidebar.tsx:11:import { ClientNode } from "@/components/sidebar/ClientNode";
+  components/dashboard-sidebar.tsx:16:interface DashboardSidebarProps {
+  components/dashboard-sidebar.tsx:23:export function DashboardSidebar({
+  components/dashboard-sidebar.tsx:28:}: DashboardSidebarProps) {
+  components/dashboard-sidebar.tsx:30:    <aside className="flex h-full w-64 flex-col border-r bg-sidebar text-sidebar-foreground border-sidebar-border shrink-0">
+  components/dashboard-sidebar.tsx:50:              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:52:                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:53:                : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:63:              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:65:                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:66:                : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:94:                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:96:                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:97:                  : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:107:                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:109:                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:110:                  : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:125:          <div className="rounded-md bg-sidebar-accent px-3 py-2 text-sm text-sidebar-accent-foreground">
+  components/dashboard-sidebar.tsx:133:      <div className="mt-auto border-t border-sidebar-border px-3 py-2">
+  components/main-content.tsx:139:                Select a session in the sidebar
+  components/sidebar/CaseNode.tsx:37:          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-sidebar-accent/50 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/CaseNode.tsx:64:            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/CaseNode.tsx:76:            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/ClientNode.tsx:32:          className="rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/EditableName.tsx:37:            className="hidden cursor-pointer rounded-md p-1 hover:bg-sidebar-accent/50 group-hover:block group-focus-within:block"
+  components/sidebar/EditableName.tsx:83:            className="rounded-md p-1 hover:bg-sidebar-accent cursor-pointer"
+  components/sidebar/SessionNode.tsx:115:        "transition-all duration-150 hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/sidebar/SessionNode.tsx:116:        isSelected && "bg-sidebar-accent font-medium"
+  components/sidebar/SessionNode.tsx:139:            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:opacity-50",
+  components/sidebar/SessionNode.tsx:140:            copied ? "text-emerald-600" : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  components/sidebar/SessionNode.tsx:156:          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-sidebar-accent disabled:opacity-50"
+  components/sidebar/SessionNode.tsx:158:          <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-sidebar-accent-foreground" aria-hidden="true" />
+  components/sidebar/SessionNode.tsx:171:          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-destructive/10"
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:1:# Dead-component deletion — `session-history-panel`, `sidebar/Sidebar`, `sidebar/EditableText`
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:7:- `components/sidebar/Sidebar.tsx` (exports `Sidebar`)
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:8:- `components/sidebar/EditableText.tsx` (exports `EditableText`)
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:54:### 2.2 `components/sidebar/EditableText.tsx`
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:58:./components/sidebar/EditableText.tsx:5:export function EditableText({
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:59:./debug_reports/DEBUG_components_sidebar_EditableText.md:1,3,5 (its own audit report)
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:64:**Zero importers.** The live rename component is `components/sidebar/EditableName.tsx`, which is
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:72:### 2.3 `components/sidebar/Sidebar.tsx`
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:75:$ grep -rniI $EX "components/sidebar" .
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:76:./components/dashboard-sidebar.tsx:11:import { ClientNode } from "@/components/sidebar/ClientNode";
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:81:$ grep -rnIiE "from ['\"][^'\"]*(sidebar|\./Sidebar|\.\./Sidebar)['\"]|import\(['\"][^'\"]*(Sidebar|Editable|session-history)[^'\"]*['\"]" .
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:82:./components/dashboard-shell.tsx:3:import { DashboardSidebar } from "@/components/dashboard-sidebar";
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:83:./components/sidebar/Sidebar.tsx:8:} from '@/components/ui/sidebar'
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:86:**Zero importers of `components/sidebar/Sidebar.tsx`.** The only `components/sidebar/*` consumer
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:87:is `components/dashboard-sidebar.tsx`, which imports `ClientNode` — not `Sidebar`. The second hit
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:88:is `sidebar/Sidebar.tsx` importing the shadcn primitive `@/components/ui/sidebar` (the other
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:89:direction). The live sidebar is `components/dashboard-sidebar.tsx` (`DashboardSidebar`), hosted by
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:106:and `components/canvas/index.ts`; neither re-exports them, and `components/sidebar/` has no
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:129:      -e "EditableText" -e "sidebar/Sidebar" -e "sidebar\\Sidebar" -e "Sidebar\.tsx" .
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:131:./debug_reports/DEBUG_components_sidebar_EditableText.md
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:132:./debug_reports/DEBUG_components_sidebar_Sidebar.md
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:146:| `components/sidebar/Sidebar.tsx` | unreferenced | deleted |
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:147:| `components/sidebar/EditableText.tsx` | unreferenced | deleted |
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:160:| §4.4, closing sentence of the sidebar paragraph | `components/sidebar/Sidebar.tsx` dropped from the "unused alternates" sentence; `clinical-folder-tree.tsx` kept |
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:210:| `components/ui/use-mobile.tsx` | duplicate of `hooks/use-mobile.ts`, which is the one `components/ui/sidebar.tsx` imports | `grep -rnI "ui/use-mobile"` — matches only a debug report |
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:89:./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:90:./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:96:**Zero importers of this path.** The only consumer, `components/ui/sidebar.tsx`, imports
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:273:| `hooks/use-mobile.ts` | imported by `components/ui/sidebar.tsx:8` (`useIsMobile()` at line 69) |
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:275:| `components/ui/sidebar.tsx` | the shadcn primitive the live dashboard sidebar is built on |
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:294:| §4.4 sidebar paragraph | `clinical-folder-tree.tsx` "is an unused alternate" → records the deletion |
+  debug_reports/DEBUG_app_dashboard_page.md:101:  import { DashboardSidebar } from "@/components/dashboard-sidebar";
+  debug_reports/DEBUG_app_dashboard_page.md:151:        <DashboardSidebar
+  debug_reports/DEBUG_components_dashboard-sidebar.md:1:﻿# Audit Report: dashboard-sidebar.tsx
+  debug_reports/DEBUG_components_dashboard-sidebar.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\dashboard-sidebar.tsx`
+  debug_reports/DEBUG_components_dashboard-sidebar.md:115:The provided TypeScript/JavaScript code for `dashboard-sidebar.tsx` is generally well-structured and follows best practices. However, there are a few areas where improvements can be made to ensure that the component is robust, secure, and free of potential issues. By following the refactored code fixes provided, you can ensure that the component is properly handled and protected.
+  debug_reports/DEBUG_components_sidebar_CaseNode.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx`
+  debug_reports/DEBUG_components_sidebar_ClientNode.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx`
+  debug_reports/DEBUG_components_sidebar_EditableName.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx`
+  debug_reports/DEBUG_components_sidebar_EditableText.md:1:﻿> **FILE DELETED 2026-10-10.** `components/sidebar/EditableText.tsx` was removed from the tree as unreferenced
+  debug_reports/DEBUG_components_sidebar_EditableText.md:7:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableText.tsx`
+  debug_reports/DEBUG_components_sidebar_SessionNode.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\SessionNode.tsx`
+  debug_reports/DEBUG_components_sidebar_SessionNode.md:170:        "transition-all duration-150 hover:bg-sidebar-accent/50",
+  debug_reports/DEBUG_components_sidebar_SessionNode.md:171:        isSelected && "bg-sidebar-accent font-medium"
+  debug_reports/DEBUG_components_sidebar_Sidebar.md:1:﻿> **FILE DELETED 2026-10-10.** `components/sidebar/Sidebar.tsx` was removed from the tree as unreferenced
+  debug_reports/DEBUG_components_sidebar_Sidebar.md:5:# Audit Report: Sidebar.tsx
+  debug_reports/DEBUG_components_sidebar_Sidebar.md:7:Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\Sidebar.tsx`
+  debug_reports/DEBUG_components_sidebar_Sidebar.md:9:### Analysis of `Sidebar.tsx`
+  debug_reports/DEBUG_components_sidebar_Sidebar.md:31:The `Sidebar.tsx` component is simple and does not contain any logic defects, edge cases, unhandled promise/async failures, race conditions, state mutation bugs, memory leaks, or security flaws. The code is straightforward and does not require any refactoring.
+  debug_reports/DEBUG_components_ui_carousel.md:1:﻿# Audit Report: carousel.tsx
+  debug_reports/DEBUG_components_ui_carousel.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx`
+  debug_reports/DEBUG_components_ui_carousel.md:18:  - The `useEmblaCarousel` hook does not handle promise rejections. If the carousel initialization fails, it will not be caught.
+  debug_reports/DEBUG_components_ui_carousel.md:19:  - **Fix:** Wrap the `useEmblaCarousel` call in a try-catch block to handle any potential errors.
+  debug_reports/DEBUG_components_ui_carousel.md:40:  type CarouselProps = {
+  debug_reports/DEBUG_components_ui_carousel.md:41:    opts?: CarouselOptions
+  debug_reports/DEBUG_components_ui_carousel.md:42:    plugins?: CarouselPlugin
+  debug_reports/DEBUG_components_ui_carousel.md:44:    setApi?: (api: CarouselApi) => void
+  debug_reports/DEBUG_components_ui_carousel.md:62:  const [carouselRef, api] = useEmblaCarousel(
+  debug_reports/DEBUG_components_ui_carousel.md:78:  const onSelect = React.useCallback((api: CarouselApi) => {
+  debug_reports/DEBUG_components_ui_carousel.md:99:By implementing these fixes, you can improve the robustness and reliability of the `Carousel` component.
+  debug_reports/DEBUG_components_ui_sidebar.md:1:﻿# Audit Report: sidebar.tsx
+  debug_reports/DEBUG_components_ui_sidebar.md:3:Path: `D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx`
+  debug_reports/DEBUG_components_ui_sidebar.md:14:      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  debug_reports/DEBUG_components_ui_sidebar.md:16:      console.error('Failed to set sidebar cookie:', error);
+  debug_reports/DEBUG_components_ui_sidebar.md:26:        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/DEBUG_components_ui_sidebar.md:30:        toggleSidebar();
+  debug_reports/DEBUG_components_ui_sidebar.md:38:  - The `openMobile` state is managed within the `SidebarProvider`, but it is not exposed to the consumer. This means that the consumer cannot control the `openMobile` state directly. This can lead to unexpected behavior if the consumer tries to control the `openMobile` state.
+  debug_reports/DEBUG_components_ui_sidebar.md:40:    - Expose `openMobile` and `setOpenMobile` in the `SidebarContext` so that the consumer can control it directly.
+  debug_reports/DEBUG_components_ui_sidebar.md:48:    document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; Secure; HttpOnly`;
+  debug_reports/DEBUG_components_ui_sidebar.md:56:    document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  debug_reports/DEBUG_components_ui_sidebar.md:58:    console.error('Failed to set sidebar cookie:', error);
+  debug_reports/DEBUG_components_ui_sidebar.md:66:      event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/DEBUG_components_ui_sidebar.md:70:      toggleSidebar();
+  debug_reports/DEBUG_components_ui_sidebar.md:75:- **Refactored Code: Expose `openMobile` and `setOpenMobile` in `SidebarContext`**
+  debug_reports/DEBUG_components_ui_sidebar.md:77:  const contextValue = React.useMemo<SidebarContextProps>(
+  debug_reports/DEBUG_components_ui_sidebar.md:85:      toggleSidebar,
+  debug_reports/DEBUG_components_ui_sidebar.md:87:    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+  debug_reports/DEBUG_components_ui_sidebar.md:93:  document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; Secure; HttpOnly`;
+  debug_reports/DEBUG_components_ui_sidebar.md:96:These refactored code fixes address the identified issues and improve the robustness, security, and usability of the `Sidebar` component.
+  debug_reports/DEBUG_components_ui_use-mobile.md:2:> the live `hooks/use-mobile.ts`, which `components/ui/sidebar.tsx:8` imports — the repo-wide reference
+  debug_reports/LINT_GATE_20261010.md:124:| 27 | `components/ui/carousel.tsx:98:5` | `react-hooks/set-state-in-effect` | Error: Calling setState synchronously within an effect can trigger cascading renders |
+  debug_reports/LINT_GATE_20261010.md:125:| 28 | `components/ui/sidebar.tsx:611:26` | `react-hooks/purity` | Error: Cannot call impure function during render |
+  debug_reports/LINT_GATE_20261010.md:183:| `react-hooks/purity` | `warn` | whole repo | 1 site: `components/ui/sidebar.tsx:611` calls `Math.random` during render |
+  debug_reports/LINT_TRIAGE_20261010.md:77:| B3 | `hooks/use-mobile.ts:14` | `react-hooks/set-state-in-effect` | `setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)` — same matchMedia-initial-read shape. Note the state starts `undefined` and is coerced by `!!isMobile`, which is deliberately hydration-safe. | Yes (`components/ui/sidebar.tsx:8` imports it — though see E-note in §7). | `useSyncExternalStore`, or accept. | S | No. |
+  debug_reports/LINT_TRIAGE_20261010.md:78:| B4 | `components/ui/sidebar.tsx:611` | `react-hooks/purity` | `Math.random()` inside `React.useMemo(…, [])` in `SidebarMenuSkeleton` — an impure call during render. | **No — `SidebarMenuSkeleton` has zero importers**, and `components/ui/sidebar.tsx` itself has **zero importers** repo-wide (see §5.3). | Delete the file (preferred — it is an unreferenced shadcn kit), or hoist the width into a state/effect if a skeleton is genuinely wanted. | S | No. Unreachable. |
+  debug_reports/LINT_TRIAGE_20261010.md:79:| B5 | `components/ui/carousel.tsx:98` | `react-hooks/set-state-in-effect` | `onSelect(api)` inside an effect — notifying the parent of the embla instance and registering listeners. | **No — `components/ui/carousel.tsx` has zero importers.** | Same as B4: unreferenced kit file. If kept, the rule is arguably over-eager here (see §8, class E debate). | S | No. Unreachable. |
+  debug_reports/LINT_TRIAGE_20261010.md:110:| C11 | `components/main-content.tsx:29` | `no-unused-vars` | `activeTab` prop destructured and typed (`:33`) but never used inside `MainContent`, which keeps its own `tab` state (`:38`). The caller **does** pass it (`app/dashboard/page.tsx:73`). | Repo-wide grep: `activeTab` is consumed only by `dashboard-sidebar.tsx`. | Remove from the destructure + prop type (and optionally stop passing it). | S |
+  debug_reports/LINT_TRIAGE_20261010.md:111:| C12 | `components/sidebar/EditableName.tsx:14` | `no-unused-vars` | `loading` state is written (`setLoading` at `:24`, `:26`) but never read. | In-file. | Delete the state pair, keep the awaits. | S |
+  debug_reports/LINT_TRIAGE_20261010.md:115:| C16 | `components/sidebar/CaseNode.tsx:108` | `no-unused-expressions` | Same stray empty template literal at EOF. | Same byte-level proof. | Delete the stray token. | S |
+  debug_reports/LINT_TRIAGE_20261010.md:116:| C17 | `components/sidebar/ClientNode.tsx:57` | `no-unused-expressions` | Same stray empty template literal at EOF. | Same byte-level proof. | Delete the stray token. | S |
+  debug_reports/LINT_TRIAGE_20261010.md:195:### 5.3 `components/ui/sidebar.tsx` — `Math.random()` during render
+  debug_reports/LINT_TRIAGE_20261010.md:208:1. `SidebarMenuSkeleton` (`:602`) is defined and exported (`:717`) and has **zero importers** repo-wide.
+  debug_reports/LINT_TRIAGE_20261010.md:209:2. `components/ui/sidebar.tsx` **itself has zero importers** — a repo-wide search for `ui/sidebar` (excluding `node_modules`, `.next`, `scratch`) returns only the comment in `eslint.config.mjs:30`. The app's actual sidebar is `components/dashboard-sidebar.tsx` (imported by `components/dashboard-shell.tsx:3`) plus `components/sidebar/*`.
+  debug_reports/LINT_TRIAGE_20261010.md:230:| | `components/ui/carousel.tsx` | 98 | `onSelect(api)` — notifies the parent and registers listeners | Callback registration against the embla instance; the rule cannot see through the callback prop. Unreachable file. (B5) |
+  debug_reports/LINT_TRIAGE_20261010.md:300:| 4 | **Lint 8d — audit the two unreferenced shadcn kit files** | Prove `components/ui/sidebar.tsx` and `components/ui/carousel.tsx` unreferenced (per-file repo-wide search, the card-6 standard) and delete them. | 2 | B (fix) / C (files) | **Low.** Both have zero importers (verified here). Clears B4 and B5 and removes ~1 000 lines of kit. |
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:1:# Mobile drawer for the dashboard sidebar — recommendation, implementation, evidence
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:9:offline harness (real `DashboardShell` / `DashboardSidebar` / `MainContent`, `window.fetch`
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:16:`DashboardSidebar`, below the Tailwind `lg` breakpoint (1024px), triggered from a slim in-flow
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:31:- **The existing 256px static sidebar at ≥1024px is byte-for-byte the same component with the same
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:32:  props.** `DashboardSidebar` and its zustand wiring are untouched; exactly one instance exists at
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:38:listener that moves the sidebar between slots and closes the drawer when the boundary is crossed;
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:49:| Two rendered slots (shadcn's own `sidebar-07` pattern: one static copy + one copy inside the sheet) | Mounts `DashboardSidebar` twice while the drawer is open — duplicate DOM, two `ClientNode` trees, doubled `EditableName` inputs. The brief forbids duplicating its state or props, so the shell moves one element instead. |
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:50:| `components/ui/use-mobile.tsx` / `hooks/use-mobile.ts` | Hardcodes 768px. Used with the `lg` chrome that leaves the sidebar unreachable between 768px and 1023px (JS says "mobile", CSS says "desktop"); used with 768px chrome it contradicts the card's "desktop ≥1024px unchanged". |
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:51:| Resizable / collapsible desktop sidebar (`react-resizable-panels` is already a dependency) | A desktop behaviour change with its own persisted state — out of scope for a card whose only desktop criterion is "unchanged". |
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:57:  `DashboardSidebar` element are replaced by `<DashboardShell …>{MainContent|ClientView}</DashboardShell>`.
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:58:  Nothing else in the file changed (`DashboardSidebar` is no longer imported there).
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:65:sidebar at 390px; a `resize` listener re-reads the query and closes the drawer only when the
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:75:  `<div class="flex h-screen">` + real `DashboardSidebar` + real `MainContent`.
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:253:  `DashboardSidebar` (static `hidden lg:flex` wrapper, or the sheet — never both), and the `resize`
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:277:Acceptance 2 — one `DashboardSidebar`, no duplicated tree — holds at every state: `aside` count ≤ 1
+  debug_reports/UI_MOBILE_DRAWER_20261010.md:343:  `deadband-before.json` / `deadband-after.json`. Both bundles use the real `DashboardSidebar`,
+  debug_reports/UI_PASS_20261010.md:18:- `shell-harness.html` — the real `DashboardSidebar` (zustand store seeded with a client,
+  debug_reports/UI_PASS_20261010.md:30:| `ui_shell_desktop_1440.png` | Sidebar + generator step 1 at 1440px: token surfaces, wrapped header, truncated session name in the header, notes area, `Clinical Modalities (1-3)` trigger |
+  debug_reports/UI_PASS_20261010.md:32:| `ui_shell_narrow_390.png` | Same shell at 390×844: no page-level horizontal overflow (scrollWidth == innerWidth == 390), but the fixed 256px sidebar leaves 134px for the main region — see the recommendation in the task report (needs a drawer/toggle, i.e. a behavioural change) |
+  debug_reports/UI_RADIUS_SCALE_20261010.md:163:| `ui_radius_shell_1440_before.png` / `ui_radius_shell_1440_after.png` | dashboard shell at 1440px: 256px sidebar, generator hero, composer textarea, modality trigger |
+  debug_reports/UI_RADIUS_SCALE_20261010.md:164:| `ui_radius_shell_390_before.png` / `ui_radius_shell_390_after.png` | the same shell at 390px (top bar + no sidebar, document width 375 = client width) |
+  debug_reports/_SIGNAL.txt:1177:  debug_reports\DEBUG_components_dashboard-sidebar.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1179:  debug_reports\DEBUG_components_dashboard-sidebar.md:6:
+  debug_reports/_SIGNAL.txt:1180:> debug_reports\DEBUG_components_dashboard-sidebar.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1182:  debug_reports\DEBUG_components_dashboard-sidebar.md:8:
+  debug_reports/_SIGNAL.txt:1183:  debug_reports\DEBUG_components_dashboard-sidebar.md:9:- **Edge Case**: The 
+  debug_reports/_SIGNAL.txt:1186:> debug_reports\DEBUG_components_dashboard-sidebar.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1190:  debug_reports\DEBUG_components_dashboard-sidebar.md:11:
+  debug_reports/_SIGNAL.txt:1191:  debug_reports\DEBUG_components_dashboard-sidebar.md:12:**Refactored Code**:
+  debug_reports/_SIGNAL.txt:1192:  debug_reports\DEBUG_components_dashboard-sidebar.md:13:- Ensure that any 
+  debug_reports/_SIGNAL.txt:1195:  debug_reports\DEBUG_components_dashboard-sidebar.md:14:
+  debug_reports/_SIGNAL.txt:1196:  debug_reports\DEBUG_components_dashboard-sidebar.md:15:```typescript
+  debug_reports/_SIGNAL.txt:1197:  debug_reports\DEBUG_components_dashboard-sidebar.md:16:// Example of 
+  debug_reports/_SIGNAL.txt:1199:  debug_reports\DEBUG_components_dashboard-sidebar.md:30:```
+  debug_reports/_SIGNAL.txt:1200:  debug_reports\DEBUG_components_dashboard-sidebar.md:31:
+  debug_reports/_SIGNAL.txt:1201:> debug_reports\DEBUG_components_dashboard-sidebar.md:32:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1203:  debug_reports\DEBUG_components_dashboard-sidebar.md:33:
+  debug_reports/_SIGNAL.txt:1204:> debug_reports\DEBUG_components_dashboard-sidebar.md:34:- **Race 
+  debug_reports/_SIGNAL.txt:1208:  debug_reports\DEBUG_components_dashboard-sidebar.md:35:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1212:> debug_reports\DEBUG_components_dashboard-sidebar.md:36:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1216:  debug_reports\DEBUG_components_dashboard-sidebar.md:37:
+  debug_reports/_SIGNAL.txt:1217:  debug_reports\DEBUG_components_dashboard-sidebar.md:38:**Refactored Code**:
+  debug_reports/_SIGNAL.txt:1218:  debug_reports\DEBUG_components_dashboard-sidebar.md:39:- Ensure that any 
+  debug_reports/_SIGNAL.txt:1221:  debug_reports\DEBUG_components_dashboard-sidebar.md:40:
+  debug_reports/_SIGNAL.txt:1222:  debug_reports\DEBUG_components_dashboard-sidebar.md:41:```typescript
+  debug_reports/_SIGNAL.txt:1223:  debug_reports\DEBUG_components_dashboard-sidebar.md:42:// Example of 
+  debug_reports/_SIGNAL.txt:1384:  debug_reports\DEBUG_components_sidebar_CaseNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1386:  debug_reports\DEBUG_components_sidebar_CaseNode.md:6:
+  debug_reports/_SIGNAL.txt:1387:> debug_reports\DEBUG_components_sidebar_CaseNode.md:7:1. **Logic Defects, 
+  debug_reports/_SIGNAL.txt:1389:> debug_reports\DEBUG_components_sidebar_CaseNode.md:8:   - **Edge Case:** 
+  debug_reports/_SIGNAL.txt:1393:  debug_reports\DEBUG_components_sidebar_CaseNode.md:9:   - **Edge Case:** 
+  debug_reports/_SIGNAL.txt:1397:> debug_reports\DEBUG_components_sidebar_CaseNode.md:10:   - **Unhandled 
+  debug_reports/_SIGNAL.txt:1402:  debug_reports\DEBUG_components_sidebar_CaseNode.md:11:
+  debug_reports/_SIGNAL.txt:1403:> debug_reports\DEBUG_components_sidebar_CaseNode.md:12:2. **Race Conditions, 
+  debug_reports/_SIGNAL.txt:1405:  debug_reports\DEBUG_components_sidebar_CaseNode.md:13:   - **State Mutation 
+  debug_reports/_SIGNAL.txt:1408:> debug_reports\DEBUG_components_sidebar_CaseNode.md:14:   - **Memory 
+  debug_reports/_SIGNAL.txt:1413:  debug_reports\DEBUG_components_sidebar_CaseNode.md:15:
+  debug_reports/_SIGNAL.txt:1414:  debug_reports\DEBUG_components_sidebar_CaseNode.md:16:3. **Security Flaws:**
+  debug_reports/_SIGNAL.txt:1415:> debug_reports\DEBUG_components_sidebar_CaseNode.md:17:   - **Security 
+  debug_reports/_SIGNAL.txt:1419:  debug_reports\DEBUG_components_sidebar_CaseNode.md:18:
+  debug_reports/_SIGNAL.txt:1420:  debug_reports\DEBUG_components_sidebar_CaseNode.md:19:### Refactored Code 
+  debug_reports/_SIGNAL.txt:1422:  debug_reports\DEBUG_components_sidebar_CaseNode.md:20:
+  debug_reports/_SIGNAL.txt:1423:  debug_reports\DEBUG_components_sidebar_CaseNode.md:21:1. **Ensure 
+  debug_reports/_SIGNAL.txt:1425:  debug_reports\DEBUG_components_sidebar_CaseNode.md:22:   - If 
+  debug_reports/_SIGNAL.txt:1428:  debug_reports\DEBUG_components_sidebar_CaseNode.md:23:
+  debug_reports/_SIGNAL.txt:1429:  debug_reports\DEBUG_components_sidebar_CaseNode.md:54:
+  debug_reports/_SIGNAL.txt:1430:  debug_reports\DEBUG_components_sidebar_CaseNode.md:55:2. **Sanitize Input 
+  debug_reports/_SIGNAL.txt:1432:> debug_reports\DEBUG_components_sidebar_CaseNode.md:56:   - If `caseData` or 
+  debug_reports/_SIGNAL.txt:1435:  debug_reports\DEBUG_components_sidebar_CaseNode.md:57:
+  debug_reports/_SIGNAL.txt:1436:  debug_reports\DEBUG_components_sidebar_CaseNode.md:58:   ```typescript
+  debug_reports/_SIGNAL.txt:1437:  debug_reports\DEBUG_components_sidebar_CaseNode.md:59:   const 
+  debug_reports/_SIGNAL.txt:1439:  debug_reports\DEBUG_components_sidebar_CaseNode.md:60:     // Implement 
+  debug_reports/_SIGNAL.txt:1441:  debug_reports\DEBUG_components_sidebar_CaseNode.md:61:     return 
+  debug_reports/_SIGNAL.txt:1443:  debug_reports\DEBUG_components_sidebar_CaseNode.md:62:   };
+  debug_reports/_SIGNAL.txt:1444:  debug_reports\DEBUG_components_sidebar_CaseNode.md:97:
+  debug_reports/_SIGNAL.txt:1445:  debug_reports\DEBUG_components_sidebar_CaseNode.md:98:- **Logic Defects:** 
+  debug_reports/_SIGNAL.txt:1447:> debug_reports\DEBUG_components_sidebar_CaseNode.md:99:- **Security Flaws:** 
+  debug_reports/_SIGNAL.txt:1449:  debug_reports\DEBUG_components_sidebar_CaseNode.md:100:- **Refactored 
+  debug_reports/_SIGNAL.txt:1452:  debug_reports\DEBUG_components_sidebar_CaseNode.md:101:
+  debug_reports/_SIGNAL.txt:1453:  debug_reports\DEBUG_components_sidebar_CaseNode.md:102:These changes will 
+  debug_reports/_SIGNAL.txt:1455:  debug_reports\DEBUG_components_sidebar_ClientNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1457:  debug_reports\DEBUG_components_sidebar_ClientNode.md:6:
+  debug_reports/_SIGNAL.txt:1458:> debug_reports\DEBUG_components_sidebar_ClientNode.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1460:  debug_reports\DEBUG_components_sidebar_ClientNode.md:8:
+  debug_reports/_SIGNAL.txt:1461:> debug_reports\DEBUG_components_sidebar_ClientNode.md:9:- **Edge Case**: The 
+  debug_reports/_SIGNAL.txt:1464:  debug_reports\DEBUG_components_sidebar_ClientNode.md:10:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1466:  debug_reports\DEBUG_components_sidebar_ClientNode.md:11:
+  debug_reports/_SIGNAL.txt:1467:> debug_reports\DEBUG_components_sidebar_ClientNode.md:12:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1470:> debug_reports\DEBUG_components_sidebar_ClientNode.md:13:  - **Fix**: Wrap 
+  debug_reports/_SIGNAL.txt:1472:  debug_reports\DEBUG_components_sidebar_ClientNode.md:14:
+  debug_reports/_SIGNAL.txt:1473:> debug_reports\DEBUG_components_sidebar_ClientNode.md:15:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1475:  debug_reports\DEBUG_components_sidebar_ClientNode.md:16:
+  debug_reports/_SIGNAL.txt:1476:> debug_reports\DEBUG_components_sidebar_ClientNode.md:17:- **Race 
+  debug_reports/_SIGNAL.txt:1479:  debug_reports\DEBUG_components_sidebar_ClientNode.md:18:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1482:  debug_reports\DEBUG_components_sidebar_ClientNode.md:19:
+  debug_reports/_SIGNAL.txt:1483:  debug_reports\DEBUG_components_sidebar_ClientNode.md:20:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1486:  debug_reports\DEBUG_components_sidebar_ClientNode.md:21:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1489:  debug_reports\DEBUG_components_sidebar_ClientNode.md:22:
+  debug_reports/_SIGNAL.txt:1490:> debug_reports\DEBUG_components_sidebar_ClientNode.md:23:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1494:  debug_reports\DEBUG_components_sidebar_ClientNode.md:24:  - **Fix**: Use 
+  debug_reports/_SIGNAL.txt:1497:  debug_reports\DEBUG_components_sidebar_ClientNode.md:25:
+  debug_reports/_SIGNAL.txt:1498:  debug_reports\DEBUG_components_sidebar_ClientNode.md:26:#### 3. Security 
+  debug_reports/_SIGNAL.txt:1500:  debug_reports\DEBUG_components_sidebar_ClientNode.md:27:
+  debug_reports/_SIGNAL.txt:1501:  debug_reports\DEBUG_components_sidebar_ClientNode.md:28:- **Security 
+  debug_reports/_SIGNAL.txt:1504:  debug_reports\DEBUG_components_sidebar_ClientNode.md:29:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1506:  debug_reports\DEBUG_components_sidebar_ClientNode.md:37:  **Explanation**: 
+  debug_reports/_SIGNAL.txt:1508:  debug_reports\DEBUG_components_sidebar_ClientNode.md:38:
+  debug_reports/_SIGNAL.txt:1509:> debug_reports\DEBUG_components_sidebar_ClientNode.md:39:- **Fix for 
+  debug_reports/_SIGNAL.txt:1511:  debug_reports\DEBUG_components_sidebar_ClientNode.md:40:  ```typescript
+  debug_reports/_SIGNAL.txt:1512:  debug_reports\DEBUG_components_sidebar_ClientNode.md:41:  try {
+  debug_reports/_SIGNAL.txt:1513:  debug_reports\DEBUG_components_sidebar_ClientNode.md:42:    await 
+  debug_reports/_SIGNAL.txt:1515:  debug_reports\DEBUG_components_sidebar_ClientNode.md:43:  } catch (error) {
+  debug_reports/_SIGNAL.txt:1516:  debug_reports\DEBUG_components_sidebar_ClientNode.md:44:    
+  debug_reports/_SIGNAL.txt:1518:  debug_reports\DEBUG_components_sidebar_ClientNode.md:45:  }
+  debug_reports/_SIGNAL.txt:1519:  debug_reports\DEBUG_components_sidebar_ClientNode.md:46:  ```
+  debug_reports/_SIGNAL.txt:1520:> debug_reports\DEBUG_components_sidebar_ClientNode.md:47:  **Explanation**: 
+  debug_reports/_SIGNAL.txt:1523:  debug_reports\DEBUG_components_sidebar_ClientNode.md:48:
+  debug_reports/_SIGNAL.txt:1524:  debug_reports\DEBUG_components_sidebar_ClientNode.md:49:- **Fix for Safe 
+  debug_reports/_SIGNAL.txt:1526:  debug_reports\DEBUG_components_sidebar_ClientNode.md:50:  ```typescript
+  debug_reports/_SIGNAL.txt:1527:  debug_reports\DEBUG_components_sidebar_ClientNode.md:51:  {cases.length === 
+  debug_reports/_SIGNAL.txt:1529:  debug_reports\DEBUG_components_sidebar_ClientNode.md:52:    <div 
+  debug_reports/_SIGNAL.txt:1531:  debug_reports\DEBUG_components_sidebar_ClientNode.md:53:      No cases yet
+  debug_reports/_SIGNAL.txt:1532:  debug_reports\DEBUG_components_sidebar_ClientNode.md:133:
+  debug_reports/_SIGNAL.txt:1533:  debug_reports\DEBUG_components_sidebar_ClientNode.md:134:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1535:> debug_reports\DEBUG_components_sidebar_ClientNode.md:135:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1537:  debug_reports\DEBUG_components_sidebar_ClientNode.md:136:- **Safe Empty 
+  debug_reports/_SIGNAL.txt:1539:  debug_reports\DEBUG_components_sidebar_ClientNode.md:137:- **Safe Map**: 
+  debug_reports/_SIGNAL.txt:1541:  debug_reports\DEBUG_components_sidebar_ClientNode.md:138:
+  debug_reports/_SIGNAL.txt:1542:  debug_reports\DEBUG_components_sidebar_ClientNode.md:139:These fixes will 
+  debug_reports/_SIGNAL.txt:1544:  debug_reports\DEBUG_components_sidebar_EditableName.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1546:  debug_reports\DEBUG_components_sidebar_EditableName.md:6:
+  debug_reports/_SIGNAL.txt:1547:> debug_reports\DEBUG_components_sidebar_EditableName.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1549:  debug_reports\DEBUG_components_sidebar_EditableName.md:8:
+  debug_reports/_SIGNAL.txt:1550:> debug_reports\DEBUG_components_sidebar_EditableName.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1554:  debug_reports\DEBUG_components_sidebar_EditableName.md:10:  - **Fix**: Add 
+  debug_reports/_SIGNAL.txt:1556:  debug_reports\DEBUG_components_sidebar_EditableName.md:11:    ```typescript
+  debug_reports/_SIGNAL.txt:1557:  debug_reports\DEBUG_components_sidebar_EditableName.md:12:    const 
+  debug_reports/_SIGNAL.txt:1559:  debug_reports\DEBUG_components_sidebar_EditableName.md:13:      const 
+  debug_reports/_SIGNAL.txt:1561:  debug_reports\DEBUG_components_sidebar_EditableName.md:14:
+  debug_reports/_SIGNAL.txt:1562:  debug_reports\DEBUG_components_sidebar_EditableName.md:15:      if 
+  debug_reports/_SIGNAL.txt:1564:  debug_reports\DEBUG_components_sidebar_EditableName.md:30:    ```
+  debug_reports/_SIGNAL.txt:1565:  debug_reports\DEBUG_components_sidebar_EditableName.md:31:
+  debug_reports/_SIGNAL.txt:1566:> debug_reports\DEBUG_components_sidebar_EditableName.md:32:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1568:  debug_reports\DEBUG_components_sidebar_EditableName.md:33:
+  debug_reports/_SIGNAL.txt:1569:  debug_reports\DEBUG_components_sidebar_EditableName.md:34:- **State 
+  debug_reports/_SIGNAL.txt:1573:  debug_reports\DEBUG_components_sidebar_EditableName.md:35:  - **Fix**: 
+  debug_reports/_SIGNAL.txt:1577:  debug_reports\DEBUG_components_sidebar_EditableName.md:36:    ```typescript
+  debug_reports/_SIGNAL.txt:1578:  debug_reports\DEBUG_components_sidebar_EditableName.md:37:    const 
+  debug_reports/_SIGNAL.txt:1580:  debug_reports\DEBUG_components_sidebar_EditableName.md:38:      const 
+  debug_reports/_SIGNAL.txt:1582:  debug_reports\DEBUG_components_sidebar_EditableText.md:5:### Analysis of 
+  debug_reports/_SIGNAL.txt:1584:  debug_reports\DEBUG_components_sidebar_EditableText.md:6:
+  debug_reports/_SIGNAL.txt:1585:> debug_reports\DEBUG_components_sidebar_EditableText.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1587:  debug_reports\DEBUG_components_sidebar_EditableText.md:8:
+  debug_reports/_SIGNAL.txt:1588:  debug_reports\DEBUG_components_sidebar_EditableText.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1592:> debug_reports\DEBUG_components_sidebar_EditableText.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1595:  debug_reports\DEBUG_components_sidebar_EditableText.md:11:
+  debug_reports/_SIGNAL.txt:1596:> debug_reports\DEBUG_components_sidebar_EditableText.md:12:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1598:  debug_reports\DEBUG_components_sidebar_EditableText.md:13:
+  debug_reports/_SIGNAL.txt:1599:> debug_reports\DEBUG_components_sidebar_EditableText.md:14:- **Race 
+  debug_reports/_SIGNAL.txt:1604:  debug_reports\DEBUG_components_sidebar_EditableText.md:15:- **State 
+  debug_reports/_SIGNAL.txt:1606:> debug_reports\DEBUG_components_sidebar_EditableText.md:16:- **Memory 
+  debug_reports/_SIGNAL.txt:1608:  debug_reports\DEBUG_components_sidebar_EditableText.md:17:
+  debug_reports/_SIGNAL.txt:1609:  debug_reports\DEBUG_components_sidebar_EditableText.md:18:#### 3. Security 
+  debug_reports/_SIGNAL.txt:1611:  debug_reports\DEBUG_components_sidebar_EditableText.md:19:
+  debug_reports/_SIGNAL.txt:1612:  debug_reports\DEBUG_components_sidebar_EditableText.md:20:- **Security 
+  debug_reports/_SIGNAL.txt:1614:  debug_reports\DEBUG_components_sidebar_EditableText.md:21:
+  debug_reports/_SIGNAL.txt:1615:  debug_reports\DEBUG_components_sidebar_EditableText.md:22:#### 4. Concrete 
+  debug_reports/_SIGNAL.txt:1617:  debug_reports\DEBUG_components_sidebar_EditableText.md:23:
+  debug_reports/_SIGNAL.txt:1618:> debug_reports\DEBUG_components_sidebar_EditableText.md:24:1. **Fix Race 
+  debug_reports/_SIGNAL.txt:1620:  debug_reports\DEBUG_components_sidebar_EditableText.md:25:   - 
+  debug_reports/_SIGNAL.txt:1623:  debug_reports\DEBUG_components_sidebar_EditableText.md:26:   - **Refactored 
+  debug_reports/_SIGNAL.txt:1625:  debug_reports\DEBUG_components_sidebar_EditableText.md:27:     ```typescript
+  debug_reports/_SIGNAL.txt:1626:  debug_reports\DEBUG_components_sidebar_EditableText.md:28:     
+  debug_reports/_SIGNAL.txt:1628:  debug_reports\DEBUG_components_sidebar_EditableText.md:29:       
+  debug_reports/_SIGNAL.txt:1630:  debug_reports\DEBUG_components_sidebar_EditableText.md:30:     }, [value]);
+  debug_reports/_SIGNAL.txt:1631:  debug_reports\DEBUG_components_sidebar_EditableText.md:112:### Summary
+  debug_reports/_SIGNAL.txt:1632:  debug_reports\DEBUG_components_sidebar_EditableText.md:113:
+  debug_reports/_SIGNAL.txt:1633:> debug_reports\DEBUG_components_sidebar_EditableText.md:114:- **Logic 
+  debug_reports/_SIGNAL.txt:1635:  debug_reports\DEBUG_components_sidebar_EditableText.md:115:- **Edge 
+  debug_reports/_SIGNAL.txt:1638:> debug_reports\DEBUG_components_sidebar_EditableText.md:116:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1641:> debug_reports\DEBUG_components_sidebar_EditableText.md:117:- **Race 
+  debug_reports/_SIGNAL.txt:1644:  debug_reports\DEBUG_components_sidebar_EditableText.md:118:- **State 
+  debug_reports/_SIGNAL.txt:1646:> debug_reports\DEBUG_components_sidebar_EditableText.md:119:- **Memory 
+  debug_reports/_SIGNAL.txt:1648:  debug_reports\DEBUG_components_sidebar_EditableText.md:120:- **Security 
+  debug_reports/_SIGNAL.txt:1650:  debug_reports\DEBUG_components_sidebar_SessionNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1652:  debug_reports\DEBUG_components_sidebar_SessionNode.md:6:
+  debug_reports/_SIGNAL.txt:1653:> debug_reports\DEBUG_components_sidebar_SessionNode.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1655:  debug_reports\DEBUG_components_sidebar_SessionNode.md:8:
+  debug_reports/_SIGNAL.txt:1656:  debug_reports\DEBUG_components_sidebar_SessionNode.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1660:> debug_reports\DEBUG_components_sidebar_SessionNode.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1665:  debug_reports\DEBUG_components_sidebar_SessionNode.md:11:
+  debug_reports/_SIGNAL.txt:1666:  debug_reports\DEBUG_components_sidebar_SessionNode.md:12:**Fix**:
+  debug_reports/_SIGNAL.txt:1667:  debug_reports\DEBUG_components_sidebar_SessionNode.md:13:- Add a check to 
+  debug_reports/_SIGNAL.txt:1669:  debug_reports\DEBUG_components_sidebar_SessionNode.md:14:- Handle potential 
+  debug_reports/_SIGNAL.txt:1671:  debug_reports\DEBUG_components_sidebar_SessionNode.md:15:
+  debug_reports/_SIGNAL.txt:1672:  debug_reports\DEBUG_components_sidebar_SessionNode.md:16:```typescript
+  debug_reports/_SIGNAL.txt:1673:  debug_reports\DEBUG_components_sidebar_SessionNode.md:35:```
+  debug_reports/_SIGNAL.txt:1674:  debug_reports\DEBUG_components_sidebar_SessionNode.md:36:
+  debug_reports/_SIGNAL.txt:1675:> debug_reports\DEBUG_components_sidebar_SessionNode.md:37:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1677:  debug_reports\DEBUG_components_sidebar_SessionNode.md:38:
+  debug_reports/_SIGNAL.txt:1678:> debug_reports\DEBUG_components_sidebar_SessionNode.md:39:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1682:  debug_reports\DEBUG_components_sidebar_SessionNode.md:40:
+  debug_reports/_SIGNAL.txt:1683:  debug_reports\DEBUG_components_sidebar_SessionNode.md:41:**Fix**:
+  debug_reports/_SIGNAL.txt:1684:  debug_reports\DEBUG_components_sidebar_SessionNode.md:42:- Clear the 
+  debug_reports/_SIGNAL.txt:1686:  debug_reports\DEBUG_components_sidebar_SessionNode.md:43:
+  debug_reports/_SIGNAL.txt:1687:  debug_reports\DEBUG_components_sidebar_SessionNode.md:44:```typescript
+  debug_reports/_SIGNAL.txt:1688:  debug_reports\DEBUG_components_sidebar_SessionNode.md:45:import { useEffect 
+  debug_reports/_SIGNAL.txt:1690:  debug_reports\DEBUG_components_sidebar_Sidebar.md:5:### Analysis of 
+  debug_reports/_SIGNAL.txt:1691:`Sidebar.tsx`
+  debug_reports/_SIGNAL.txt:1692:  debug_reports\DEBUG_components_sidebar_Sidebar.md:6:
+  debug_reports/_SIGNAL.txt:1693:> debug_reports\DEBUG_components_sidebar_Sidebar.md:7:#### 1. Logic Defects, 
+  debug_reports/_SIGNAL.txt:1695:  debug_reports\DEBUG_components_sidebar_Sidebar.md:8:- **Logic Defects**: 
+  debug_reports/_SIGNAL.txt:1698:> debug_reports\DEBUG_components_sidebar_Sidebar.md:9:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1701:  debug_reports\DEBUG_components_sidebar_Sidebar.md:10:
+  debug_reports/_SIGNAL.txt:1702:> debug_reports\DEBUG_components_sidebar_Sidebar.md:11:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1704:> debug_reports\DEBUG_components_sidebar_Sidebar.md:12:- **Race Conditions**: 
+  debug_reports/_SIGNAL.txt:1707:  debug_reports\DEBUG_components_sidebar_Sidebar.md:13:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1710:> debug_reports\DEBUG_components_sidebar_Sidebar.md:14:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1713:  debug_reports\DEBUG_components_sidebar_Sidebar.md:15:
+  debug_reports/_SIGNAL.txt:1714:  debug_reports\DEBUG_components_sidebar_Sidebar.md:16:#### 3. Security Flaws
+  debug_reports/_SIGNAL.txt:1715:> debug_reports\DEBUG_components_sidebar_Sidebar.md:17:- **Supabase RLS 
+  debug_reports/_SIGNAL.txt:1718:> debug_reports\DEBUG_components_sidebar_Sidebar.md:18:- **Credential 
+  debug_reports/_SIGNAL.txt:1721:  debug_reports\DEBUG_components_sidebar_Sidebar.md:19:- **Improper Input 
+  debug_reports/_SIGNAL.txt:1724:  debug_reports\DEBUG_components_sidebar_Sidebar.md:20:
+  debug_reports/_SIGNAL.txt:1725:  debug_reports\DEBUG_components_sidebar_Sidebar.md:21:### Refactored Code 
+  debug_reports/_SIGNAL.txt:1727:  debug_reports\DEBUG_components_sidebar_Sidebar.md:22:
+  debug_reports/_SIGNAL.txt:1728:  debug_reports\DEBUG_components_sidebar_Sidebar.md:23:Since the code does 
+  debug_reports/_SIGNAL.txt:1730:  debug_reports\DEBUG_components_sidebar_Sidebar.md:24:
+  debug_reports/_SIGNAL.txt:1731:  debug_reports\DEBUG_components_sidebar_Sidebar.md:25:### Summary
+  debug_reports/_SIGNAL.txt:1732:  debug_reports\DEBUG_components_sidebar_Sidebar.md:26:
+  debug_reports/_SIGNAL.txt:1733:> debug_reports\DEBUG_components_sidebar_Sidebar.md:27:The `Sidebar.tsx` 
+  debug_reports/_SIGNAL.txt:2462:  debug_reports\DEBUG_components_ui_carousel.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:2464:  debug_reports\DEBUG_components_ui_carousel.md:6:
+  debug_reports/_SIGNAL.txt:2465:> debug_reports\DEBUG_components_ui_carousel.md:7:#### 1. Logic Defects, Edge 
+  debug_reports/_SIGNAL.txt:2467:  debug_reports\DEBUG_components_ui_carousel.md:8:
+  debug_reports/_SIGNAL.txt:2468:  debug_reports\DEBUG_components_ui_carousel.md:9:- **Edge Case: Orientation 
+  debug_reports/_SIGNAL.txt:2470:  debug_reports\DEBUG_components_ui_carousel.md:10:  - The `orientation` prop 
+  debug_reports/_SIGNAL.txt:2473:  debug_reports\DEBUG_components_ui_carousel.md:11:  - **Fix:** Add 
+  debug_reports/_SIGNAL.txt:2476:  debug_reports\DEBUG_components_ui_carousel.md:12:
+  debug_reports/_SIGNAL.txt:2477:  debug_reports\DEBUG_components_ui_carousel.md:13:- **Edge Case: `setApi` 
+  debug_reports/_SIGNAL.txt:2479:  debug_reports\DEBUG_components_ui_carousel.md:15:  - **Fix:** Add 
+  debug_reports/_SIGNAL.txt:2481:  debug_reports\DEBUG_components_ui_carousel.md:16:
+  debug_reports/_SIGNAL.txt:2482:> debug_reports\DEBUG_components_ui_carousel.md:17:- **Unhandled 
+  debug_reports/_SIGNAL.txt:2484:  debug_reports\DEBUG_components_ui_carousel.md:18:  - The `useEmblaCarousel` 
+  debug_reports/_SIGNAL.txt:2485:hook does not handle promise rejections. If the carousel initialization 
+  debug_reports/_SIGNAL.txt:2487:  debug_reports\DEBUG_components_ui_carousel.md:19:  - **Fix:** Wrap the 
+  debug_reports/_SIGNAL.txt:2488:`useEmblaCarousel` call in a try-catch block to handle any potential errors.
+  debug_reports/_SIGNAL.txt:2489:  debug_reports\DEBUG_components_ui_carousel.md:20:
+  debug_reports/_SIGNAL.txt:2490:> debug_reports\DEBUG_components_ui_carousel.md:21:#### 2. Race Conditions, 
+  debug_reports/_SIGNAL.txt:2492:  debug_reports\DEBUG_components_ui_carousel.md:22:
+  debug_reports/_SIGNAL.txt:2493:  debug_reports\DEBUG_components_ui_carousel.md:23:- **State Mutation Bug: 
+  debug_reports/_SIGNAL.txt:2495:> debug_reports\DEBUG_components_ui_carousel.md:24:  - The state updates in 
+  debug_reports/_SIGNAL.txt:2498:  debug_reports\DEBUG_components_ui_carousel.md:25:  - **Fix:** Use 
+  debug_reports/_SIGNAL.txt:2500:  debug_reports\DEBUG_components_ui_carousel.md:26:
+  debug_reports/_SIGNAL.txt:2501:> debug_reports\DEBUG_components_ui_carousel.md:27:- **Memory Leak: Event 
+  debug_reports/_SIGNAL.txt:2503:> debug_reports\DEBUG_components_ui_carousel.md:28:  - The event listeners 
+  debug_reports/_SIGNAL.txt:2505:  debug_reports\DEBUG_components_ui_carousel.md:29:  - **Fix:** Ensure that 
+  debug_reports/_SIGNAL.txt:2507:  debug_reports\DEBUG_components_ui_carousel.md:30:
+  debug_reports/_SIGNAL.txt:2508:  debug_reports\DEBUG_components_ui_carousel.md:31:#### 3. Security Flaws
+  debug_reports/_SIGNAL.txt:2509:  debug_reports\DEBUG_components_ui_carousel.md:32:
+  debug_reports/_SIGNAL.txt:2510:  debug_reports\DEBUG_components_ui_carousel.md:33:- **Security Flaws: No 
+  debug_reports/_SIGNAL.txt:2512:  debug_reports\DEBUG_components_ui_carousel.md:34:  - The provided code does 
+  debug_reports/_SIGNAL.txt:4168:  debug_reports\DEBUG_components_ui_sidebar.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:4170:  debug_reports\DEBUG_components_ui_sidebar.md:6:
+  debug_reports/_SIGNAL.txt:4171:> debug_reports\DEBUG_components_ui_sidebar.md:7:#### 1. Logic Defects, Edge 
+  debug_reports/_SIGNAL.txt:4173:  debug_reports\DEBUG_components_ui_sidebar.md:8:
+  debug_reports/_SIGNAL.txt:4174:  debug_reports\DEBUG_components_ui_sidebar.md:9:- **Edge Case: Cookie 
+  debug_reports/_SIGNAL.txt:4176:> debug_reports\DEBUG_components_ui_sidebar.md:10:  - The cookie handling 
+  debug_reports/_SIGNAL.txt:4180:  debug_reports\DEBUG_components_ui_sidebar.md:11:  - **Refactored Code:**
+  debug_reports/_SIGNAL.txt:4181:  debug_reports\DEBUG_components_ui_sidebar.md:12:    ```typescript
+  debug_reports/_SIGNAL.txt:4182:  debug_reports\DEBUG_components_ui_sidebar.md:13:    try {
+  debug_reports/_SIGNAL.txt:4183:  debug_reports\DEBUG_components_ui_sidebar.md:14:      document.cookie = 
+  debug_reports/_SIGNAL.txt:4184:`${SIDEBAR_COOKIE_NAME}=${openState}; path=/; 
+  debug_reports/_SIGNAL.txt:4185:max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  debug_reports/_SIGNAL.txt:4186:  debug_reports\DEBUG_components_ui_sidebar.md:15:    } catch (error) {
+  debug_reports/_SIGNAL.txt:4187:  debug_reports\DEBUG_components_ui_sidebar.md:16:      console.error('Failed 
+  debug_reports/_SIGNAL.txt:4188:to set sidebar cookie:', error);
+  debug_reports/_SIGNAL.txt:4189:  debug_reports\DEBUG_components_ui_sidebar.md:25:      if (
+  debug_reports/_SIGNAL.txt:4190:  debug_reports\DEBUG_components_ui_sidebar.md:26:        event.key === 
+  debug_reports/_SIGNAL.txt:4191:SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/_SIGNAL.txt:4192:> debug_reports\DEBUG_components_ui_sidebar.md:27:        (event.metaKey !== 
+  debug_reports/_SIGNAL.txt:4194:  debug_reports\DEBUG_components_ui_sidebar.md:28:      ) {
+  debug_reports/_SIGNAL.txt:4195:  debug_reports\DEBUG_components_ui_sidebar.md:29:        
+  debug_reports/_SIGNAL.txt:4197:  debug_reports\DEBUG_components_ui_sidebar.md:30:        toggleSidebar();
+  debug_reports/_SIGNAL.txt:4198:  debug_reports\DEBUG_components_ui_sidebar.md:31:      }
+  debug_reports/_SIGNAL.txt:4199:  debug_reports\DEBUG_components_ui_sidebar.md:32:    };
+  debug_reports/_SIGNAL.txt:4200:  debug_reports\DEBUG_components_ui_sidebar.md:33:    ```
+  debug_reports/_SIGNAL.txt:4201:  debug_reports\DEBUG_components_ui_sidebar.md:34:
+  debug_reports/_SIGNAL.txt:4202:> debug_reports\DEBUG_components_ui_sidebar.md:35:#### 2. Race Conditions, 
+  debug_reports/_SIGNAL.txt:4204:  debug_reports\DEBUG_components_ui_sidebar.md:36:
+  debug_reports/_SIGNAL.txt:4205:  debug_reports\DEBUG_components_ui_sidebar.md:37:- **State Mutation Bug: 
+  debug_reports/_SIGNAL.txt:4207:  debug_reports\DEBUG_components_ui_sidebar.md:38:  - The `openMobile` state 
+  debug_reports/_SIGNAL.txt:4208:is managed within the `SidebarProvider`, but it is not exposed to the 
+  debug_reports/_SIGNAL.txt:4212:  debug_reports\DEBUG_components_ui_sidebar.md:39:  - **Refactored Code:**
+  debug_reports/_SIGNAL.txt:4213:  debug_reports\DEBUG_components_ui_sidebar.md:40:    - Expose `openMobile` 
+  debug_reports/_SIGNAL.txt:4214:and `setOpenMobile` in the `SidebarContext` so that the consumer can control 
+  debug_reports/_SIGNAL.txt:4216:  debug_reports\DEBUG_components_ui_sidebar.md:41:
+  debug_reports/_SIGNAL.txt:4217:  debug_reports\DEBUG_components_ui_sidebar.md:65:    if (
+  debug_reports/_SIGNAL.txt:4218:  debug_reports\DEBUG_components_ui_sidebar.md:66:      event.key === 
+  debug_reports/_SIGNAL.txt:4219:SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/_SIGNAL.txt:4220:> debug_reports\DEBUG_components_ui_sidebar.md:67:      (event.metaKey !== 
+  debug_reports/_SIGNAL.txt:4222:  debug_reports\DEBUG_components_ui_sidebar.md:68:    ) {
+  debug_reports/_SIGNAL.txt:4223:  debug_reports\DEBUG_components_ui_sidebar.md:69:      
+  debug_reports/_SIGNAL.txt:4225:  debug_reports\DEBUG_components_ui_sidebar.md:70:      toggleSidebar();
+  debug_reports/_SIGNAL.txt:4226:  debug_reports\DEBUG_components_ui_sidebar.md:71:    }
+  debug_reports/_SIGNAL.txt:4227:  debug_reports\DEBUG_components_ui_sidebar.md:72:  };
+  debug_reports/_SIGNAL.txt:4228:  debug_reports\DEBUG_components_ui_sidebar.md:73:  ```
+  debug_reports/gates_dead_file_sweep_20261010.txt:21:./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+  debug_reports/gates_dead_file_sweep_20261010.txt:34:./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+  debug_reports/gates_dead_file_sweep_20261010.txt:40:./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+  debug_reports/gates_dead_file_sweep_20261010.txt:41:./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+  debug_reports/gates_dead_file_sweep_20261010.txt:594:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/gates_dead_file_sweep_20261010.txt:618:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:621:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:624:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:665:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:674:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/gates_dead_file_sweep_20261010.txt:683:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:688:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/gates_lint_8a_20261010.txt:256:M	components/sidebar/CaseNode.tsx
+  debug_reports/gates_lint_8a_20261010.txt:257:M	components/sidebar/ClientNode.tsx
+  debug_reports/gates_lint_8a_20261010.txt:258:M	components/sidebar/EditableName.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:364:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:388:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:391:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:394:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:435:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:444:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:453:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:458:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8a_after_20261010.txt:132:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8a_after_20261010.txt:192:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8a_after_20261010.txt:201:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8a_after_20261010.txt:210:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8a_after_20261010.txt:215:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8a_before_20261010.txt:138:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8a_before_20261010.txt:162:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_8a_before_20261010.txt:165:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_8a_before_20261010.txt:168:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_8a_before_20261010.txt:209:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8a_before_20261010.txt:218:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8a_before_20261010.txt:227:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8a_before_20261010.txt:232:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8b_after_20261010.txt:133:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8b_after_20261010.txt:193:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8b_after_20261010.txt:202:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8b_after_20261010.txt:211:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8b_after_20261010.txt:216:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8b_before_20261010.txt:136:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8b_before_20261010.txt:196:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8b_before_20261010.txt:205:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8b_before_20261010.txt:214:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8b_before_20261010.txt:219:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8c_after_20261010.txt:120:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8c_after_20261010.txt:180:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8c_after_20261010.txt:189:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8c_after_20261010.txt:198:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8c_after_20261010.txt:203:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8c_before_20261010.txt:133:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8c_before_20261010.txt:193:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8c_before_20261010.txt:202:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8c_before_20261010.txt:211:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8c_before_20261010.txt:216:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:164:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:188:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:191:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:194:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:235:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:244:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:253:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:258:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:165:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:189:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:192:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:195:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:236:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:245:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:254:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:259:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_triage_post_card6_20261010.txt:142:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_triage_post_card6_20261010.txt:166:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:169:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:172:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:213:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:222:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_triage_post_card6_20261010.txt:231:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:236:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  documentation.md:60:**Two views** (`app/dashboard/page.tsx`, toggled in `components/dashboard-sidebar.tsx`):
+  documentation.md:91:| `app/dashboard/page.tsx` | Authenticated shell — client landing → sidebar + clinician/client view |
+  documentation.md:99:| `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-shell`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
+  documentation.md:271:The sidebar UI is `components/sidebar/ClientNode.tsx` → `CaseNode.tsx` → `SessionNode.tsx`, with
+  documentation.md:279:whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
+  documentation.md:283:The shell that hosts the sidebar — `components/dashboard-shell.tsx`, which
+  documentation.md:288:`DashboardSidebar` element — never a second copy — traps focus, closes on Escape or its built-in
+  documentation.md:365:  **Copy client link** / **Open client link** actions in the sidebar (§4.4). The Worker signs
+  documentation.md:795:| `/dashboard` | guarded | client landing → sidebar + clinician/client view |
+  documentation.md:888:- `components/dashboard-shell.tsx` owns the responsive sidebar (§4.4). `lg` — the media query
+  documentation.md:894:  one `DashboardSidebar` — the static `hidden lg:flex` wrapper, or the sheet below `lg` — and a
+  documentation.md:898:  sidebar at 390px, and a viewport change inside the same mode (an on-screen keyboard, say) leaves
+  documentation.md:903:  768px breakpoint would not line up with the `lg` chrome, leaving the sidebar unreachable between
+  documentation.md:1246:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope. All four remaining members of this row are gone as of 2026-10-10: `components/clinical-folder-tree.tsx`, `components/ui/use-toast.ts` (dup of `hooks/use-toast.ts`), `components/ui/use-mobile.tsx` (dup of `hooks/use-mobile.ts`) and `components/ui/sonner.tsx` (a second `Toaster` no call site mounted) were each proved unreferenced by a per-file repo-wide search and deleted; the `sonner` dependency is now unused and is a listed recommendation, not a change. Full evidence: `debug_reports/DEAD_FILE_SWEEP_20261010.md` |
+  documentation.md:1268:| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extending `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`, with `eslint-config-next` pinned to the installed `next` 16.2.4. It lints 130 files and exits **0**: 0 errors / 98 warnings (tree `cb3ac3a`). After the 2026-10-10 dead-file sweep (§13.3) the same command reports the same **0 errors** and **91 warnings** — every one of the seven removed findings sat in a deleted file. Its `patch-*.js` CommonJS override now matches no file; it is left for the lint triage, which owns `eslint.config.mjs`. The gate install deliberately did not remediate source — its first run was 73 errors / 29 warnings — so it encodes seven documented exceptions, each with a one-line reason in the config: `@typescript-eslint/no-explicit-any` → `warn` (51 sites of accumulated `any`), `react-hooks/set-state-in-effect` → `warn` (14 sites of the set-state-in-effect pattern), `react-hooks/refs` → `warn` (originally 1 site, `ReflectionCanvas.tsx`; **0 sites after rank 8c**, so the downgrade is now dead and is proposed for deletion at rank 8f), `react-hooks/purity` → `warn` (1 site, `Math.random` in `components/ui/sidebar.tsx`; **0 sites after rank 8d**, which deleted that file, so this downgrade is dead too and is likewise proposed for deletion at rank 8f), `react/no-unescaped-entities` → `warn` (2 one-line apostrophe escapes), `@typescript-eslint/no-require-imports` off for the three root CommonJS `patch-*.js` maintenance scripts, and `@typescript-eslint/ban-ts-comment` off under `backend/` (the Worker's deliberate `@ts-nocheck`). Downgraded rules stay visible in every run rather than being ignored. Deliberately **not** wired into `.githooks`: a pre-commit lint step against this baseline would block every future commit. The 91-warning baseline was triaged on 2026-10-10 into a classified register — every finding assigned to class A (correctness bug), B (real defect, low impact), C (dead code), D (type/style) or E (false positive / config gap / moot), each with a recommended action, an effort estimate and a "can it bite a clinician" verdict, plus a ranked fix plan: `debug_reports/LINT_TRIAGE_20261010.md`. Raw post-card-6 lint output: `debug_reports/lint_triage_post_card6_20261010.txt`. The triage changed no code and no rule: it is a proposal for the operator. **Rank 1 of that plan was executed on 2026-10-10** (card `t_c2aa216a`): the 15 dead bindings of register rows C1–C6 and C8–C14 (`generateStructuredTask`, `getDefaultActivity`, `sessionContext`/`setSessionContext`, `reflectionPrompt`/`setReflectionPrompt`, `catch (err)`, `clientId`, `Upload`, `drawBackground`, `prev`, `activeTab`, `loading`, `actionTypes`, `copyFile`) and the 3 stray empty template literals at EOF of `components/main-content.tsx`, `components/sidebar/CaseNode.tsx` and `components/sidebar/ClientNode.tsx` were deleted across 10 files, and `activeTab` was also dropped from the `MainContent` call site (`app/dashboard/page.tsx`). The same command now reports 0 errors / **72 warnings** on that tree. The drop is **19, not the register's projected 18**: the register counted the C4 line only as its two `no-unused-vars` findings, but that line also carried one `@typescript-eslint/no-explicit-any` which the register had budgeted to its rank-5 `any` sweep — so that sweep now targets **50** sites, not 51, and the "51 sites" figure in the config exception above stays stale until rank 5 lands. C7 (`geistMono`) was deliberately left untouched (§7.1 rank 8b). Raw before/after lint, `tsc`, `npm test`, `npm run build` and the 13-route build diff: `debug_reports/gates_lint_8a_20261010.txt`. Rank 8b (2026-10-10, `t_c2816da0`) then applied the C7 font. `app/layout.tsx` gives the Geist Mono loader `variable: "--font-geist-mono"` and puts `${geistMono.variable}` on `<body>` beside `${geist.className}`; `app/globals.css`'s `@theme inline` token is now `--font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;` (the sans token is untouched). `npm run lint` on that tree is **0 errors / 71 warnings** — one `no-unused-vars` cleared. The built stylesheet's rule is `.font-mono{font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace}` and `--font-geist-mono` itself is emitted as `"Geist Mono", "Geist Mono Fallback"`. Two measured corrections to the triage register's §5.1: (a) the `Geist Mono` `@font-face` rules were **already emitted before** the change — Next 16.2.4 (Turbopack) writes them for the loader call whether or not the loader's class is used — so pre-change `.font-mono` was already monospaced wherever the webfont loaded; the real pre-change defects were the missing generic fallback and the dead binding. (b) The new generic `monospace` keyword is nevertheless **shadowed on the webfont-failure path**: Next's generated value of `--font-geist-mono` ends in its own `"Geist Mono Fallback"` face (`src: local(Arial)`, proportional), which wins ahead of `ui-monospace`. Measured with `*.woff2` blocked, 14/14 review-page `.font-mono` elements render proportionally before *and* after (advance test 47.84px vs 203.22px; Arial wins), while the stack's own tail `ui-monospace, SFMono-Regular, Menlo, monospace` measures monospaced (87.97px/87.97px) — so the degradation guarantee is one family-list edit away, and it is an operator call because it trades away Next's metric-adjusted fallback. `adjustFontFallback: false` was tested and does **not** remove that face under Turbopack 16.2.4. Evidence: `debug_reports/gates_lint_8b_20261010.txt`, `css_8b_before_after_20261010.txt`, `font_8b_measure_*.json` and the two screenshots `font_8b_review_webfont_{loaded,blocked}_20261010.png`. **Rank 3 of that plan — rank 8c, card `t_a948efaf` — was executed on 2026-10-10** and touched one file, `components/canvas/ReflectionCanvas.tsx`. (1) **B16**: `const [historyLen, setHistoryLen] = useState(strokesRef.current.length)` was a ref read on the render path — React evaluates the initialiser argument on *every* render and discards all but the first result — and is now `useState(() => initialData?.strokes?.length ?? 0)`, reading the same prop the ref is seeded from. (2) **B1**: the `useImperativeHandle` dependency array was `[background]`, so the handle closed over the `clientId` / `submissionId` props as of the last `background` change; `uploadReflection()` falls back to those closed-over props when called with no arguments (`submissionIdParam || submissionId`), so a caller relying on the fallback could attach a reflection image to a **stale client or submission**. The array is now `[background, clientId, submissionId]`. Both sites carry an in-place comment; no caller and no test scaffolding were added for `uploadReflection()` — it still has **zero callers**, and the change removes the latent path rather than exercising it. `npm run lint` on that tree is **0 errors / 69 warnings** (71 − 2, exactly the two intended findings). `react-hooks/refs` is now at **zero** sites, which is why the `react-hooks/refs` → `warn` downgrade above is dead and is proposed for deletion at rank 8f: removing it restores the rule to the **`error`** severity that `eslint-plugin-react-hooks` 7.0.0's `recommended-latest` config assigns (`eslint --print-config` on a probe config without the exception block reports severity 2, against 1 with it). `react-hooks/exhaustive-deps` goes 2 → **1** site and **is not a local override at all** — it is the upstream `warn` that `eslint-config-next` inherits from the plugin's `recommended` config, so rank 8c's second acceptance question has no config change to propose for it; the one remaining site is register row B10 (`components/main-content.tsx:89`, missing `fetchVignettes`). Both changes were verified in a real Chromium harness (`scratch/rc-harness`, untracked) that mounts the shipping component beside the pre-fix source extracted verbatim from `git show HEAD:components/canvas/ReflectionCanvas.tsx`, with `window.fetch` stubbed and synthetic non-PHI fixtures: the **A/B seed value is identical** (3 seeded strokes → `Undo (3)` / `Redo (0)` / "3 strokes" on both builds; no `initialData` → `Undo (0)` on both), all four mutation→counter pairs hold under real CDP mouse input (commit → `Undo (n+1)`, `Redo (0)`; undo → `Undo (n−1)`, `Redo (1)`; redo → back to `Undo (n)`, `Redo (0)`; commit after an undo discards the redo branch → `Redo (0)`; clear → `Undo (0)`, `Redo (0)`, Undo/Redo/Clear all disabled and the placeholder restored) with the DOM counters matching `exportVectorData().strokes.length` and `hasContent()` at every step, and the **B1 A/B is decisive**: after re-rendering both variants with `clientId=client-NEW` / `submissionId=submission-NEW` and `background` unchanged, a no-argument `uploadReflection()` posts `client_id=client-NEW` + `submission_id=submission-NEW` from the fixed build and the **stale** `client-OLD` / `submission-OLD` from the pre-fix build — the mis-attribution path reproduced and closed. Evidence: `debug_reports/gates_lint_8c_20261010.txt`, `lint_8c_{before,after}_20261010.txt`, `test_8c_20261010.txt`, `build_8c_after_20261010.txt`, `routes_8c_diff_20261010.txt` (empty — the route list is byte-identical to rank 8b's 13 routes), `lint_8c_reflectioncanvas_diff_20261010.txt` and `lint_8c_harness_evidence_20261010.json`. The register's adjacent §5.2 observation — that the canvas never re-syncs `strokesRef` if `initialData` changes after mount — is recorded as a **deliberate limitation, not a defect**: `initialData` is read once, at mount (as is `background`, from the same prop), because the undo/redo stacks are per-session state and adopting new props mid-session would silently discard the user's in-progress strokes; a parent that needs to load a different document remounts the component with a `key`. Neither current call site passes `initialData` (`app/practice/[sessionId]/page.tsx:208` passes no props at all; `components/vignette-generator.tsx:692` passes only `clientId` / `submissionId`), so no caller needs the behaviour. **Rank 4 of that plan — rank 8d, card `t_eaef274e` — was executed on 2026-10-10**: `components/ui/sidebar.tsx` (register row B4) and `components/ui/carousel.tsx` (B5) were deleted after a per-file reference proof of their own — the basename searched case-insensitively across every tracked file and again across the whole working tree, static `@/components/ui/...` and relative import forms, dynamic `import()` / `next/dynamic`, the repo's only two barrels (`components/canvas/index.ts`, `components/tasks/index.ts` — neither reaches `ui/`), `tsconfig.json` paths, `components.json`, `eslint.config.mjs`, the Tailwind `@source` globs (`../app`, `../components`, `../lib`, `../hooks`, `../stores` under `source(none)`) and every Markdown file. The only hits outside `debug_reports/` prose were this row's own predecessor text, the stale `eslint.config.mjs` comment, and `package.json`'s `embla-carousel-react` entry. Raw searches: `debug_reports/lint_8d_refs_20261010.txt`. `npm run lint` goes **69 → 67**, exactly the two intended findings — `react-hooks/purity` 1 → 0 (`Math.random()` in `SidebarMenuSkeleton`) and `react-hooks/set-state-in-effect` 12 → 11 (the carousel's `onSelect(api)` effect) — with `no-explicit-any` (50), `react/no-unescaped-entities` (2) and `react-hooks/exhaustive-deps` (1) unchanged and no new or increased finding; the gate now lints 128 files, not 130. The stale comment at `eslint.config.mjs:30` that named `components/ui/sidebar.tsx` as the `Math.random` site was corrected to record the zero-site state and to hand the dead downgrade to rank 8f; the rule itself is untouched, because config changes are 8f's scope (its `react-hooks/set-state-in-effect` comment still says "14 sites across 13 files" against a measured 12 → 11 — also left for 8f). The Tailwind build is the load-bearing check, and it was measured rather than assumed: deleting the files shrinks the emitted stylesheet from 152 763 to 141 957 bytes (104 individual selectors, all utilities whose only occurrences were in the two deleted files), while a token-by-token cross-check of all 7 483 class candidates in the 118 remaining live files found **zero** tokens whose rule existed before the deletion and is missing after it — the live sidebar's `focus-visible:ring-sidebar-ring`, `border-sidebar-border`, `h-9`, `bg-sidebar` and friends all survive, so nothing live was leaning on the deleted kit. `npx tsc --noEmit` exit 0, `npm test` 35/35 + 12/12 + 15/15, `npm run build` exit 0 with a byte-identical 13-route list (md5 `8dca323846944e45a21742d7a25eac1d` on both sides). Three follow-on findings recorded rather than actioned, because the register's ranked plan has no slot for them and dependencies/dead-code adjudication is an operator call: `components/ui/skeleton.tsx` and `components/ui/tooltip.tsx` each had exactly one importer before this change — the deleted `components/ui/sidebar.tsx` — so both are now unreferenced, and `embla-carousel-react` (`package.json`) has lost its only importer. Evidence: `debug_reports/gates_lint_8d_20261010.txt`, `lint_8d_{before,after}_20261010.txt`, `build_8d_after_20261010.txt`, `routes_8d_diff_20261010.txt` (empty) and `css_8d_before_after_20261010.txt`. |
+  eslint.config.mjs:30:      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+  package.json:51:    "embla-carousel-react": "8.6.0",
+
+## 2. The same search restricted to non-Markdown files (code, config, tests, scripts, workers)
+$ git grep -n -i -E "sidebar|carousel" -- . ":!*.md" ":!package-lock.json" ":!pnpm-lock.yaml"
+  app/globals.css:37:  --sidebar: oklch(1 0 0);
+  app/globals.css:38:  --sidebar-foreground: oklch(0.35 0.02 250);
+  app/globals.css:39:  --sidebar-primary: oklch(0.65 0.12 200);
+  app/globals.css:40:  --sidebar-primary-foreground: oklch(1 0 0);
+  app/globals.css:41:  --sidebar-accent: oklch(0.94 0.03 200);
+  app/globals.css:42:  --sidebar-accent-foreground: oklch(0.35 0.02 250);
+  app/globals.css:43:  --sidebar-border: oklch(0.92 0.02 240);
+  app/globals.css:44:  --sidebar-ring: oklch(0.65 0.12 200);
+  app/globals.css:72:  --sidebar: oklch(0.205 0 0);
+  app/globals.css:73:  --sidebar-foreground: oklch(0.985 0 0);
+  app/globals.css:74:  --sidebar-primary: oklch(0.488 0.243 264.376);
+  app/globals.css:75:  --sidebar-primary-foreground: oklch(0.985 0 0);
+  app/globals.css:76:  --sidebar-accent: oklch(0.269 0 0);
+  app/globals.css:77:  --sidebar-accent-foreground: oklch(0.985 0 0);
+  app/globals.css:78:  --sidebar-border: oklch(0.269 0 0);
+  app/globals.css:79:  --sidebar-ring: oklch(0.439 0 0);
+  app/globals.css:113:  --color-sidebar: var(--sidebar);
+  app/globals.css:114:  --color-sidebar-foreground: var(--sidebar-foreground);
+  app/globals.css:115:  --color-sidebar-primary: var(--sidebar-primary);
+  app/globals.css:116:  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  app/globals.css:117:  --color-sidebar-accent: var(--sidebar-accent);
+  app/globals.css:118:  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  app/globals.css:119:  --color-sidebar-border: var(--sidebar-border);
+  app/globals.css:120:  --color-sidebar-ring: var(--sidebar-ring);
+  components/dashboard-shell.tsx:3:import { DashboardSidebar } from "@/components/dashboard-sidebar";
+  components/dashboard-shell.tsx:55:  const sidebar = (
+  components/dashboard-shell.tsx:56:    <DashboardSidebar
+  components/dashboard-shell.tsx:66:      {!isMobile && <div className="hidden lg:flex">{sidebar}</div>}
+  components/dashboard-shell.tsx:68:        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-sidebar-border bg-sidebar px-3 lg:hidden">
+  components/dashboard-shell.tsx:70:            <button type="button" aria-label="Open navigation" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+  components/dashboard-shell.tsx:80:          {sidebar}
+  components/dashboard-sidebar.tsx:11:import { ClientNode } from "@/components/sidebar/ClientNode";
+  components/dashboard-sidebar.tsx:16:interface DashboardSidebarProps {
+  components/dashboard-sidebar.tsx:23:export function DashboardSidebar({
+  components/dashboard-sidebar.tsx:28:}: DashboardSidebarProps) {
+  components/dashboard-sidebar.tsx:30:    <aside className="flex h-full w-64 flex-col border-r bg-sidebar text-sidebar-foreground border-sidebar-border shrink-0">
+  components/dashboard-sidebar.tsx:50:              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:52:                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:53:                : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:63:              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:65:                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:66:                : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:94:                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:96:                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:97:                  : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:107:                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/dashboard-sidebar.tsx:109:                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+  components/dashboard-sidebar.tsx:110:                  : "hover:bg-sidebar-accent/50"
+  components/dashboard-sidebar.tsx:125:          <div className="rounded-md bg-sidebar-accent px-3 py-2 text-sm text-sidebar-accent-foreground">
+  components/dashboard-sidebar.tsx:133:      <div className="mt-auto border-t border-sidebar-border px-3 py-2">
+  components/main-content.tsx:139:                Select a session in the sidebar
+  components/sidebar/CaseNode.tsx:37:          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-sidebar-accent/50 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/CaseNode.tsx:64:            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/CaseNode.tsx:76:            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/ClientNode.tsx:32:          className="rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+  components/sidebar/EditableName.tsx:37:            className="hidden cursor-pointer rounded-md p-1 hover:bg-sidebar-accent/50 group-hover:block group-focus-within:block"
+  components/sidebar/EditableName.tsx:83:            className="rounded-md p-1 hover:bg-sidebar-accent cursor-pointer"
+  components/sidebar/SessionNode.tsx:115:        "transition-all duration-150 hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+  components/sidebar/SessionNode.tsx:116:        isSelected && "bg-sidebar-accent font-medium"
+  components/sidebar/SessionNode.tsx:139:            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:opacity-50",
+  components/sidebar/SessionNode.tsx:140:            copied ? "text-emerald-600" : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  components/sidebar/SessionNode.tsx:156:          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-sidebar-accent disabled:opacity-50"
+  components/sidebar/SessionNode.tsx:158:          <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-sidebar-accent-foreground" aria-hidden="true" />
+  components/sidebar/SessionNode.tsx:171:          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-destructive/10"
+  debug_reports/_SIGNAL.txt:1177:  debug_reports\DEBUG_components_dashboard-sidebar.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1179:  debug_reports\DEBUG_components_dashboard-sidebar.md:6:
+  debug_reports/_SIGNAL.txt:1180:> debug_reports\DEBUG_components_dashboard-sidebar.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1182:  debug_reports\DEBUG_components_dashboard-sidebar.md:8:
+  debug_reports/_SIGNAL.txt:1183:  debug_reports\DEBUG_components_dashboard-sidebar.md:9:- **Edge Case**: The 
+  debug_reports/_SIGNAL.txt:1186:> debug_reports\DEBUG_components_dashboard-sidebar.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1190:  debug_reports\DEBUG_components_dashboard-sidebar.md:11:
+  debug_reports/_SIGNAL.txt:1191:  debug_reports\DEBUG_components_dashboard-sidebar.md:12:**Refactored Code**:
+  debug_reports/_SIGNAL.txt:1192:  debug_reports\DEBUG_components_dashboard-sidebar.md:13:- Ensure that any 
+  debug_reports/_SIGNAL.txt:1195:  debug_reports\DEBUG_components_dashboard-sidebar.md:14:
+  debug_reports/_SIGNAL.txt:1196:  debug_reports\DEBUG_components_dashboard-sidebar.md:15:```typescript
+  debug_reports/_SIGNAL.txt:1197:  debug_reports\DEBUG_components_dashboard-sidebar.md:16:// Example of 
+  debug_reports/_SIGNAL.txt:1199:  debug_reports\DEBUG_components_dashboard-sidebar.md:30:```
+  debug_reports/_SIGNAL.txt:1200:  debug_reports\DEBUG_components_dashboard-sidebar.md:31:
+  debug_reports/_SIGNAL.txt:1201:> debug_reports\DEBUG_components_dashboard-sidebar.md:32:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1203:  debug_reports\DEBUG_components_dashboard-sidebar.md:33:
+  debug_reports/_SIGNAL.txt:1204:> debug_reports\DEBUG_components_dashboard-sidebar.md:34:- **Race 
+  debug_reports/_SIGNAL.txt:1208:  debug_reports\DEBUG_components_dashboard-sidebar.md:35:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1212:> debug_reports\DEBUG_components_dashboard-sidebar.md:36:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1216:  debug_reports\DEBUG_components_dashboard-sidebar.md:37:
+  debug_reports/_SIGNAL.txt:1217:  debug_reports\DEBUG_components_dashboard-sidebar.md:38:**Refactored Code**:
+  debug_reports/_SIGNAL.txt:1218:  debug_reports\DEBUG_components_dashboard-sidebar.md:39:- Ensure that any 
+  debug_reports/_SIGNAL.txt:1221:  debug_reports\DEBUG_components_dashboard-sidebar.md:40:
+  debug_reports/_SIGNAL.txt:1222:  debug_reports\DEBUG_components_dashboard-sidebar.md:41:```typescript
+  debug_reports/_SIGNAL.txt:1223:  debug_reports\DEBUG_components_dashboard-sidebar.md:42:// Example of 
+  debug_reports/_SIGNAL.txt:1384:  debug_reports\DEBUG_components_sidebar_CaseNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1386:  debug_reports\DEBUG_components_sidebar_CaseNode.md:6:
+  debug_reports/_SIGNAL.txt:1387:> debug_reports\DEBUG_components_sidebar_CaseNode.md:7:1. **Logic Defects, 
+  debug_reports/_SIGNAL.txt:1389:> debug_reports\DEBUG_components_sidebar_CaseNode.md:8:   - **Edge Case:** 
+  debug_reports/_SIGNAL.txt:1393:  debug_reports\DEBUG_components_sidebar_CaseNode.md:9:   - **Edge Case:** 
+  debug_reports/_SIGNAL.txt:1397:> debug_reports\DEBUG_components_sidebar_CaseNode.md:10:   - **Unhandled 
+  debug_reports/_SIGNAL.txt:1402:  debug_reports\DEBUG_components_sidebar_CaseNode.md:11:
+  debug_reports/_SIGNAL.txt:1403:> debug_reports\DEBUG_components_sidebar_CaseNode.md:12:2. **Race Conditions, 
+  debug_reports/_SIGNAL.txt:1405:  debug_reports\DEBUG_components_sidebar_CaseNode.md:13:   - **State Mutation 
+  debug_reports/_SIGNAL.txt:1408:> debug_reports\DEBUG_components_sidebar_CaseNode.md:14:   - **Memory 
+  debug_reports/_SIGNAL.txt:1413:  debug_reports\DEBUG_components_sidebar_CaseNode.md:15:
+  debug_reports/_SIGNAL.txt:1414:  debug_reports\DEBUG_components_sidebar_CaseNode.md:16:3. **Security Flaws:**
+  debug_reports/_SIGNAL.txt:1415:> debug_reports\DEBUG_components_sidebar_CaseNode.md:17:   - **Security 
+  debug_reports/_SIGNAL.txt:1419:  debug_reports\DEBUG_components_sidebar_CaseNode.md:18:
+  debug_reports/_SIGNAL.txt:1420:  debug_reports\DEBUG_components_sidebar_CaseNode.md:19:### Refactored Code 
+  debug_reports/_SIGNAL.txt:1422:  debug_reports\DEBUG_components_sidebar_CaseNode.md:20:
+  debug_reports/_SIGNAL.txt:1423:  debug_reports\DEBUG_components_sidebar_CaseNode.md:21:1. **Ensure 
+  debug_reports/_SIGNAL.txt:1425:  debug_reports\DEBUG_components_sidebar_CaseNode.md:22:   - If 
+  debug_reports/_SIGNAL.txt:1428:  debug_reports\DEBUG_components_sidebar_CaseNode.md:23:
+  debug_reports/_SIGNAL.txt:1429:  debug_reports\DEBUG_components_sidebar_CaseNode.md:54:
+  debug_reports/_SIGNAL.txt:1430:  debug_reports\DEBUG_components_sidebar_CaseNode.md:55:2. **Sanitize Input 
+  debug_reports/_SIGNAL.txt:1432:> debug_reports\DEBUG_components_sidebar_CaseNode.md:56:   - If `caseData` or 
+  debug_reports/_SIGNAL.txt:1435:  debug_reports\DEBUG_components_sidebar_CaseNode.md:57:
+  debug_reports/_SIGNAL.txt:1436:  debug_reports\DEBUG_components_sidebar_CaseNode.md:58:   ```typescript
+  debug_reports/_SIGNAL.txt:1437:  debug_reports\DEBUG_components_sidebar_CaseNode.md:59:   const 
+  debug_reports/_SIGNAL.txt:1439:  debug_reports\DEBUG_components_sidebar_CaseNode.md:60:     // Implement 
+  debug_reports/_SIGNAL.txt:1441:  debug_reports\DEBUG_components_sidebar_CaseNode.md:61:     return 
+  debug_reports/_SIGNAL.txt:1443:  debug_reports\DEBUG_components_sidebar_CaseNode.md:62:   };
+  debug_reports/_SIGNAL.txt:1444:  debug_reports\DEBUG_components_sidebar_CaseNode.md:97:
+  debug_reports/_SIGNAL.txt:1445:  debug_reports\DEBUG_components_sidebar_CaseNode.md:98:- **Logic Defects:** 
+  debug_reports/_SIGNAL.txt:1447:> debug_reports\DEBUG_components_sidebar_CaseNode.md:99:- **Security Flaws:** 
+  debug_reports/_SIGNAL.txt:1449:  debug_reports\DEBUG_components_sidebar_CaseNode.md:100:- **Refactored 
+  debug_reports/_SIGNAL.txt:1452:  debug_reports\DEBUG_components_sidebar_CaseNode.md:101:
+  debug_reports/_SIGNAL.txt:1453:  debug_reports\DEBUG_components_sidebar_CaseNode.md:102:These changes will 
+  debug_reports/_SIGNAL.txt:1455:  debug_reports\DEBUG_components_sidebar_ClientNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1457:  debug_reports\DEBUG_components_sidebar_ClientNode.md:6:
+  debug_reports/_SIGNAL.txt:1458:> debug_reports\DEBUG_components_sidebar_ClientNode.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1460:  debug_reports\DEBUG_components_sidebar_ClientNode.md:8:
+  debug_reports/_SIGNAL.txt:1461:> debug_reports\DEBUG_components_sidebar_ClientNode.md:9:- **Edge Case**: The 
+  debug_reports/_SIGNAL.txt:1464:  debug_reports\DEBUG_components_sidebar_ClientNode.md:10:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1466:  debug_reports\DEBUG_components_sidebar_ClientNode.md:11:
+  debug_reports/_SIGNAL.txt:1467:> debug_reports\DEBUG_components_sidebar_ClientNode.md:12:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1470:> debug_reports\DEBUG_components_sidebar_ClientNode.md:13:  - **Fix**: Wrap 
+  debug_reports/_SIGNAL.txt:1472:  debug_reports\DEBUG_components_sidebar_ClientNode.md:14:
+  debug_reports/_SIGNAL.txt:1473:> debug_reports\DEBUG_components_sidebar_ClientNode.md:15:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1475:  debug_reports\DEBUG_components_sidebar_ClientNode.md:16:
+  debug_reports/_SIGNAL.txt:1476:> debug_reports\DEBUG_components_sidebar_ClientNode.md:17:- **Race 
+  debug_reports/_SIGNAL.txt:1479:  debug_reports\DEBUG_components_sidebar_ClientNode.md:18:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1482:  debug_reports\DEBUG_components_sidebar_ClientNode.md:19:
+  debug_reports/_SIGNAL.txt:1483:  debug_reports\DEBUG_components_sidebar_ClientNode.md:20:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1486:  debug_reports\DEBUG_components_sidebar_ClientNode.md:21:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1489:  debug_reports\DEBUG_components_sidebar_ClientNode.md:22:
+  debug_reports/_SIGNAL.txt:1490:> debug_reports\DEBUG_components_sidebar_ClientNode.md:23:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1494:  debug_reports\DEBUG_components_sidebar_ClientNode.md:24:  - **Fix**: Use 
+  debug_reports/_SIGNAL.txt:1497:  debug_reports\DEBUG_components_sidebar_ClientNode.md:25:
+  debug_reports/_SIGNAL.txt:1498:  debug_reports\DEBUG_components_sidebar_ClientNode.md:26:#### 3. Security 
+  debug_reports/_SIGNAL.txt:1500:  debug_reports\DEBUG_components_sidebar_ClientNode.md:27:
+  debug_reports/_SIGNAL.txt:1501:  debug_reports\DEBUG_components_sidebar_ClientNode.md:28:- **Security 
+  debug_reports/_SIGNAL.txt:1504:  debug_reports\DEBUG_components_sidebar_ClientNode.md:29:  - **Fix**: Ensure 
+  debug_reports/_SIGNAL.txt:1506:  debug_reports\DEBUG_components_sidebar_ClientNode.md:37:  **Explanation**: 
+  debug_reports/_SIGNAL.txt:1508:  debug_reports\DEBUG_components_sidebar_ClientNode.md:38:
+  debug_reports/_SIGNAL.txt:1509:> debug_reports\DEBUG_components_sidebar_ClientNode.md:39:- **Fix for 
+  debug_reports/_SIGNAL.txt:1511:  debug_reports\DEBUG_components_sidebar_ClientNode.md:40:  ```typescript
+  debug_reports/_SIGNAL.txt:1512:  debug_reports\DEBUG_components_sidebar_ClientNode.md:41:  try {
+  debug_reports/_SIGNAL.txt:1513:  debug_reports\DEBUG_components_sidebar_ClientNode.md:42:    await 
+  debug_reports/_SIGNAL.txt:1515:  debug_reports\DEBUG_components_sidebar_ClientNode.md:43:  } catch (error) {
+  debug_reports/_SIGNAL.txt:1516:  debug_reports\DEBUG_components_sidebar_ClientNode.md:44:    
+  debug_reports/_SIGNAL.txt:1518:  debug_reports\DEBUG_components_sidebar_ClientNode.md:45:  }
+  debug_reports/_SIGNAL.txt:1519:  debug_reports\DEBUG_components_sidebar_ClientNode.md:46:  ```
+  debug_reports/_SIGNAL.txt:1520:> debug_reports\DEBUG_components_sidebar_ClientNode.md:47:  **Explanation**: 
+  debug_reports/_SIGNAL.txt:1523:  debug_reports\DEBUG_components_sidebar_ClientNode.md:48:
+  debug_reports/_SIGNAL.txt:1524:  debug_reports\DEBUG_components_sidebar_ClientNode.md:49:- **Fix for Safe 
+  debug_reports/_SIGNAL.txt:1526:  debug_reports\DEBUG_components_sidebar_ClientNode.md:50:  ```typescript
+  debug_reports/_SIGNAL.txt:1527:  debug_reports\DEBUG_components_sidebar_ClientNode.md:51:  {cases.length === 
+  debug_reports/_SIGNAL.txt:1529:  debug_reports\DEBUG_components_sidebar_ClientNode.md:52:    <div 
+  debug_reports/_SIGNAL.txt:1531:  debug_reports\DEBUG_components_sidebar_ClientNode.md:53:      No cases yet
+  debug_reports/_SIGNAL.txt:1532:  debug_reports\DEBUG_components_sidebar_ClientNode.md:133:
+  debug_reports/_SIGNAL.txt:1533:  debug_reports\DEBUG_components_sidebar_ClientNode.md:134:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1535:> debug_reports\DEBUG_components_sidebar_ClientNode.md:135:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1537:  debug_reports\DEBUG_components_sidebar_ClientNode.md:136:- **Safe Empty 
+  debug_reports/_SIGNAL.txt:1539:  debug_reports\DEBUG_components_sidebar_ClientNode.md:137:- **Safe Map**: 
+  debug_reports/_SIGNAL.txt:1541:  debug_reports\DEBUG_components_sidebar_ClientNode.md:138:
+  debug_reports/_SIGNAL.txt:1542:  debug_reports\DEBUG_components_sidebar_ClientNode.md:139:These fixes will 
+  debug_reports/_SIGNAL.txt:1544:  debug_reports\DEBUG_components_sidebar_EditableName.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1546:  debug_reports\DEBUG_components_sidebar_EditableName.md:6:
+  debug_reports/_SIGNAL.txt:1547:> debug_reports\DEBUG_components_sidebar_EditableName.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1549:  debug_reports\DEBUG_components_sidebar_EditableName.md:8:
+  debug_reports/_SIGNAL.txt:1550:> debug_reports\DEBUG_components_sidebar_EditableName.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1554:  debug_reports\DEBUG_components_sidebar_EditableName.md:10:  - **Fix**: Add 
+  debug_reports/_SIGNAL.txt:1556:  debug_reports\DEBUG_components_sidebar_EditableName.md:11:    ```typescript
+  debug_reports/_SIGNAL.txt:1557:  debug_reports\DEBUG_components_sidebar_EditableName.md:12:    const 
+  debug_reports/_SIGNAL.txt:1559:  debug_reports\DEBUG_components_sidebar_EditableName.md:13:      const 
+  debug_reports/_SIGNAL.txt:1561:  debug_reports\DEBUG_components_sidebar_EditableName.md:14:
+  debug_reports/_SIGNAL.txt:1562:  debug_reports\DEBUG_components_sidebar_EditableName.md:15:      if 
+  debug_reports/_SIGNAL.txt:1564:  debug_reports\DEBUG_components_sidebar_EditableName.md:30:    ```
+  debug_reports/_SIGNAL.txt:1565:  debug_reports\DEBUG_components_sidebar_EditableName.md:31:
+  debug_reports/_SIGNAL.txt:1566:> debug_reports\DEBUG_components_sidebar_EditableName.md:32:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1568:  debug_reports\DEBUG_components_sidebar_EditableName.md:33:
+  debug_reports/_SIGNAL.txt:1569:  debug_reports\DEBUG_components_sidebar_EditableName.md:34:- **State 
+  debug_reports/_SIGNAL.txt:1573:  debug_reports\DEBUG_components_sidebar_EditableName.md:35:  - **Fix**: 
+  debug_reports/_SIGNAL.txt:1577:  debug_reports\DEBUG_components_sidebar_EditableName.md:36:    ```typescript
+  debug_reports/_SIGNAL.txt:1578:  debug_reports\DEBUG_components_sidebar_EditableName.md:37:    const 
+  debug_reports/_SIGNAL.txt:1580:  debug_reports\DEBUG_components_sidebar_EditableName.md:38:      const 
+  debug_reports/_SIGNAL.txt:1582:  debug_reports\DEBUG_components_sidebar_EditableText.md:5:### Analysis of 
+  debug_reports/_SIGNAL.txt:1584:  debug_reports\DEBUG_components_sidebar_EditableText.md:6:
+  debug_reports/_SIGNAL.txt:1585:> debug_reports\DEBUG_components_sidebar_EditableText.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1587:  debug_reports\DEBUG_components_sidebar_EditableText.md:8:
+  debug_reports/_SIGNAL.txt:1588:  debug_reports\DEBUG_components_sidebar_EditableText.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1592:> debug_reports\DEBUG_components_sidebar_EditableText.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1595:  debug_reports\DEBUG_components_sidebar_EditableText.md:11:
+  debug_reports/_SIGNAL.txt:1596:> debug_reports\DEBUG_components_sidebar_EditableText.md:12:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1598:  debug_reports\DEBUG_components_sidebar_EditableText.md:13:
+  debug_reports/_SIGNAL.txt:1599:> debug_reports\DEBUG_components_sidebar_EditableText.md:14:- **Race 
+  debug_reports/_SIGNAL.txt:1604:  debug_reports\DEBUG_components_sidebar_EditableText.md:15:- **State 
+  debug_reports/_SIGNAL.txt:1606:> debug_reports\DEBUG_components_sidebar_EditableText.md:16:- **Memory 
+  debug_reports/_SIGNAL.txt:1608:  debug_reports\DEBUG_components_sidebar_EditableText.md:17:
+  debug_reports/_SIGNAL.txt:1609:  debug_reports\DEBUG_components_sidebar_EditableText.md:18:#### 3. Security 
+  debug_reports/_SIGNAL.txt:1611:  debug_reports\DEBUG_components_sidebar_EditableText.md:19:
+  debug_reports/_SIGNAL.txt:1612:  debug_reports\DEBUG_components_sidebar_EditableText.md:20:- **Security 
+  debug_reports/_SIGNAL.txt:1614:  debug_reports\DEBUG_components_sidebar_EditableText.md:21:
+  debug_reports/_SIGNAL.txt:1615:  debug_reports\DEBUG_components_sidebar_EditableText.md:22:#### 4. Concrete 
+  debug_reports/_SIGNAL.txt:1617:  debug_reports\DEBUG_components_sidebar_EditableText.md:23:
+  debug_reports/_SIGNAL.txt:1618:> debug_reports\DEBUG_components_sidebar_EditableText.md:24:1. **Fix Race 
+  debug_reports/_SIGNAL.txt:1620:  debug_reports\DEBUG_components_sidebar_EditableText.md:25:   - 
+  debug_reports/_SIGNAL.txt:1623:  debug_reports\DEBUG_components_sidebar_EditableText.md:26:   - **Refactored 
+  debug_reports/_SIGNAL.txt:1625:  debug_reports\DEBUG_components_sidebar_EditableText.md:27:     ```typescript
+  debug_reports/_SIGNAL.txt:1626:  debug_reports\DEBUG_components_sidebar_EditableText.md:28:     
+  debug_reports/_SIGNAL.txt:1628:  debug_reports\DEBUG_components_sidebar_EditableText.md:29:       
+  debug_reports/_SIGNAL.txt:1630:  debug_reports\DEBUG_components_sidebar_EditableText.md:30:     }, [value]);
+  debug_reports/_SIGNAL.txt:1631:  debug_reports\DEBUG_components_sidebar_EditableText.md:112:### Summary
+  debug_reports/_SIGNAL.txt:1632:  debug_reports\DEBUG_components_sidebar_EditableText.md:113:
+  debug_reports/_SIGNAL.txt:1633:> debug_reports\DEBUG_components_sidebar_EditableText.md:114:- **Logic 
+  debug_reports/_SIGNAL.txt:1635:  debug_reports\DEBUG_components_sidebar_EditableText.md:115:- **Edge 
+  debug_reports/_SIGNAL.txt:1638:> debug_reports\DEBUG_components_sidebar_EditableText.md:116:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1641:> debug_reports\DEBUG_components_sidebar_EditableText.md:117:- **Race 
+  debug_reports/_SIGNAL.txt:1644:  debug_reports\DEBUG_components_sidebar_EditableText.md:118:- **State 
+  debug_reports/_SIGNAL.txt:1646:> debug_reports\DEBUG_components_sidebar_EditableText.md:119:- **Memory 
+  debug_reports/_SIGNAL.txt:1648:  debug_reports\DEBUG_components_sidebar_EditableText.md:120:- **Security 
+  debug_reports/_SIGNAL.txt:1650:  debug_reports\DEBUG_components_sidebar_SessionNode.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:1652:  debug_reports\DEBUG_components_sidebar_SessionNode.md:6:
+  debug_reports/_SIGNAL.txt:1653:> debug_reports\DEBUG_components_sidebar_SessionNode.md:7:#### 1. Logic 
+  debug_reports/_SIGNAL.txt:1655:  debug_reports\DEBUG_components_sidebar_SessionNode.md:8:
+  debug_reports/_SIGNAL.txt:1656:  debug_reports\DEBUG_components_sidebar_SessionNode.md:9:- **Edge Case**: 
+  debug_reports/_SIGNAL.txt:1660:> debug_reports\DEBUG_components_sidebar_SessionNode.md:10:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1665:  debug_reports\DEBUG_components_sidebar_SessionNode.md:11:
+  debug_reports/_SIGNAL.txt:1666:  debug_reports\DEBUG_components_sidebar_SessionNode.md:12:**Fix**:
+  debug_reports/_SIGNAL.txt:1667:  debug_reports\DEBUG_components_sidebar_SessionNode.md:13:- Add a check to 
+  debug_reports/_SIGNAL.txt:1669:  debug_reports\DEBUG_components_sidebar_SessionNode.md:14:- Handle potential 
+  debug_reports/_SIGNAL.txt:1671:  debug_reports\DEBUG_components_sidebar_SessionNode.md:15:
+  debug_reports/_SIGNAL.txt:1672:  debug_reports\DEBUG_components_sidebar_SessionNode.md:16:```typescript
+  debug_reports/_SIGNAL.txt:1673:  debug_reports\DEBUG_components_sidebar_SessionNode.md:35:```
+  debug_reports/_SIGNAL.txt:1674:  debug_reports\DEBUG_components_sidebar_SessionNode.md:36:
+  debug_reports/_SIGNAL.txt:1675:> debug_reports\DEBUG_components_sidebar_SessionNode.md:37:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1677:  debug_reports\DEBUG_components_sidebar_SessionNode.md:38:
+  debug_reports/_SIGNAL.txt:1678:> debug_reports\DEBUG_components_sidebar_SessionNode.md:39:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1682:  debug_reports\DEBUG_components_sidebar_SessionNode.md:40:
+  debug_reports/_SIGNAL.txt:1683:  debug_reports\DEBUG_components_sidebar_SessionNode.md:41:**Fix**:
+  debug_reports/_SIGNAL.txt:1684:  debug_reports\DEBUG_components_sidebar_SessionNode.md:42:- Clear the 
+  debug_reports/_SIGNAL.txt:1686:  debug_reports\DEBUG_components_sidebar_SessionNode.md:43:
+  debug_reports/_SIGNAL.txt:1687:  debug_reports\DEBUG_components_sidebar_SessionNode.md:44:```typescript
+  debug_reports/_SIGNAL.txt:1688:  debug_reports\DEBUG_components_sidebar_SessionNode.md:45:import { useEffect 
+  debug_reports/_SIGNAL.txt:1690:  debug_reports\DEBUG_components_sidebar_Sidebar.md:5:### Analysis of 
+  debug_reports/_SIGNAL.txt:1691:`Sidebar.tsx`
+  debug_reports/_SIGNAL.txt:1692:  debug_reports\DEBUG_components_sidebar_Sidebar.md:6:
+  debug_reports/_SIGNAL.txt:1693:> debug_reports\DEBUG_components_sidebar_Sidebar.md:7:#### 1. Logic Defects, 
+  debug_reports/_SIGNAL.txt:1695:  debug_reports\DEBUG_components_sidebar_Sidebar.md:8:- **Logic Defects**: 
+  debug_reports/_SIGNAL.txt:1698:> debug_reports\DEBUG_components_sidebar_Sidebar.md:9:- **Unhandled 
+  debug_reports/_SIGNAL.txt:1701:  debug_reports\DEBUG_components_sidebar_Sidebar.md:10:
+  debug_reports/_SIGNAL.txt:1702:> debug_reports\DEBUG_components_sidebar_Sidebar.md:11:#### 2. Race 
+  debug_reports/_SIGNAL.txt:1704:> debug_reports\DEBUG_components_sidebar_Sidebar.md:12:- **Race Conditions**: 
+  debug_reports/_SIGNAL.txt:1707:  debug_reports\DEBUG_components_sidebar_Sidebar.md:13:- **State Mutation 
+  debug_reports/_SIGNAL.txt:1710:> debug_reports\DEBUG_components_sidebar_Sidebar.md:14:- **Memory Leaks**: 
+  debug_reports/_SIGNAL.txt:1713:  debug_reports\DEBUG_components_sidebar_Sidebar.md:15:
+  debug_reports/_SIGNAL.txt:1714:  debug_reports\DEBUG_components_sidebar_Sidebar.md:16:#### 3. Security Flaws
+  debug_reports/_SIGNAL.txt:1715:> debug_reports\DEBUG_components_sidebar_Sidebar.md:17:- **Supabase RLS 
+  debug_reports/_SIGNAL.txt:1718:> debug_reports\DEBUG_components_sidebar_Sidebar.md:18:- **Credential 
+  debug_reports/_SIGNAL.txt:1721:  debug_reports\DEBUG_components_sidebar_Sidebar.md:19:- **Improper Input 
+  debug_reports/_SIGNAL.txt:1724:  debug_reports\DEBUG_components_sidebar_Sidebar.md:20:
+  debug_reports/_SIGNAL.txt:1725:  debug_reports\DEBUG_components_sidebar_Sidebar.md:21:### Refactored Code 
+  debug_reports/_SIGNAL.txt:1727:  debug_reports\DEBUG_components_sidebar_Sidebar.md:22:
+  debug_reports/_SIGNAL.txt:1728:  debug_reports\DEBUG_components_sidebar_Sidebar.md:23:Since the code does 
+  debug_reports/_SIGNAL.txt:1730:  debug_reports\DEBUG_components_sidebar_Sidebar.md:24:
+  debug_reports/_SIGNAL.txt:1731:  debug_reports\DEBUG_components_sidebar_Sidebar.md:25:### Summary
+  debug_reports/_SIGNAL.txt:1732:  debug_reports\DEBUG_components_sidebar_Sidebar.md:26:
+  debug_reports/_SIGNAL.txt:1733:> debug_reports\DEBUG_components_sidebar_Sidebar.md:27:The `Sidebar.tsx` 
+  debug_reports/_SIGNAL.txt:2462:  debug_reports\DEBUG_components_ui_carousel.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:2464:  debug_reports\DEBUG_components_ui_carousel.md:6:
+  debug_reports/_SIGNAL.txt:2465:> debug_reports\DEBUG_components_ui_carousel.md:7:#### 1. Logic Defects, Edge 
+  debug_reports/_SIGNAL.txt:2467:  debug_reports\DEBUG_components_ui_carousel.md:8:
+  debug_reports/_SIGNAL.txt:2468:  debug_reports\DEBUG_components_ui_carousel.md:9:- **Edge Case: Orientation 
+  debug_reports/_SIGNAL.txt:2470:  debug_reports\DEBUG_components_ui_carousel.md:10:  - The `orientation` prop 
+  debug_reports/_SIGNAL.txt:2473:  debug_reports\DEBUG_components_ui_carousel.md:11:  - **Fix:** Add 
+  debug_reports/_SIGNAL.txt:2476:  debug_reports\DEBUG_components_ui_carousel.md:12:
+  debug_reports/_SIGNAL.txt:2477:  debug_reports\DEBUG_components_ui_carousel.md:13:- **Edge Case: `setApi` 
+  debug_reports/_SIGNAL.txt:2479:  debug_reports\DEBUG_components_ui_carousel.md:15:  - **Fix:** Add 
+  debug_reports/_SIGNAL.txt:2481:  debug_reports\DEBUG_components_ui_carousel.md:16:
+  debug_reports/_SIGNAL.txt:2482:> debug_reports\DEBUG_components_ui_carousel.md:17:- **Unhandled 
+  debug_reports/_SIGNAL.txt:2484:  debug_reports\DEBUG_components_ui_carousel.md:18:  - The `useEmblaCarousel` 
+  debug_reports/_SIGNAL.txt:2485:hook does not handle promise rejections. If the carousel initialization 
+  debug_reports/_SIGNAL.txt:2487:  debug_reports\DEBUG_components_ui_carousel.md:19:  - **Fix:** Wrap the 
+  debug_reports/_SIGNAL.txt:2488:`useEmblaCarousel` call in a try-catch block to handle any potential errors.
+  debug_reports/_SIGNAL.txt:2489:  debug_reports\DEBUG_components_ui_carousel.md:20:
+  debug_reports/_SIGNAL.txt:2490:> debug_reports\DEBUG_components_ui_carousel.md:21:#### 2. Race Conditions, 
+  debug_reports/_SIGNAL.txt:2492:  debug_reports\DEBUG_components_ui_carousel.md:22:
+  debug_reports/_SIGNAL.txt:2493:  debug_reports\DEBUG_components_ui_carousel.md:23:- **State Mutation Bug: 
+  debug_reports/_SIGNAL.txt:2495:> debug_reports\DEBUG_components_ui_carousel.md:24:  - The state updates in 
+  debug_reports/_SIGNAL.txt:2498:  debug_reports\DEBUG_components_ui_carousel.md:25:  - **Fix:** Use 
+  debug_reports/_SIGNAL.txt:2500:  debug_reports\DEBUG_components_ui_carousel.md:26:
+  debug_reports/_SIGNAL.txt:2501:> debug_reports\DEBUG_components_ui_carousel.md:27:- **Memory Leak: Event 
+  debug_reports/_SIGNAL.txt:2503:> debug_reports\DEBUG_components_ui_carousel.md:28:  - The event listeners 
+  debug_reports/_SIGNAL.txt:2505:  debug_reports\DEBUG_components_ui_carousel.md:29:  - **Fix:** Ensure that 
+  debug_reports/_SIGNAL.txt:2507:  debug_reports\DEBUG_components_ui_carousel.md:30:
+  debug_reports/_SIGNAL.txt:2508:  debug_reports\DEBUG_components_ui_carousel.md:31:#### 3. Security Flaws
+  debug_reports/_SIGNAL.txt:2509:  debug_reports\DEBUG_components_ui_carousel.md:32:
+  debug_reports/_SIGNAL.txt:2510:  debug_reports\DEBUG_components_ui_carousel.md:33:- **Security Flaws: No 
+  debug_reports/_SIGNAL.txt:2512:  debug_reports\DEBUG_components_ui_carousel.md:34:  - The provided code does 
+  debug_reports/_SIGNAL.txt:4168:  debug_reports\DEBUG_components_ui_sidebar.md:5:### Analysis and 
+  debug_reports/_SIGNAL.txt:4170:  debug_reports\DEBUG_components_ui_sidebar.md:6:
+  debug_reports/_SIGNAL.txt:4171:> debug_reports\DEBUG_components_ui_sidebar.md:7:#### 1. Logic Defects, Edge 
+  debug_reports/_SIGNAL.txt:4173:  debug_reports\DEBUG_components_ui_sidebar.md:8:
+  debug_reports/_SIGNAL.txt:4174:  debug_reports\DEBUG_components_ui_sidebar.md:9:- **Edge Case: Cookie 
+  debug_reports/_SIGNAL.txt:4176:> debug_reports\DEBUG_components_ui_sidebar.md:10:  - The cookie handling 
+  debug_reports/_SIGNAL.txt:4180:  debug_reports\DEBUG_components_ui_sidebar.md:11:  - **Refactored Code:**
+  debug_reports/_SIGNAL.txt:4181:  debug_reports\DEBUG_components_ui_sidebar.md:12:    ```typescript
+  debug_reports/_SIGNAL.txt:4182:  debug_reports\DEBUG_components_ui_sidebar.md:13:    try {
+  debug_reports/_SIGNAL.txt:4183:  debug_reports\DEBUG_components_ui_sidebar.md:14:      document.cookie = 
+  debug_reports/_SIGNAL.txt:4184:`${SIDEBAR_COOKIE_NAME}=${openState}; path=/; 
+  debug_reports/_SIGNAL.txt:4185:max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  debug_reports/_SIGNAL.txt:4186:  debug_reports\DEBUG_components_ui_sidebar.md:15:    } catch (error) {
+  debug_reports/_SIGNAL.txt:4187:  debug_reports\DEBUG_components_ui_sidebar.md:16:      console.error('Failed 
+  debug_reports/_SIGNAL.txt:4188:to set sidebar cookie:', error);
+  debug_reports/_SIGNAL.txt:4189:  debug_reports\DEBUG_components_ui_sidebar.md:25:      if (
+  debug_reports/_SIGNAL.txt:4190:  debug_reports\DEBUG_components_ui_sidebar.md:26:        event.key === 
+  debug_reports/_SIGNAL.txt:4191:SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/_SIGNAL.txt:4192:> debug_reports\DEBUG_components_ui_sidebar.md:27:        (event.metaKey !== 
+  debug_reports/_SIGNAL.txt:4194:  debug_reports\DEBUG_components_ui_sidebar.md:28:      ) {
+  debug_reports/_SIGNAL.txt:4195:  debug_reports\DEBUG_components_ui_sidebar.md:29:        
+  debug_reports/_SIGNAL.txt:4197:  debug_reports\DEBUG_components_ui_sidebar.md:30:        toggleSidebar();
+  debug_reports/_SIGNAL.txt:4198:  debug_reports\DEBUG_components_ui_sidebar.md:31:      }
+  debug_reports/_SIGNAL.txt:4199:  debug_reports\DEBUG_components_ui_sidebar.md:32:    };
+  debug_reports/_SIGNAL.txt:4200:  debug_reports\DEBUG_components_ui_sidebar.md:33:    ```
+  debug_reports/_SIGNAL.txt:4201:  debug_reports\DEBUG_components_ui_sidebar.md:34:
+  debug_reports/_SIGNAL.txt:4202:> debug_reports\DEBUG_components_ui_sidebar.md:35:#### 2. Race Conditions, 
+  debug_reports/_SIGNAL.txt:4204:  debug_reports\DEBUG_components_ui_sidebar.md:36:
+  debug_reports/_SIGNAL.txt:4205:  debug_reports\DEBUG_components_ui_sidebar.md:37:- **State Mutation Bug: 
+  debug_reports/_SIGNAL.txt:4207:  debug_reports\DEBUG_components_ui_sidebar.md:38:  - The `openMobile` state 
+  debug_reports/_SIGNAL.txt:4208:is managed within the `SidebarProvider`, but it is not exposed to the 
+  debug_reports/_SIGNAL.txt:4212:  debug_reports\DEBUG_components_ui_sidebar.md:39:  - **Refactored Code:**
+  debug_reports/_SIGNAL.txt:4213:  debug_reports\DEBUG_components_ui_sidebar.md:40:    - Expose `openMobile` 
+  debug_reports/_SIGNAL.txt:4214:and `setOpenMobile` in the `SidebarContext` so that the consumer can control 
+  debug_reports/_SIGNAL.txt:4216:  debug_reports\DEBUG_components_ui_sidebar.md:41:
+  debug_reports/_SIGNAL.txt:4217:  debug_reports\DEBUG_components_ui_sidebar.md:65:    if (
+  debug_reports/_SIGNAL.txt:4218:  debug_reports\DEBUG_components_ui_sidebar.md:66:      event.key === 
+  debug_reports/_SIGNAL.txt:4219:SIDEBAR_KEYBOARD_SHORTCUT &&
+  debug_reports/_SIGNAL.txt:4220:> debug_reports\DEBUG_components_ui_sidebar.md:67:      (event.metaKey !== 
+  debug_reports/_SIGNAL.txt:4222:  debug_reports\DEBUG_components_ui_sidebar.md:68:    ) {
+  debug_reports/_SIGNAL.txt:4223:  debug_reports\DEBUG_components_ui_sidebar.md:69:      
+  debug_reports/_SIGNAL.txt:4225:  debug_reports\DEBUG_components_ui_sidebar.md:70:      toggleSidebar();
+  debug_reports/_SIGNAL.txt:4226:  debug_reports\DEBUG_components_ui_sidebar.md:71:    }
+  debug_reports/_SIGNAL.txt:4227:  debug_reports\DEBUG_components_ui_sidebar.md:72:  };
+  debug_reports/_SIGNAL.txt:4228:  debug_reports\DEBUG_components_ui_sidebar.md:73:  ```
+  debug_reports/gates_dead_file_sweep_20261010.txt:21:./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+  debug_reports/gates_dead_file_sweep_20261010.txt:34:./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+  debug_reports/gates_dead_file_sweep_20261010.txt:40:./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+  debug_reports/gates_dead_file_sweep_20261010.txt:41:./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+  debug_reports/gates_dead_file_sweep_20261010.txt:594:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/gates_dead_file_sweep_20261010.txt:618:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:621:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:624:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:665:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:674:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/gates_dead_file_sweep_20261010.txt:683:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/gates_dead_file_sweep_20261010.txt:688:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/gates_lint_8a_20261010.txt:256:M	components/sidebar/CaseNode.tsx
+  debug_reports/gates_lint_8a_20261010.txt:257:M	components/sidebar/ClientNode.tsx
+  debug_reports/gates_lint_8a_20261010.txt:258:M	components/sidebar/EditableName.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:364:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:388:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:391:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:394:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:435:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:444:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:453:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/gates_readme_gradle_untrack_20261010.txt:458:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8a_after_20261010.txt:132:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8a_after_20261010.txt:192:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8a_after_20261010.txt:201:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8a_after_20261010.txt:210:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8a_after_20261010.txt:215:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8a_before_20261010.txt:138:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8a_before_20261010.txt:162:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_8a_before_20261010.txt:165:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_8a_before_20261010.txt:168:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_8a_before_20261010.txt:209:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8a_before_20261010.txt:218:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8a_before_20261010.txt:227:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8a_before_20261010.txt:232:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8b_after_20261010.txt:133:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8b_after_20261010.txt:193:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8b_after_20261010.txt:202:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8b_after_20261010.txt:211:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8b_after_20261010.txt:216:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8b_before_20261010.txt:136:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8b_before_20261010.txt:196:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8b_before_20261010.txt:205:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8b_before_20261010.txt:214:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8b_before_20261010.txt:219:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8c_after_20261010.txt:120:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8c_after_20261010.txt:180:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8c_after_20261010.txt:189:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8c_after_20261010.txt:198:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8c_after_20261010.txt:203:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_8c_before_20261010.txt:133:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_8c_before_20261010.txt:193:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_8c_before_20261010.txt:202:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_8c_before_20261010.txt:211:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_8c_before_20261010.txt:216:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:164:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:188:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:191:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:194:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:235:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:244:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:253:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_gate_npm_run_lint_after_20261010.txt:258:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:165:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:189:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:192:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:195:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:236:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:245:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:254:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_gate_npm_run_lint_before_20261010.txt:259:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  debug_reports/lint_triage_post_card6_20261010.txt:142:  55 |   const sidebar = (  react-hooks/set-state-in-effect
+  debug_reports/lint_triage_post_card6_20261010.txt:166:D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:169:D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:172:D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:213:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:222:D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+  debug_reports/lint_triage_post_card6_20261010.txt:231:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  debug_reports/lint_triage_post_card6_20261010.txt:236:D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  eslint.config.mjs:30:      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+  package.json:51:    "embla-carousel-react": "8.6.0",
+
+## 3. Import-path form only
+$ git grep -n -i -E "ui/sidebar|ui/carousel" -- .
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:83:./components/sidebar/Sidebar.tsx:8:} from '@/components/ui/sidebar'
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:88:is `sidebar/Sidebar.tsx` importing the shadcn primitive `@/components/ui/sidebar` (the other
+  debug_reports/DEAD_COMPONENT_DELETION_20261010.md:210:| `components/ui/use-mobile.tsx` | duplicate of `hooks/use-mobile.ts`, which is the one `components/ui/sidebar.tsx` imports | `grep -rnI "ui/use-mobile"` — matches only a debug report |
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:89:./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:90:./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:96:**Zero importers of this path.** The only consumer, `components/ui/sidebar.tsx`, imports
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:273:| `hooks/use-mobile.ts` | imported by `components/ui/sidebar.tsx:8` (`useIsMobile()` at line 69) |
+  debug_reports/DEAD_FILE_SWEEP_20261010.md:275:| `components/ui/sidebar.tsx` | the shadcn primitive the live dashboard sidebar is built on |
+  debug_reports/DEBUG_components_ui_use-mobile.md:2:> the live `hooks/use-mobile.ts`, which `components/ui/sidebar.tsx:8` imports — the repo-wide reference
+  debug_reports/LINT_GATE_20261010.md:124:| 27 | `components/ui/carousel.tsx:98:5` | `react-hooks/set-state-in-effect` | Error: Calling setState synchronously within an effect can trigger cascading renders |
+  debug_reports/LINT_GATE_20261010.md:125:| 28 | `components/ui/sidebar.tsx:611:26` | `react-hooks/purity` | Error: Cannot call impure function during render |
+  debug_reports/LINT_GATE_20261010.md:183:| `react-hooks/purity` | `warn` | whole repo | 1 site: `components/ui/sidebar.tsx:611` calls `Math.random` during render |
+  debug_reports/LINT_TRIAGE_20261010.md:77:| B3 | `hooks/use-mobile.ts:14` | `react-hooks/set-state-in-effect` | `setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)` — same matchMedia-initial-read shape. Note the state starts `undefined` and is coerced by `!!isMobile`, which is deliberately hydration-safe. | Yes (`components/ui/sidebar.tsx:8` imports it — though see E-note in §7). | `useSyncExternalStore`, or accept. | S | No. |
+  debug_reports/LINT_TRIAGE_20261010.md:78:| B4 | `components/ui/sidebar.tsx:611` | `react-hooks/purity` | `Math.random()` inside `React.useMemo(…, [])` in `SidebarMenuSkeleton` — an impure call during render. | **No — `SidebarMenuSkeleton` has zero importers**, and `components/ui/sidebar.tsx` itself has **zero importers** repo-wide (see §5.3). | Delete the file (preferred — it is an unreferenced shadcn kit), or hoist the width into a state/effect if a skeleton is genuinely wanted. | S | No. Unreachable. |
+  debug_reports/LINT_TRIAGE_20261010.md:79:| B5 | `components/ui/carousel.tsx:98` | `react-hooks/set-state-in-effect` | `onSelect(api)` inside an effect — notifying the parent of the embla instance and registering listeners. | **No — `components/ui/carousel.tsx` has zero importers.** | Same as B4: unreferenced kit file. If kept, the rule is arguably over-eager here (see §8, class E debate). | S | No. Unreachable. |
+  debug_reports/LINT_TRIAGE_20261010.md:195:### 5.3 `components/ui/sidebar.tsx` — `Math.random()` during render
+  debug_reports/LINT_TRIAGE_20261010.md:209:2. `components/ui/sidebar.tsx` **itself has zero importers** — a repo-wide search for `ui/sidebar` (excluding `node_modules`, `.next`, `scratch`) returns only the comment in `eslint.config.mjs:30`. The app's actual sidebar is `components/dashboard-sidebar.tsx` (imported by `components/dashboard-shell.tsx:3`) plus `components/sidebar/*`.
+  debug_reports/LINT_TRIAGE_20261010.md:230:| | `components/ui/carousel.tsx` | 98 | `onSelect(api)` — notifies the parent and registers listeners | Callback registration against the embla instance; the rule cannot see through the callback prop. Unreachable file. (B5) |
+  debug_reports/LINT_TRIAGE_20261010.md:300:| 4 | **Lint 8d — audit the two unreferenced shadcn kit files** | Prove `components/ui/sidebar.tsx` and `components/ui/carousel.tsx` unreferenced (per-file repo-wide search, the card-6 standard) and delete them. | 2 | B (fix) / C (files) | **Low.** Both have zero importers (verified here). Clears B4 and B5 and removes ~1 000 lines of kit. |
+  debug_reports/gates_dead_file_sweep_20261010.txt:40:./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+  debug_reports/gates_dead_file_sweep_20261010.txt:41:./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+  documentation.md:1268:| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extending `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`, with `eslint-config-next` pinned to the installed `next` 16.2.4. It lints 130 files and exits **0**: 0 errors / 98 warnings (tree `cb3ac3a`). After the 2026-10-10 dead-file sweep (§13.3) the same command reports the same **0 errors** and **91 warnings** — every one of the seven removed findings sat in a deleted file. Its `patch-*.js` CommonJS override now matches no file; it is left for the lint triage, which owns `eslint.config.mjs`. The gate install deliberately did not remediate source — its first run was 73 errors / 29 warnings — so it encodes seven documented exceptions, each with a one-line reason in the config: `@typescript-eslint/no-explicit-any` → `warn` (51 sites of accumulated `any`), `react-hooks/set-state-in-effect` → `warn` (14 sites of the set-state-in-effect pattern), `react-hooks/refs` → `warn` (originally 1 site, `ReflectionCanvas.tsx`; **0 sites after rank 8c**, so the downgrade is now dead and is proposed for deletion at rank 8f), `react-hooks/purity` → `warn` (1 site, `Math.random` in `components/ui/sidebar.tsx`; **0 sites after rank 8d**, which deleted that file, so this downgrade is dead too and is likewise proposed for deletion at rank 8f), `react/no-unescaped-entities` → `warn` (2 one-line apostrophe escapes), `@typescript-eslint/no-require-imports` off for the three root CommonJS `patch-*.js` maintenance scripts, and `@typescript-eslint/ban-ts-comment` off under `backend/` (the Worker's deliberate `@ts-nocheck`). Downgraded rules stay visible in every run rather than being ignored. Deliberately **not** wired into `.githooks`: a pre-commit lint step against this baseline would block every future commit. The 91-warning baseline was triaged on 2026-10-10 into a classified register — every finding assigned to class A (correctness bug), B (real defect, low impact), C (dead code), D (type/style) or E (false positive / config gap / moot), each with a recommended action, an effort estimate and a "can it bite a clinician" verdict, plus a ranked fix plan: `debug_reports/LINT_TRIAGE_20261010.md`. Raw post-card-6 lint output: `debug_reports/lint_triage_post_card6_20261010.txt`. The triage changed no code and no rule: it is a proposal for the operator. **Rank 1 of that plan was executed on 2026-10-10** (card `t_c2aa216a`): the 15 dead bindings of register rows C1–C6 and C8–C14 (`generateStructuredTask`, `getDefaultActivity`, `sessionContext`/`setSessionContext`, `reflectionPrompt`/`setReflectionPrompt`, `catch (err)`, `clientId`, `Upload`, `drawBackground`, `prev`, `activeTab`, `loading`, `actionTypes`, `copyFile`) and the 3 stray empty template literals at EOF of `components/main-content.tsx`, `components/sidebar/CaseNode.tsx` and `components/sidebar/ClientNode.tsx` were deleted across 10 files, and `activeTab` was also dropped from the `MainContent` call site (`app/dashboard/page.tsx`). The same command now reports 0 errors / **72 warnings** on that tree. The drop is **19, not the register's projected 18**: the register counted the C4 line only as its two `no-unused-vars` findings, but that line also carried one `@typescript-eslint/no-explicit-any` which the register had budgeted to its rank-5 `any` sweep — so that sweep now targets **50** sites, not 51, and the "51 sites" figure in the config exception above stays stale until rank 5 lands. C7 (`geistMono`) was deliberately left untouched (§7.1 rank 8b). Raw before/after lint, `tsc`, `npm test`, `npm run build` and the 13-route build diff: `debug_reports/gates_lint_8a_20261010.txt`. Rank 8b (2026-10-10, `t_c2816da0`) then applied the C7 font. `app/layout.tsx` gives the Geist Mono loader `variable: "--font-geist-mono"` and puts `${geistMono.variable}` on `<body>` beside `${geist.className}`; `app/globals.css`'s `@theme inline` token is now `--font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;` (the sans token is untouched). `npm run lint` on that tree is **0 errors / 71 warnings** — one `no-unused-vars` cleared. The built stylesheet's rule is `.font-mono{font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace}` and `--font-geist-mono` itself is emitted as `"Geist Mono", "Geist Mono Fallback"`. Two measured corrections to the triage register's §5.1: (a) the `Geist Mono` `@font-face` rules were **already emitted before** the change — Next 16.2.4 (Turbopack) writes them for the loader call whether or not the loader's class is used — so pre-change `.font-mono` was already monospaced wherever the webfont loaded; the real pre-change defects were the missing generic fallback and the dead binding. (b) The new generic `monospace` keyword is nevertheless **shadowed on the webfont-failure path**: Next's generated value of `--font-geist-mono` ends in its own `"Geist Mono Fallback"` face (`src: local(Arial)`, proportional), which wins ahead of `ui-monospace`. Measured with `*.woff2` blocked, 14/14 review-page `.font-mono` elements render proportionally before *and* after (advance test 47.84px vs 203.22px; Arial wins), while the stack's own tail `ui-monospace, SFMono-Regular, Menlo, monospace` measures monospaced (87.97px/87.97px) — so the degradation guarantee is one family-list edit away, and it is an operator call because it trades away Next's metric-adjusted fallback. `adjustFontFallback: false` was tested and does **not** remove that face under Turbopack 16.2.4. Evidence: `debug_reports/gates_lint_8b_20261010.txt`, `css_8b_before_after_20261010.txt`, `font_8b_measure_*.json` and the two screenshots `font_8b_review_webfont_{loaded,blocked}_20261010.png`. **Rank 3 of that plan — rank 8c, card `t_a948efaf` — was executed on 2026-10-10** and touched one file, `components/canvas/ReflectionCanvas.tsx`. (1) **B16**: `const [historyLen, setHistoryLen] = useState(strokesRef.current.length)` was a ref read on the render path — React evaluates the initialiser argument on *every* render and discards all but the first result — and is now `useState(() => initialData?.strokes?.length ?? 0)`, reading the same prop the ref is seeded from. (2) **B1**: the `useImperativeHandle` dependency array was `[background]`, so the handle closed over the `clientId` / `submissionId` props as of the last `background` change; `uploadReflection()` falls back to those closed-over props when called with no arguments (`submissionIdParam || submissionId`), so a caller relying on the fallback could attach a reflection image to a **stale client or submission**. The array is now `[background, clientId, submissionId]`. Both sites carry an in-place comment; no caller and no test scaffolding were added for `uploadReflection()` — it still has **zero callers**, and the change removes the latent path rather than exercising it. `npm run lint` on that tree is **0 errors / 69 warnings** (71 − 2, exactly the two intended findings). `react-hooks/refs` is now at **zero** sites, which is why the `react-hooks/refs` → `warn` downgrade above is dead and is proposed for deletion at rank 8f: removing it restores the rule to the **`error`** severity that `eslint-plugin-react-hooks` 7.0.0's `recommended-latest` config assigns (`eslint --print-config` on a probe config without the exception block reports severity 2, against 1 with it). `react-hooks/exhaustive-deps` goes 2 → **1** site and **is not a local override at all** — it is the upstream `warn` that `eslint-config-next` inherits from the plugin's `recommended` config, so rank 8c's second acceptance question has no config change to propose for it; the one remaining site is register row B10 (`components/main-content.tsx:89`, missing `fetchVignettes`). Both changes were verified in a real Chromium harness (`scratch/rc-harness`, untracked) that mounts the shipping component beside the pre-fix source extracted verbatim from `git show HEAD:components/canvas/ReflectionCanvas.tsx`, with `window.fetch` stubbed and synthetic non-PHI fixtures: the **A/B seed value is identical** (3 seeded strokes → `Undo (3)` / `Redo (0)` / "3 strokes" on both builds; no `initialData` → `Undo (0)` on both), all four mutation→counter pairs hold under real CDP mouse input (commit → `Undo (n+1)`, `Redo (0)`; undo → `Undo (n−1)`, `Redo (1)`; redo → back to `Undo (n)`, `Redo (0)`; commit after an undo discards the redo branch → `Redo (0)`; clear → `Undo (0)`, `Redo (0)`, Undo/Redo/Clear all disabled and the placeholder restored) with the DOM counters matching `exportVectorData().strokes.length` and `hasContent()` at every step, and the **B1 A/B is decisive**: after re-rendering both variants with `clientId=client-NEW` / `submissionId=submission-NEW` and `background` unchanged, a no-argument `uploadReflection()` posts `client_id=client-NEW` + `submission_id=submission-NEW` from the fixed build and the **stale** `client-OLD` / `submission-OLD` from the pre-fix build — the mis-attribution path reproduced and closed. Evidence: `debug_reports/gates_lint_8c_20261010.txt`, `lint_8c_{before,after}_20261010.txt`, `test_8c_20261010.txt`, `build_8c_after_20261010.txt`, `routes_8c_diff_20261010.txt` (empty — the route list is byte-identical to rank 8b's 13 routes), `lint_8c_reflectioncanvas_diff_20261010.txt` and `lint_8c_harness_evidence_20261010.json`. The register's adjacent §5.2 observation — that the canvas never re-syncs `strokesRef` if `initialData` changes after mount — is recorded as a **deliberate limitation, not a defect**: `initialData` is read once, at mount (as is `background`, from the same prop), because the undo/redo stacks are per-session state and adopting new props mid-session would silently discard the user's in-progress strokes; a parent that needs to load a different document remounts the component with a `key`. Neither current call site passes `initialData` (`app/practice/[sessionId]/page.tsx:208` passes no props at all; `components/vignette-generator.tsx:692` passes only `clientId` / `submissionId`), so no caller needs the behaviour. **Rank 4 of that plan — rank 8d, card `t_eaef274e` — was executed on 2026-10-10**: `components/ui/sidebar.tsx` (register row B4) and `components/ui/carousel.tsx` (B5) were deleted after a per-file reference proof of their own — the basename searched case-insensitively across every tracked file and again across the whole working tree, static `@/components/ui/...` and relative import forms, dynamic `import()` / `next/dynamic`, the repo's only two barrels (`components/canvas/index.ts`, `components/tasks/index.ts` — neither reaches `ui/`), `tsconfig.json` paths, `components.json`, `eslint.config.mjs`, the Tailwind `@source` globs (`../app`, `../components`, `../lib`, `../hooks`, `../stores` under `source(none)`) and every Markdown file. The only hits outside `debug_reports/` prose were this row's own predecessor text, the stale `eslint.config.mjs` comment, and `package.json`'s `embla-carousel-react` entry. Raw searches: `debug_reports/lint_8d_refs_20261010.txt`. `npm run lint` goes **69 → 67**, exactly the two intended findings — `react-hooks/purity` 1 → 0 (`Math.random()` in `SidebarMenuSkeleton`) and `react-hooks/set-state-in-effect` 12 → 11 (the carousel's `onSelect(api)` effect) — with `no-explicit-any` (50), `react/no-unescaped-entities` (2) and `react-hooks/exhaustive-deps` (1) unchanged and no new or increased finding; the gate now lints 128 files, not 130. The stale comment at `eslint.config.mjs:30` that named `components/ui/sidebar.tsx` as the `Math.random` site was corrected to record the zero-site state and to hand the dead downgrade to rank 8f; the rule itself is untouched, because config changes are 8f's scope (its `react-hooks/set-state-in-effect` comment still says "14 sites across 13 files" against a measured 12 → 11 — also left for 8f). The Tailwind build is the load-bearing check, and it was measured rather than assumed: deleting the files shrinks the emitted stylesheet from 152 763 to 141 957 bytes (104 individual selectors, all utilities whose only occurrences were in the two deleted files), while a token-by-token cross-check of all 7 483 class candidates in the 118 remaining live files found **zero** tokens whose rule existed before the deletion and is missing after it — the live sidebar's `focus-visible:ring-sidebar-ring`, `border-sidebar-border`, `h-9`, `bg-sidebar` and friends all survive, so nothing live was leaning on the deleted kit. `npx tsc --noEmit` exit 0, `npm test` 35/35 + 12/12 + 15/15, `npm run build` exit 0 with a byte-identical 13-route list (md5 `8dca323846944e45a21742d7a25eac1d` on both sides). Three follow-on findings recorded rather than actioned, because the register's ranked plan has no slot for them and dependencies/dead-code adjudication is an operator call: `components/ui/skeleton.tsx` and `components/ui/tooltip.tsx` each had exactly one importer before this change — the deleted `components/ui/sidebar.tsx` — so both are now unreferenced, and `embla-carousel-react` (`package.json`) has lost its only importer. Evidence: `debug_reports/gates_lint_8d_20261010.txt`, `lint_8d_{before,after}_20261010.txt`, `build_8d_after_20261010.txt`, `routes_8d_diff_20261010.txt` (empty) and `css_8d_before_after_20261010.txt`. |
+  eslint.config.mjs:30:      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+
+## 4. Whole working tree (tracked + untracked), any form of the two paths
+$ grep -rniI --exclude-dir={node_modules,.next,.git,scratch} --exclude={tsconfig.tsbuildinfo,package-lock.json,pnpm-lock.yaml} -E "ui/sidebar|ui/carousel|sidebar\.tsx|carousel\.tsx" .
+  total hits: 101
+  hits outside debug_reports/ (the whole live tree, verbatim):
+    ./documentation.md:60:**Two views** (`app/dashboard/page.tsx`, toggled in `components/dashboard-sidebar.tsx`):
+    ./documentation.md:1246:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it i
+    ./documentation.md:1268:| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extend
+    ./eslint.config.mjs:30:      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+  hits inside debug_reports/, grouped by file:
+       11     debug_reports/DEAD_COMPONENT_DELETION_20261010.md
+        8     debug_reports/LINT_TRIAGE_20261010.md
+        8     debug_reports/gates_dead_file_sweep_20261010.txt
+        5     debug_reports/DEBUG_components_sidebar_Sidebar.md
+        5     debug_reports/DEAD_FILE_SWEEP_20261010.md
+        4     debug_reports/lint_triage_post_card6_20261010.txt
+        4     debug_reports/lint_gate_npm_run_lint_before_20261010.txt
+        4     debug_reports/lint_gate_npm_run_lint_after_20261010.txt
+        4     debug_reports/lint_8d_before_20261010.txt
+        4     debug_reports/lint_8c_before_20261010.txt
+        4     debug_reports/lint_8c_after_20261010.txt
+        4     debug_reports/lint_8b_before_20261010.txt
+        4     debug_reports/lint_8b_after_20261010.txt
+        4     debug_reports/lint_8a_before_20261010.txt
+        4     debug_reports/lint_8a_after_20261010.txt
+        4     debug_reports/gates_readme_gradle_untrack_20261010.txt
+        3     debug_reports/LINT_GATE_20261010.md
+        3     debug_reports/DEBUG_components_dashboard-sidebar.md
+        3     debug_reports/css_8d_before_after_20261010.txt
+        2     debug_reports/DEBUG_components_ui_sidebar.md
+        2     debug_reports/DEBUG_components_ui_carousel.md
+        2     debug_reports/_SIGNAL.txt
+        1     debug_reports/DEBUG_components_ui_use-mobile.md
+  (those are prior audits/lint logs quoting the paths — prose, not importers; tsconfig.tsbuildinfo,
+   a generated artifact that lists every file in the TS program, is excluded by name and is gitignored)
+
+## 5. Config surfaces that could bind the modules
+--- tsconfig.json (path alias) ---
+      "paths": {
+        "@/*": [
+          "./*"
+        ]
+      }
+--- components.json (shadcn aliases; it lists no component files) ---
+  13:  "aliases": {
+  14:    "components": "@/components",
+  16:    "ui": "@/components/ui",
+--- app/globals.css (Tailwind entry: the scan roots) ---
+  @import 'tailwindcss' source(none);
+  @source '../app';
+  @source '../components';
+  @source '../lib';
+  @source '../hooks';
+  @source '../stores';
+--- eslint.config.mjs ---
+  // eslint.config.mjs - ESLint flat config (ESLint 9) for the ALICE Next.js App Router app.
+  // Added by kanban task t_95d7f790. Pairs with the installed next@16.2.4; Next 16 removed
+  // `next lint`, so ESLint is driven directly by the existing `npm run lint` -> `eslint .`.
+  //
+  // Baseline when this gate was first installed (2026-10-10, tree at cb3ac3a):
+  //   130 files linted, 34 with findings, 102 problems = 73 errors / 29 warnings.
+  // Every rule exception below is a documented, visible downgrade or a scoped rule-off.
+  // Nothing here ignores real source: downgraded rules still print their findings as
+  // warnings on every run, so the debt stays in the totals instead of disappearing.
+  import { defineConfig, globalIgnores } from "eslint/config";
+  import nextVitals from "eslint-config-next/core-web-vitals";
+  import nextTs from "eslint-config-next/typescript";
+  
+  export default defineConfig([
+    ...nextVitals,
+    ...nextTs,
+  
+    // --- Rule exceptions (each one deliberate; see documentation.md section 13.4) ---
+    {
+      rules: {
+        // 51 pre-existing sites across 11 files. Removing `any` is a typing programme of its
+        // own, not a lint-gate install, so it stays visible as a warning.
+        "@typescript-eslint/no-explicit-any": "warn",
+        // 14 sites across 13 files: the codebase syncs state from props/fetch inside
+        // useEffect. Real cascading-render risk, but every site needs a behavioural change
+        // (derived state or useEffectEvent), so it stays visible as a warning.
+        "react-hooks/set-state-in-effect": "warn",
+        // 1 site: components/canvas/ReflectionCanvas.tsx reads a ref during render.
+        "react-hooks/refs": "warn",
+        // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+        // deleted as unreferenced (register row B4). The downgrade is now dead and is proposed
+        // for deletion at rank 8f — deleting it here would be a rule change, which is 8f's scope.
+        "react-hooks/purity": "warn",
+        // 2 sites: a bare apostrophe in JSX text (forgot-password page, ThreeCsForm). One-line
+        // escapes with no behaviour change, left for a follow-up edit rather than this card.
+        "react/no-unescaped-entities": "warn",
+      },
+    },
+  
+    // Root maintenance scripts are one-off CommonJS utilities; `require()` is their native
+    // style, so the TypeScript-era import rule does not apply to them.
+    {
+      files: ["patch-cloudflare.js", "patch-tasks.js", "patch-vignette.js"],
+      languageOptions: { sourceType: "commonjs" },
+      rules: { "@typescript-eslint/no-require-imports": "off" },
+    },
+  
+    // The Cloudflare Worker entry (backend/CloudFlare.js) is plain JS shipped with an explicit
+    // `@ts-nocheck` header; that is the file documented contract, not an accident.
+    {
+      files: ["backend/**/*.js"],
+      rules: { "@typescript-eslint/ban-ts-comment": "off" },
+    },
+  
+    globalIgnores([
+      // Build output
+      ".next/**",
+      // Dependencies
+      "node_modules/**",
+      // Generated / vendored Worker bundles and wrangler scratch state
+      "backend/.wrangler/**",
+      "backend/deployed/**",
+      // Verification-harness report bundles and screenshots
+      "debug_reports/**",
+      // Obsidian sync copy of documentation.md
+      ".obsidian_sync/**",
+      // Local scratch workspace (untracked)
+      "scratch/**",
+      // Generated by next dev/build
+      "next-env.d.ts",
+    ]),
+  ]);
+
+## 6. Barrels and re-exports
+--- every index.ts under components/ ---
+  components/canvas/index.ts
+  components/tasks/index.ts
+--- their contents (neither references ui/) ---
+  /**
+   * components/canvas/index.ts
+   *
+   * Public barrel for the reflection-canvas module.
+   */
+  
+  export { default as ReflectionCanvas } from "./ReflectionCanvas";
+  export type { ReflectionCanvasHandle, ReflectionCanvasProps } from "./ReflectionCanvas";
+  
+  export { exportAsImageBlob, serialiseVectorData, deserialiseVectorData } from "./canvasUtils";
+  
+  export {
+    BACKGROUND_OPTIONS,
+    STROKE_WIDTHS,
+    EXPORT_MAX_WIDTH_PX,
+    EXPORT_MAX_SIZE_BYTES,
+  } from "./canvasTypes";
+  export type {
+    BackgroundType,
+    CanvasVectorData,
+    DrawTool,
+    Stroke,
+    Point,
+    UploadResult,
+  } from "./canvasTypes";
+  /**
+   * components/tasks/index.ts
+   *
+   * Public barrel for the practice-tasks module.
+   */
+  
+  export { DynamicTaskForm } from "./DynamicTaskForm";
+  export type { TaskVariant } from "./DynamicTaskForm";
+  
+  export { ActivityScheduleForm, createEmptySchedule, DAYS, TIME_SLOTS } from "./ActivityScheduleForm";
+  export type { WeeklySchedule, TimeBlock, Day } from "./ActivityScheduleForm";
+  
+  export { ThreeCsForm, createEmptyThreeCsData } from "./ThreeCsForm";
+  export type { ThreeCsData } from "./ThreeCsForm";
+--- every re-export in the repo (export * / export {} from) ---
+  components/canvas/index.ts:7:export { default as ReflectionCanvas } from "./ReflectionCanvas";
+  components/canvas/index.ts:10:export { exportAsImageBlob, serialiseVectorData, deserialiseVectorData } from "./canvasUtils";
+  components/tasks/index.ts:7:export { DynamicTaskForm } from "./DynamicTaskForm";
+  components/tasks/index.ts:10:export { ActivityScheduleForm, createEmptySchedule, DAYS, TIME_SLOTS } from "./ActivityScheduleForm";
+  components/tasks/index.ts:13:export { ThreeCsForm, createEmptyThreeCsData } from "./ThreeCsForm";
+
+## 7. Dynamic imports / lazy loading
+$ git grep -n -E "import\(|next/dynamic|React\.lazy" -- "*.ts" "*.tsx" "*.mjs" "*.js"
+  components/main-content.tsx:12:import dynamic from "next/dynamic";
+  components/main-content.tsx:22:const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
+  components/vignette-generator.tsx:247:      const { downloadPracticePackagePdf } = await import("@/lib/export-practice-pdf")
+  next.config.mjs:1:/** @type {import('next').NextConfig} */
+  postcss.config.mjs:1:/** @type {import('postcss-load-config').Config} */
+  tests/worker.test.mjs:112:const worker = (await import(pathToFileURL(workerFile).href)).default
+
+## 8. Tests, scripts, workers, and all JSON/TOML configs
+--- tracked files under tests/ scripts/ workers/ and every *.json/*.toml — do any mention the two names? ---
+  .cursor/config.json                      0
+0 hit(s)
+  .github/workflows/docs-check.yml         0
+0 hit(s)
+  .github/workflows/weekly-docs-audit.yml  0
+0 hit(s)
+  .vscode/launch.json                      0
+0 hit(s)
+  .vscode/mcp.json                         0
+0 hit(s)
+  ai-config/mcp.json                       0
+0 hit(s)
+  components.json                          0
+0 hit(s)
+  debug_reports/font_8b_measure_after_blocked_20261010.json 0
+0 hit(s)
+  debug_reports/font_8b_measure_after_chart_20261010.json 0
+0 hit(s)
+  debug_reports/font_8b_measure_after_normal_20261010.json 0
+0 hit(s)
+  debug_reports/font_8b_measure_before_blocked_20261010.json 0
+0 hit(s)
+  debug_reports/lint_8c_harness_evidence_20261010.json 0
+0 hit(s)
+  overnight-debug.ps1                      0
+0 hit(s)
+  package.json                             1 hit(s)
+  scripts/BackUp/dispatch-inbox-bkup.ps1   0
+0 hit(s)
+  scripts/check-docs.mjs                   0
+0 hit(s)
+  scripts/dispatch-inbox.ps1               0
+0 hit(s)
+  scripts/logs/dispatch-2026-10-01.log     0
+0 hit(s)
+  scripts/logs/dispatch-2026-10-02.log     0
+0 hit(s)
+  scripts/logs/dispatch-2026-10-03.log     0
+0 hit(s)
+  scripts/logs/dispatch-2026-10-05.log     0
+0 hit(s)
+  scripts/run-silent.vbs                   0
+0 hit(s)
+  tests/hydration-guard.test.mjs           0
+0 hit(s)
+  tests/pdf-export.test.mjs                0
+0 hit(s)
+  tests/worker.test.mjs                    0
+0 hit(s)
+  tsconfig.json                            0
+0 hit(s)
+  workers/mcp-gateway/package.json         0
+0 hit(s)
+  workers/mcp-gateway/src/context.ts       0
+0 hit(s)
+  workers/mcp-gateway/src/index.ts         0
+0 hit(s)
+  workers/mcp-gateway/src/tools.ts         0
+0 hit(s)
+  workers/mcp-gateway/wrangler.toml        0
+0 hit(s)
+  (no line above = none of those files mention either name)
+
+## 9. Conclusion
+  Zero importers of either module in any form: static absolute (@/components/ui/...), static relative,
+  dynamic import(), next/dynamic, barrel/re-export, tsconfig path, Tailwind @source scan, test, script,
+  worker, or JSON/TOML config. The only live-tree hits are prose: documentation.md §13.4 (this card
+  corrected it), the stale eslint.config.mjs:30 comment (corrected here), and package.json's
+  embla-carousel-react entry — a dependency whose only importer was components/ui/carousel.tsx.
+  Both files are safe to delete. See css_8d_before_after_20261010.txt for the build-level proof.

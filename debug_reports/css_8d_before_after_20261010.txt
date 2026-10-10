@@ -1,0 +1,50 @@
+# Lint 8d — components/ui/sidebar.tsx + components/ui/carousel.tsx deletion: Tailwind build evidence
+# Card t_eaef274e, branch alan, 2026-10-10. Pre-change tree = HEAD 1c3cb44 with both files present.
+
+## Method
+The two kit files sit under the Tailwind scan root `components` (`app/globals.css`:
+`@import 'tailwindcss' source(none);` + `@source '../components'`), so deleting them can drop
+utility rules whose only occurrence was in those files. To attribute any CSS delta rather than
+assume it, the same `npm run build` was run twice from this working tree:
+
+  A. BEFORE  — `git checkout HEAD -- components/ui/sidebar.tsx components/ui/carousel.tsx`, build
+  B. AFTER   — the card's committed state (both files deleted), build
+
+Both builds exited 0 with the same 13-route table. The emitted stylesheets were then compared.
+
+## Sizes
+  before (A): 152763 bytes   .next/static/chunks/*.css
+  after  (B): 141957 bytes   .next/static/chunks/*.css
+  delta      :  -10806 bytes (-7.1 %)
+
+## Selector delta (commas split first, so Tailwind merge/reorder does not read as add/remove)
+  individual selectors before: 1401
+  individual selectors after : 1297
+  removed: 104        added: 0
+
+## Decisive check: does any LIVE file lose a rule it depends on?
+Every class-candidate token in every string literal of the 118 remaining live source files
+(app/ components/ lib/ hooks/ stores/ types/ styles/ backend/ workers/) was tested against both
+stylesheets (7483 distinct candidates):
+
+  tokens whose rule existed BEFORE and is missing AFTER : 0
+
+i.e. no token used by a surviving file lost its rule. Spot probes, read off the bytes:
+
+  ring-sidebar-ring          before: .ring-sidebar-ring{--tw-ring-color:var(--sidebar-ring)}
+                             after : .focus-visible\:ring-sidebar-ring:focus-visible{...same...}
+                             -> the live sidebar's variant usage survives; only the bare
+                                (sidebar.tsx-onward) rule went
+  h-7                        before: .h-7{height:calc(var(--spacing) * 7)}
+                             after : .file\:h-7::file-selector-button{...}   (input.tsx keeps its)
+  md:flex / sm:flex          before+after: only the prefixed cousins the live files use
+                             (.md\:flex-row, .sm\:flex-row, .sm\:flex-none, ...); no live file
+                             uses the bare form that was removed
+  bg-sidebar                 present before and after (dashboard-sidebar, dashboard-shell)
+  border-sidebar-border      present before and after
+  max-w-(--skeleton-width)   before: present (SidebarMenuSkeleton)   after: gone (correct — only
+                             the deleted file used it)
+
+## Conclusion
+The stylesheet shrank by exactly the utilities whose only occurrences were the two deleted files,
+and no surviving file's class lost its rule. No live styling depends on the deleted kit.

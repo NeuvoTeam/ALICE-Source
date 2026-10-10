@@ -27,7 +27,9 @@ export default defineConfig([
       "react-hooks/set-state-in-effect": "warn",
       // 1 site: components/canvas/ReflectionCanvas.tsx reads a ref during render.
       "react-hooks/refs": "warn",
-      // 1 site: components/ui/sidebar.tsx calls Math.random during render.
+      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+      // deleted as unreferenced (register row B4). The downgrade is now dead and is proposed
+      // for deletion at rank 8f — deleting it here would be a rule change, which is 8f's scope.
       "react-hooks/purity": "warn",
       // 2 sites: a bare apostrophe in JSX text (forgot-password page, ThreeCsForm). One-line
       // escapes with no behaviour change, left for a follow-up edit rather than this card.
