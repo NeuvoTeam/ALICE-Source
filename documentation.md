@@ -96,7 +96,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `app/homework/[sessionId]` | Legacy redirect shim — forwards an already-shared `/homework` link to `/practice/<id>`, carrying `?exp=&sig=` across unchanged (§4.7) |
 | `app/cases/[caseId]/sessions/[sessionId]` | Bookmark-compat redirect shim — selects the session in the store then `router.replace('/')` |
 | `app/api/analyze/session/route.ts` | **Legacy/dev-only** Next.js route calling a local Ollama instance. Not used by the shipped UI (see §7) |
-| `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-shell`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
+| `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-shell`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
 | `components/tasks/` | Practice-task module: `DynamicTaskForm` (Typeform-style orchestrator with debounced auto-save + error banner + human-approval gate), `ActivityScheduleForm` (Handout 1 — weekly grid on desktop, day-accordion on mobile), `ThreeCsForm` (Handout 10 — progressive-disclosure 3-step thought record). All are `"use client"` and call the Worker via `apiFetch` — never Supabase directly |
 | `components/canvas/` | Reflection canvas module: `ReflectionCanvas` (HTML5 Canvas with native Pointer Events, stylus detection, palm rejection, Bézier rendering, undo/redo, background variants); `canvasUtils.ts` (rendering + compression pipeline — PNG then JPEG fallback to enforce ≤ 2 MB / ≤ 1 200 px); `canvasTypes.ts` (types + constants). Uploads go through `POST /reflections/upload` via `apiFetch` |
 | `components/ui/` | Generated shadcn/ui primitives (new-york style). Treat as vendored — regenerate rather than hand-edit |
@@ -279,8 +279,7 @@ width when idle instead of being permanently truncated to make room for icons th
 drawn; every interactive element in the tree carries a visible `focus-visible` ring. The
 whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
 (`app/globals.css`) rather than hardcoded Tailwind greys, so it follows the dark theme.
-`components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
-(see §13).
+`components/clinical-folder-tree.tsx` is an unused alternate (see §13).
 
 The shell that hosts the sidebar — `components/dashboard-shell.tsx`, which
 `app/dashboard/page.tsx` renders in place of the old `<div className="flex h-screen">` row — is
@@ -901,9 +900,6 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   `lg:hidden`, so no chrome is added on desktop. The repo's `hooks/use-mobile.ts` was not used: its
   768px breakpoint would not line up with the `lg` chrome, leaving the sidebar unreachable between
   768px and 1023px. Measurements and screenshots: `debug_reports/UI_MOBILE_DRAWER_20261010.md`.
-- `components/session-history-panel.tsx` renders the flagged-consideration cards with token colours
-  (`text-muted-foreground`, `border-border`, amber with `dark:` variants); its expand toggle is
-  `type="button"` with `aria-expanded` and a `focus-visible` ring.
 - `components/auth-guard.tsx` renders `Loading...` until `GET /auth/me` resolves, then either renders
   the children or hard-redirects to `/login`.
 - Toast feedback is wired to `hooks/use-toast.ts`, and `app/layout.tsx` mounts `<Toaster />` from
@@ -1180,7 +1176,6 @@ local development, but several are user-visible or security-relevant.
 | `sessions.client_id` | `createSession` sends `{ caseId }` only, so new sessions can have a `NULL` `client_id` even though the column is written when supplied. `GET /client/history` works around this by joining through `case_formulations`; `GET /sessions?clientId=…` (used by the History tab) does not, so it stays empty for such sessions |
 | `/forgot-password` | "Send Reset Link" only shows `alert("Reset password functionality will be connected next.")` — no GoTrue recovery call |
 | `/client-login` | Accepts credentials, then simply `router.push(redirect)`. It authenticates nothing |
-| `session-history-panel.tsx` | Declares `riskFlags?: string[]` while `analysis.riskFlags` entries are objects (`{ label, severity, confidence, evidence }`); nothing currently renders this component against real data |
 | Toasts now render | `app/layout.tsx` mounts `<Toaster />` from `components/ui/toaster.tsx` after `{children}`, so `toast()` calls such as the "Could not open client" notice in `app/dashboard/page.tsx` reach the DOM (§8.5) |
 
 ### 13.3 Duplication, drift and dead code
@@ -1188,7 +1183,7 @@ local development, but several are user-visible or security-relevant.
 | Item | Detail |
 | --- | --- |
 | Two hierarchy models | `stores/useClientNavStore.ts` (Worker-backed, in use) vs `lib/clinical-hierarchy.ts` + `hooks/use-clinical-workspace.ts` + `lib/vignette-restore.ts` (localStorage-only, unused by the dashboard). Keeping both invites edits to the wrong one |
-| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; `components/sidebar/Sidebar.tsx` duplicates `dashboard-sidebar.tsx` without the app chrome; `components/sidebar/EditableText.tsx` exports an `EditableText` that nothing imports; `components/session-history-panel.tsx` exports `SessionHistoryPanel`, which no screen mounts. None is imported anywhere |
+| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
 | Hard-coded API URLs | `components/ClientLanding.tsx`, `app/login/page.tsx` and `app/signup/page.tsx` repeat the Worker URL instead of importing `CLINICAL_AI_API_BASE` |
 | Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both); `src/memory.ts` is empty |
 | Empty placeholders | `ai-config/prompts/intake.txt`, `ai-config/prompts/session.txt`, `supabase/functions/`, `public/placeholder-*` |
