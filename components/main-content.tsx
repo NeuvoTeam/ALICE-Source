@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import {
   Loader2,
@@ -90,25 +91,27 @@ export function MainContent({
   }, [client.id, selectedSessionId]);
 
   return (
-    <main className="flex-1 p-6 space-y-6">
+    <main className="flex-1 min-w-0 space-y-6 p-4 sm:p-6">
 
       {/* HEADER */}
-      <div className="flex justify-between items-center border-b pb-4">
-        <h1 className="text-xl font-bold">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <h1 className="text-xl font-bold min-w-0 break-words">
           {client.name} Dashboard
         </h1>
 
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onChangeClient}
-          className="border px-3 py-1 rounded"
+          className="shrink-0"
         >
           Change Client
-        </button>
+        </Button>
       </div>
 
       {/* ERROR */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-yellow-50 border">
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertCircle className="h-4 w-4" />
           <span>{error}</span>
         </div>
@@ -152,13 +155,13 @@ export function MainContent({
               {isLoading ? (
                 <Loader2 className="animate-spin" />
               ) : savedVignettes.length === 0 ? (
-                <p>No data yet</p>
+                <p className="text-sm text-muted-foreground">No data yet</p>
               ) : (
                 <div className="space-y-2">
                   {savedVignettes.map((entry, i) => (
                     <div
                       key={i}
-                      className="p-2 border rounded"
+                      className="rounded-lg border p-3 text-sm break-words"
                     >
                       {entry.created_at || "No date"}
                     </div>
@@ -176,9 +179,9 @@ export function MainContent({
               <CardTitle>Config</CardTitle>
             </CardHeader>
 
-            <CardContent>
-              <p>API: {API_BASE}</p>
-              <p>Client: {CLIENT_ID}</p>
+            <CardContent className="space-y-1 text-sm text-muted-foreground">
+              <p className="break-all">API: {API_BASE}</p>
+              <p className="break-words">Client: {CLIENT_ID}</p>
             </CardContent>
           </Card>
         </TabsContent>

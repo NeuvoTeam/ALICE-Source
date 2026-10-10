@@ -854,7 +854,14 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   (`components/vignette-generator.tsx`) still owns the array. The prop contract
   (`selectedModalities`, `onChange`, `disabled`) is unchanged.
 - `components/main-content.tsx` dynamically imports the generator with `ssr: false`; its History tab
-  lists `GET /sessions?clientId=…` rows keyed on `created_at`.
+  lists `GET /sessions?clientId=…` rows keyed on `created_at`. The region is `min-w-0` with
+  `p-4 sm:p-6`, so the `flex-1` column can shrink at narrow widths instead of forcing horizontal
+  overflow; the header wraps rather than clipping a long client name, and **Change Client** is the
+  shared `Button variant="outline"` rather than a raw `<button>`. Error banners and flag pills carry
+  explicit `dark:` variants so they stay legible when the dark theme is applied.
+- `components/session-history-panel.tsx` renders the flagged-consideration cards with token colours
+  (`text-muted-foreground`, `border-border`, amber with `dark:` variants); its expand toggle is
+  `type="button"` with `aria-expanded` and a `focus-visible` ring.
 - `components/auth-guard.tsx` renders `Loading...` until `GET /auth/me` resolves, then either renders
   the children or hard-redirects to `/login`.
 - Toast feedback is wired to `hooks/use-toast.ts`, and `components/ui/toaster.tsx` /
@@ -1136,7 +1143,7 @@ local development, but several are user-visible or security-relevant.
 | Item | Detail |
 | --- | --- |
 | Two hierarchy models | `stores/useClientNavStore.ts` (Worker-backed, in use) vs `lib/clinical-hierarchy.ts` + `hooks/use-clinical-workspace.ts` + `lib/vignette-restore.ts` (localStorage-only, unused by the dashboard). Keeping both invites edits to the wrong one |
-| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; `components/sidebar/Sidebar.tsx` duplicates `dashboard-sidebar.tsx` without the app chrome; `components/sidebar/EditableText.tsx` exports an `EditableText` that nothing imports. None is imported anywhere |
+| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; `components/sidebar/Sidebar.tsx` duplicates `dashboard-sidebar.tsx` without the app chrome; `components/sidebar/EditableText.tsx` exports an `EditableText` that nothing imports; `components/session-history-panel.tsx` exports `SessionHistoryPanel`, which no screen mounts. None is imported anywhere |
 | Hard-coded API URLs | `components/ClientLanding.tsx`, `app/login/page.tsx` and `app/signup/page.tsx` repeat the Worker URL instead of importing `CLINICAL_AI_API_BASE` |
 | Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both); `src/memory.ts` is empty |
 | Empty placeholders | `ai-config/prompts/intake.txt`, `ai-config/prompts/session.txt`, `supabase/functions/`, `public/placeholder-*` |
