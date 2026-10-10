@@ -522,39 +522,39 @@ export default function VignetteGenerator({
   }
 
   return (
-    <Card className="max-w-2xl mx-auto shadow-2xl border-t-4 border-t-primary rounded-[2.5rem] overflow-hidden bg-white">
-      <CardHeader className="border-b bg-zinc-50/50 pb-6 px-8">
+    <Card className="max-w-2xl mx-auto shadow-2xl border-t-4 border-t-primary rounded-[2.5rem] overflow-hidden bg-card text-card-foreground">
+      <CardHeader className="border-b border-border bg-muted/50 px-5 pb-6 sm:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 rounded-2xl">
               <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
-            <CardTitle className="text-xl font-black tracking-tight text-zinc-800 uppercase">
+            <CardTitle className="text-xl font-black tracking-tight text-foreground uppercase">
               ALICE 
             </CardTitle>
           </div>
           <div className="flex flex-col items-end gap-1">
             {sessionName && (
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <span className="max-w-[12rem] truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {sessionName}
               </span>
             )}
-            <div className="px-3 py-1 bg-white border rounded-full text-[10px] font-bold text-zinc-400">
+            <div className="px-3 py-1 rounded-full border border-border bg-background text-[10px] font-bold text-muted-foreground">
               PHASE {step}
               {isSaving ? " · saving…" : ""}
             </div>
           </div>
         </div>
-        <Progress value={step * 33.3} className="h-1.5 mt-6 bg-zinc-100" />
+        <Progress value={step * 33.3} className="mt-6 h-1.5 bg-muted" />
       </CardHeader>
 
       {degradedWarning && (
-        <div className="mx-8 mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900">
+        <div className="mx-5 mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 sm:mx-8 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           ⚠️ AI unavailable: {degradedWarning}
         </div>
       )}
 
-      <CardContent className="pt-8 px-8 pb-10">
+      <CardContent className="px-5 pt-8 pb-10 sm:px-8">
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             <div className="relative">
@@ -565,13 +565,13 @@ export default function VignetteGenerator({
                   if (sessionInput.trim()) persistNotes(sessionInput)
                 }}
                 placeholder="Paste Heidi notes here..."
-                className="min-h-[220px] text-base p-6 bg-zinc-50 border-2 rounded-[2rem] focus:border-primary/20"
+                className="min-h-[220px] rounded-[2rem] border-2 bg-muted/50 p-6 text-base focus:border-primary/20"
               />
               <Button
                 onClick={handleHeidiImport}
                 variant="outline"
                 size="sm"
-                className="absolute top-4 right-4 rounded-full bg-white shadow-sm"
+                className="absolute top-4 right-4 rounded-full border-border bg-background shadow-sm"
               >
                 <ClipboardPaste className="h-4 w-4 mr-2" /> Paste from Heidi
               </Button>
@@ -582,20 +582,20 @@ export default function VignetteGenerator({
                 aria-live="polite"
                 className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider"
               >
-                <span className="text-zinc-400">
+                <span className="text-muted-foreground">
                   {notesLength.toLocaleString()} /{" "}
                   {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters ·{" "}
                   {notesBudget}
                 </span>
                 {notesTooLong ? (
-                  <span className="text-red-600">Too long to send</span>
+                  <span className="text-destructive">Too long to send</span>
                 ) : notesLong ? (
-                  <span className="text-amber-600">Long note</span>
+                  <span className="text-amber-600 dark:text-amber-400">Long note</span>
                 ) : null}
               </div>
 
               {notesTooLong && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-900">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
                   {GROQ_TPM_LIMIT_NOTE} Trim these notes to about{" "}
                   {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters — as they
                   stand, the request is rejected before any AI work happens.
@@ -603,7 +603,7 @@ export default function VignetteGenerator({
               )}
 
               {notesLong && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
                   {GROQ_TPM_LIMIT_NOTE} Generation should still work, but a second
                   run inside the same minute may be rate limited.
                 </div>
@@ -622,13 +622,13 @@ export default function VignetteGenerator({
 
             <Button
               onClick={handleAnalyzeAndGenerate}
-              className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
+              className="h-14 w-full rounded-xl text-lg font-bold shadow-lg"
               disabled={!sessionInput || isProcessing || notesTooLong}
             >
               {isProcessing ? (
-                <Loader2 className="animate-spin mr-2" />
+                <Loader2 className="animate-spin mr-2" aria-hidden="true" />
               ) : (
-                <Sparkles className="mr-2" />
+                <Sparkles className="mr-2" aria-hidden="true" />
               )}
               Analyze & Recommend
             </Button>
@@ -637,14 +637,14 @@ export default function VignetteGenerator({
 
         {step === 2 && (
           <div className="space-y-6 animate-in slide-in-from-right">
-            <div className="p-6 rounded-[2rem] bg-blue-50/50 border border-blue-100 text-sm italic font-medium text-blue-900 leading-relaxed">
+            <div className="rounded-[2rem] border border-blue-100 bg-blue-50/50 p-6 text-sm italic font-medium leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
               {analysis?.rationale &&
               analysis.rationale !== PLACEHOLDER_RATIONALE
                 ? `"${analysis.rationale}"`
                 : `"No formulation yet — run Analyze & Recommend. (An earlier run stored no usable analysis.)"`}
             </div>
 
-            <div className="p-10 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm">
+            <div className="p-6 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm sm:p-10">
               <div className="flex flex-col gap-6 border-b pb-8">
                 <div className="flex justify-between items-start">
                   <div>
@@ -655,18 +655,18 @@ export default function VignetteGenerator({
                       ALICE
                     </p>
                   </div>
-                  <div className="h-10 w-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center">
-                    <CheckCircle2 className="text-green-600 h-6 w-6" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-green-100 bg-green-50 dark:border-green-900/50 dark:bg-green-950/40">
+                    <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/50 p-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Override Activity Format
                     </label>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Select
                       value={activityFormat}
                       onValueChange={(val: any) =>
@@ -674,7 +674,7 @@ export default function VignetteGenerator({
                       }
                       disabled={isProcessing}
                     >
-                      <SelectTrigger className="flex-1 h-12 rounded-xl bg-white border-zinc-200">
+                      <SelectTrigger className="h-12 flex-1 rounded-xl border-input bg-background">
                         <SelectValue placeholder="Select activity format" />
                       </SelectTrigger>
                       <SelectContent>
@@ -688,9 +688,9 @@ export default function VignetteGenerator({
                       onClick={handleRegenerateExplicit}
                       disabled={isProcessing}
                       variant="outline"
-                      className="h-12 px-6 rounded-xl border-zinc-200 bg-white"
+                      className="h-12 rounded-xl border-input bg-background px-6"
                     >
-                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2 text-primary" />}
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />}
                       {isProcessing ? "Generating..." : "Regenerate"}
                     </Button>
                   </div>
@@ -712,8 +712,8 @@ export default function VignetteGenerator({
               )}
             </div>
             
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-              <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+            <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3">
+              <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                 Client link · signed &amp; expiring
               </div>
 
@@ -723,34 +723,34 @@ export default function VignetteGenerator({
                   onClick={handleCopyClientLink}
                   className="w-full h-11 rounded-xl font-bold"
                 >
-                  <Copy className="h-4 w-4 mr-2" /> Copy Client Link
+                  <Copy className="h-4 w-4 mr-2" aria-hidden="true" /> Copy Client Link
                 </Button>
               </div>
 
               {linkStatus && (
-                <div className="text-[11px] font-medium text-zinc-500">
+                <div className="text-[11px] font-medium text-muted-foreground">
                   {linkStatus}
                 </div>
               )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
                 onClick={() => setStep(1)}
-                className="h-12 rounded-2xl"
+                className="h-12 rounded-xl"
               >
                 Back to Notes
               </Button>
               <Button
                 onClick={handleDownloadPdf}
-                className="flex-1 bg-zinc-900 text-white h-12 rounded-2xl font-bold"
+                className="h-12 flex-1 rounded-xl bg-foreground font-bold text-background hover:bg-foreground/90"
                 disabled={isExporting || !practicePackage}
               >
                 {isExporting ? (
-                  <Loader2 className="animate-spin mr-2" />
+                  <Loader2 className="animate-spin mr-2" aria-hidden="true" />
                 ) : (
-                  <Download className="mr-2" />
+                  <Download className="mr-2" aria-hidden="true" />
                 )}
                 Export PDF
               </Button>

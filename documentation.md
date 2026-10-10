@@ -847,6 +847,14 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   this approach; the hidden role-play/quiz blocks and the unreferenced `components/clinical-folder-tree.tsx`
   stub went with them, since neither had a consumer (the screen hid them and the PDF excludes them) and
   both were the only `tsc` errors. `npm run test:pdf` guards geometry, pagination, glyph hygiene and naming.
+- The generator's shell is token-based: the card surface is `bg-card`, the header band and inline
+  notices use `border-border` / `bg-muted/50` with explicit `dark:` variants for the amber, red, blue
+  and green callouts, and the action buttons normalise to `rounded-xl` (the two hero radii,
+  `rounded-[2rem]` on the notes area and `rounded-[2.5rem]` on the card and the document preview, are
+  deliberate). Horizontal space adapts below `sm`: the card/header/notice padding drops from `px-8`/
+  `mx-8`/`p-10` to `px-5`/`mx-5`/`p-6`, and the override-format and Back/Export rows stack
+  (`flex-col sm:flex-row`) instead of squeezing. The "Client Practice Task" preview keeps its white
+  paper colours on purpose — it is a document preview and stays legible in either theme.
 - `components/modality-selector.tsx` is the only modality picker: a `Popover` trigger labelled
   `Clinical Modalities (1-3)` with the live selection appended, opening a checkbox list built from
   `MODALITIES` (`lib/ai/schemas.ts`). It is presentational only — the 1–3 / no-duplicate rule lives in
