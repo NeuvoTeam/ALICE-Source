@@ -8,6 +8,7 @@ import { ClientView } from "@/components/client-view";
 import ClientLanding from "@/components/ClientLanding";
 import { useToast } from "@/hooks/use-toast";
 import AuthGuard from "@/components/auth-guard";
+import type { Client } from "@/types";
 
 type ViewMode = "clinician" | "client";
 type ClinicianTab = "vignette" | "summaries";
@@ -36,8 +37,8 @@ export default function Dashboard() {
   const content = !storeClient ? (
     <ClientLanding
       onSelectClient={async (
-        client: any,
-        options?: any
+        client: Client,
+        options?: { bootstrap?: boolean }
       ) => {
         await selectClient(
           client.id,
