@@ -54,8 +54,9 @@ export function ClientView({ client }: { client: Client }) {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    setIsLoading(true)
-
+    // No pre-set: `isLoading` initialises to `true` and this effect is the loader's only
+    // caller, so the call only ever re-set the value the state already held (lint rank 8g,
+    // register row B8).
     const fetchVignettes = async () => {
       try {
         const response = await apiFetch(`${API_BASE}/client/history?clientId=${CLIENT_ID}`)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiFetch } from "@/lib/auth";
 
@@ -52,10 +52,11 @@ const [showAddClient, setShowAddClient] =
   /^\d+$/.test(phoneNumber) &&
   phoneNumber.length >= 6;
 
-  const fetchClients = async () => {
+  // Stable identity: the mount effect below depends on it, and it only ever calls `setState`
+  // and module constants. Loading is set by the callers that need a spinner (create, refresh);
+  // the mount path already starts with `loading === true` (lint rank 8g, register row B7).
+  const fetchClients = useCallback(async () => {
     try {
-      setLoading(true);
-
       const res = await apiFetch(
         `${API_BASE}/clients`,
         {
@@ -83,11 +84,15 @@ const [showAddClient, setShowAddClient] =
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    // The loader runs as this effect's own async task: nothing is written synchronously in
+    // the effect body (lint rank 8g, register row B7).
+    void (async () => {
+      await fetchClients();
+    })();
+  }, [fetchClients]);
 
   const fetchClient = async (id: string) => {
     try {
@@ -204,6 +209,7 @@ setEmail("");
 setCountryCode("+65");
 setPhoneNumber("");
 
+      setLoading(true);
       await fetchClients();
 
 setShowAddClient(false);
@@ -291,7 +297,10 @@ fontSize: 15,
           
   
           <button
-            onClick={fetchClients}
+            onClick={() => {
+              setLoading(true);
+              void fetchClients();
+            }}
             style={{
               padding: "10px 14px",
               borderRadius: 8,

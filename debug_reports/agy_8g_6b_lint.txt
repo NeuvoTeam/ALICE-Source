@@ -1,0 +1,18 @@
+Before lint total: ✖ 20 problems (0 errors, 20 warnings)
+After lint total: ✖ 15 problems (0 errors, 15 warnings)
+
+Cleared findings:
+- react-hooks/set-state-in-effect in app/practitioner/tasks/[id]/review/page.tsx:1288
+- react-hooks/set-state-in-effect in components/ClientLanding.tsx:88
+- react-hooks/set-state-in-effect in components/client-view.tsx:57
+- react-hooks/set-state-in-effect in components/main-content.tsx:89
+- react-hooks/exhaustive-deps in components/main-content.tsx:90
+
+git diff --stat:
+warning: in the working copy of 'app/practitioner/tasks/[id]/review/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/client-view.tsx', LF will be replaced by CRLF the next time Git touches it
+ app/practitioner/tasks/[id]/review/page.tsx | 23 +++++++++++---
+ components/ClientLanding.tsx                | 25 ++++++++++-----
+ components/client-view.tsx                  |  5 +--
+ components/main-content.tsx                 | 48 ++++++++++++++++++++---------
+ 4 files changed, 73 insertions(+), 28 deletions(-)

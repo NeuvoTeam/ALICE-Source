@@ -1252,8 +1252,9 @@ function ReviewPageInner() {
   const [localLabel, setLocalLabel] = useState<string>("");
 
   const fetchBundle = useCallback(async () => {
-    setFetchError(null);
-    setLoading(true);
+    // No synchronous state writes here (lint rank 8g, register row B6). `loading` starts
+    // `true` and `fetchError` starts `null`, so both of these were bail-outs on mount; the
+    // Retry handler re-establishes them for the only caller that needs them.
     try {
       const res = await apiFetch(
         `${API}/tasks/submissions/${encodeURIComponent(submissionId)}/bundle`,
@@ -1285,7 +1286,21 @@ function ReviewPageInner() {
     }
   }, [submissionId]);
 
-  useEffect(() => { fetchBundle(); }, [fetchBundle]);
+  useEffect(() => {
+    // The loader runs as this effect's own async task, so nothing is written synchronously
+    // in the effect body (lint rank 8g, register row B6).
+    void (async () => {
+      await fetchBundle();
+    })();
+  }, [fetchBundle]);
+
+  // Retry re-opens the loading gate and clears the previous failure before re-running the
+  // loader — the two writes `fetchBundle` used to make on every caller's behalf.
+  const handleRetry = useCallback(() => {
+    setFetchError(null);
+    setLoading(true);
+    void fetchBundle();
+  }, [fetchBundle]);
 
   const isLocked = bundle?.submission.status === "approved";
   const readOnly  = isLocked;
@@ -1312,7 +1327,7 @@ function ReviewPageInner() {
             <ArrowLeft className="h-4 w-4" />
             Go back
           </Button>
-          <Button onClick={fetchBundle}>Retry</Button>
+          <Button onClick={handleRetry}>Retry</Button>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -35,8 +35,10 @@ export function MainContent({
   onChangeClient: () => void;
 }) {
   const [savedVignettes, setSavedVignettes] = useState<Vignette[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Loading and the failure banner are derived from the request key (see `requestKey` below),
+  // not pre-set synchronously inside the effect (lint rank 8g, register row B9).
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const [tab, setTab] = useState("generate");
 
   const CLIENT_ID = client.id.toString();
@@ -60,10 +62,17 @@ export function MainContent({
     );
   });
 
-  const fetchVignettes = async () => {
-    setIsLoading(true);
-    setError(null);
+  /**
+   * The request key ties each response to the client/session pair it belongs to. `isLoading`
+   * and the error banner are derived from it, so a response for a key that is no longer
+   * current is ignored rather than written through a synchronous pre-set. The pre-sets the
+   * triage register recorded here were not bail-outs: `isLoading` starts `false`, and a
+   * previous failure was only ever cleared at the head of the next fetch (lint rank 8g,
+   * register row B9; the same edit clears row B10, the missing dependency).
+   */
+  const requestKey = `${CLIENT_ID}:${selectedSessionId ?? ""}`;
 
+  const fetchVignettes = useCallback(async () => {
     try {
       const res = await apiFetch(
         `${API_BASE}/sessions?clientId=${client.id}`
@@ -78,17 +87,28 @@ export function MainContent({
       } else {
         setSavedVignettes([]);
       }
+
+      // Cleared on success, not at the head of the next fetch, so a failure that is never
+      // retried cannot leave a stale banner behind.
+      setError(null);
     } catch (err) {
       console.error("Fetch error:", err);
-      setError("Failed to load sessions");
+      setError({ key: requestKey, message: "Failed to load sessions" });
     } finally {
-      setIsLoading(false);
+      setLoadedKey(requestKey);
     }
-  };
+  }, [client.id, requestKey]);
 
   useEffect(() => {
-    fetchVignettes();
-  }, [client.id, selectedSessionId]);
+    // The loader runs as this effect's own async task: nothing is written synchronously in
+    // the effect body (lint rank 8g, register rows B9/B10).
+    void (async () => {
+      await fetchVignettes();
+    })();
+  }, [fetchVignettes]);
+
+  const isLoading = loadedKey !== requestKey;
+  const errorMessage = error && error.key === requestKey ? error.message : null;
 
   return (
     <main className="flex-1 min-w-0 space-y-6 p-4 sm:p-6">
@@ -110,10 +130,10 @@ export function MainContent({
       </div>
 
       {/* ERROR */}
-      {error && (
+      {errorMessage && (
         <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertCircle className="h-4 w-4" />
-          <span>{error}</span>
+          <span>{errorMessage}</span>
         </div>
       )}
 

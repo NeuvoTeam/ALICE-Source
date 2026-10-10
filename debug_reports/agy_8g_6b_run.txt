@@ -1,0 +1,12 @@
+I have successfully completed the edits to the four specific files to resolve the `react-hooks/set-state-in-effect` violations caused by the `fetch`-derived `set-state-in-effect` sites. 
+
+As requested:
+1. **`app/practitioner/tasks/[id]/review/page.tsx`**: Removed the synchronous state writes from `fetchBundle`, wrapped the `useEffect` call in an asynchronous IIFE, and introduced a new `handleRetry` function for the retry button.
+2. **`components/ClientLanding.tsx`**: Wrapped `fetchClients` in a `useCallback`, removed the synchronous state writes within it, wrapped the mount effect in an async IIFE, and restored the `setLoading(true)` spinner to the explicit `fetchClients` callers.
+3. **`components/client-view.tsx`**: Removed the synchronous `setIsLoading(true)` inside the effect and added the required comment.
+4. **`components/main-content.tsx`**: Removed the synchronous `setIsLoading` and `setError` inside `fetchVignettes`, changed them to rely on a stable `requestKey` to act gracefully as derived state, wrapped the mount effect in an async IIFE, and updated the rendered JSX template accordingly.
+
+I ran the required verification commands (`npm run lint` and `npx eslint`) which showed exactly **0 errors, 15 warnings**, confirming that the 4 `set-state-in-effect` and 1 `exhaustive-deps` issues have been effectively cleared.
+
+The full self-check report with the exact outputs and the `git diff --stat` has been written to:
+[agy_8g_6b_lint.txt](file:///D:/Work/Neuvo/ALICE/Source/debug_reports/agy_8g_6b_lint.txt)
