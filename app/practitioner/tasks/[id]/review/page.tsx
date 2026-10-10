@@ -340,7 +340,7 @@ function AuditLogPanel({ auditLog }: { auditLog: NormalisedAuditLogEntry[] }) {
         </div>
         <CardDescription className="text-xs">
           Sourced from{" "}
-          <code className="font-mono text-[10px] bg-muted px-1 py-0.5 rounded">
+          <code className="font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm">
             status_audit_log
           </code>
         </CardDescription>
@@ -448,7 +448,7 @@ function LabelEditor({
           }}
           maxLength={200}
           className={cn(
-            "flex-1 rounded-lg border border-primary/50 bg-background px-3 py-1.5 text-sm font-semibold",
+            "flex-1 rounded-md border border-primary/50 bg-background px-3 py-1.5 text-sm font-semibold",
             "focus:outline-none focus:ring-2 focus:ring-ring/40"
           )}
         />
@@ -473,7 +473,7 @@ function LabelEditor({
           type="button"
           onClick={startEdit}
           title="Edit exercise label"
-          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           <Edit3 className="h-4 w-4" />
         </button>
@@ -780,7 +780,7 @@ function ReflectionPanel({ reflections }: { reflections: NormalisedReflection[] 
                 <button
                   type="button"
                   onClick={() => setExpanded((prev) => (prev === r.id ? null : r.id))}
-                  className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-black/60 px-2.5 py-1 text-[11px] text-white backdrop-blur-sm"
+                  className="absolute bottom-2 right-2 flex items-center gap-1 rounded-sm bg-black/60 px-2.5 py-1 text-[11px] text-white backdrop-blur-sm"
                 >
                   {expanded === r.id ? (
                     <><ChevronUp className="h-3 w-3" /> Collapse</>
@@ -869,7 +869,7 @@ function PractitionerNotesPanel({
         </CardTitle>
         <CardDescription className="text-xs">
           Notes are append-only and stored exclusively in{" "}
-          <code className="font-mono text-[10px] bg-muted px-1 py-0.5 rounded">
+          <code className="font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm">
             submission_practitioner_notes
           </code>
         </CardDescription>
@@ -956,7 +956,7 @@ function ApproveDialog({ onConfirm, onCancel, isLoading }: ApproveDialogProps) {
         aria-modal="true"
         aria-labelledby="approve-dialog-title"
         className={cn(
-          "relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl",
+          "relative w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl",
           "border-emerald-200 dark:border-emerald-900"
         )}
       >
@@ -983,7 +983,7 @@ function ApproveDialog({ onConfirm, onCancel, isLoading }: ApproveDialogProps) {
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded accent-emerald-600"
+              className="mt-0.5 h-4 w-4 rounded-xs accent-emerald-600"
             />
             <span className="text-emerald-900 dark:text-emerald-100">
               I have reviewed the client submission and reflections, and I confirm
@@ -1034,7 +1034,7 @@ function RevisionDialog({ onConfirm, onCancel, isLoading }: RevisionDialogProps)
         role="dialog"
         aria-modal="true"
         aria-labelledby="revision-dialog-title"
-        className="relative w-full max-w-lg rounded-2xl border border-amber-200 bg-card p-6 shadow-xl dark:border-amber-900"
+        className="relative w-full max-w-lg rounded-xl border border-amber-200 bg-card p-6 shadow-xl dark:border-amber-900"
       >
         <h2 id="revision-dialog-title" className="mb-1.5 text-lg font-bold">
           Request Client Revision

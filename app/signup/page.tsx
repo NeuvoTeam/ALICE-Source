@@ -156,7 +156,7 @@ export default function SignupPage() {
           width: 520,
           background: "#fff",
           padding: 48,
-          borderRadius: 24,
+          borderRadius: 16,
           boxShadow:
             "0 12px 30px rgba(15,23,42,0.08)",
         }}

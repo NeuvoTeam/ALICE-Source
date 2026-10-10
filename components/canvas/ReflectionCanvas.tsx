@@ -570,7 +570,7 @@ const ReflectionCanvas = React.forwardRef<
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-2xl border border-slate-200",
+        "relative flex flex-col overflow-hidden rounded-xl border border-slate-200",
         "bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900",
         className
       )}
@@ -582,7 +582,7 @@ const ReflectionCanvas = React.forwardRef<
         className={cn(
           // Floating pill positioned at the top centre
           "absolute left-1/2 top-3 z-20 -translate-x-1/2",
-          "flex items-center gap-0.5 rounded-2xl px-2 py-1.5",
+          "flex items-center gap-0.5 rounded-xl px-2 py-1.5",
           "bg-white/90 shadow-lg shadow-slate-200/60 backdrop-blur-md",
           "border border-slate-100 dark:border-slate-700",
           "dark:bg-slate-800/90 dark:shadow-slate-900/60"

@@ -522,11 +522,11 @@ export default function VignetteGenerator({
   }
 
   return (
-    <Card className="max-w-2xl mx-auto shadow-2xl border-t-4 border-t-primary rounded-[2.5rem] overflow-hidden bg-card text-card-foreground">
+    <Card className="max-w-2xl mx-auto shadow-2xl border-t-4 border-t-primary rounded-4xl overflow-hidden bg-card text-card-foreground">
       <CardHeader className="border-b border-border bg-muted/50 px-5 pb-6 sm:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 rounded-2xl">
+            <div className="p-2.5 bg-primary/10 rounded-xl">
               <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
             <CardTitle className="text-xl font-black tracking-tight text-foreground uppercase">
@@ -565,7 +565,7 @@ export default function VignetteGenerator({
                   if (sessionInput.trim()) persistNotes(sessionInput)
                 }}
                 placeholder="Paste Heidi notes here..."
-                className="min-h-[220px] rounded-[2rem] border-2 bg-muted/50 p-6 text-base focus:border-primary/20"
+                className="min-h-[220px] rounded-4xl border-2 bg-muted/50 p-6 text-base focus:border-primary/20"
               />
               <Button
                 onClick={handleHeidiImport}
@@ -622,7 +622,7 @@ export default function VignetteGenerator({
 
             <Button
               onClick={handleAnalyzeAndGenerate}
-              className="h-14 w-full rounded-xl text-lg font-bold shadow-lg"
+              className="h-14 w-full rounded-md text-lg font-bold shadow-lg"
               disabled={!sessionInput || isProcessing || notesTooLong}
             >
               {isProcessing ? (
@@ -637,14 +637,14 @@ export default function VignetteGenerator({
 
         {step === 2 && (
           <div className="space-y-6 animate-in slide-in-from-right">
-            <div className="rounded-[2rem] border border-blue-100 bg-blue-50/50 p-6 text-sm italic font-medium leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+            <div className="rounded-4xl border border-blue-100 bg-blue-50/50 p-6 text-sm italic font-medium leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
               {analysis?.rationale &&
               analysis.rationale !== PLACEHOLDER_RATIONALE
                 ? `"${analysis.rationale}"`
                 : `"No formulation yet — run Analyze & Recommend. (An earlier run stored no usable analysis.)"`}
             </div>
 
-            <div className="p-6 border-2 rounded-[2.5rem] bg-white text-zinc-900 space-y-8 shadow-sm sm:p-10">
+            <div className="p-6 border-2 rounded-4xl bg-white text-zinc-900 space-y-8 shadow-sm sm:p-10">
               <div className="flex flex-col gap-6 border-b pb-8">
                 <div className="flex justify-between items-start">
                   <div>
@@ -660,7 +660,7 @@ export default function VignetteGenerator({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/50 p-4">
+                <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/50 p-4">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Override Activity Format
@@ -674,7 +674,7 @@ export default function VignetteGenerator({
                       }
                       disabled={isProcessing}
                     >
-                      <SelectTrigger className="h-12 flex-1 rounded-xl border-input bg-background">
+                      <SelectTrigger className="h-12 flex-1 rounded-md border-input bg-background">
                         <SelectValue placeholder="Select activity format" />
                       </SelectTrigger>
                       <SelectContent>
@@ -688,7 +688,7 @@ export default function VignetteGenerator({
                       onClick={handleRegenerateExplicit}
                       disabled={isProcessing}
                       variant="outline"
-                      className="h-12 rounded-xl border-input bg-background px-6"
+                      className="h-12 rounded-md border-input bg-background px-6"
                     >
                       {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />}
                       {isProcessing ? "Generating..." : "Regenerate"}
@@ -712,7 +712,7 @@ export default function VignetteGenerator({
               )}
             </div>
             
-            <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3">
+            <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3">
               <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                 Client link · signed &amp; expiring
               </div>
@@ -721,7 +721,7 @@ export default function VignetteGenerator({
                 <Button
                   variant="outline"
                   onClick={handleCopyClientLink}
-                  className="w-full h-11 rounded-xl font-bold"
+                  className="w-full h-11 rounded-md font-bold"
                 >
                   <Copy className="h-4 w-4 mr-2" aria-hidden="true" /> Copy Client Link
                 </Button>
@@ -738,13 +738,13 @@ export default function VignetteGenerator({
               <Button
                 variant="outline"
                 onClick={() => setStep(1)}
-                className="h-12 rounded-xl"
+                className="h-12 rounded-md"
               >
                 Back to Notes
               </Button>
               <Button
                 onClick={handleDownloadPdf}
-                className="h-12 flex-1 rounded-xl bg-foreground font-bold text-background hover:bg-foreground/90"
+                className="h-12 flex-1 rounded-md bg-foreground font-bold text-background hover:bg-foreground/90"
                 disabled={isExporting || !practicePackage}
               >
                 {isExporting ? (

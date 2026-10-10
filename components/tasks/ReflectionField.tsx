@@ -11,7 +11,7 @@ interface ReflectionFieldProps {
 
 export function ReflectionField({ prompt, value, onChange, disabled }: ReflectionFieldProps) {
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-6 shadow-sm">
+    <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
       <div className="space-y-1">
         <Label htmlFor="reflection" className="text-base font-semibold">
           Reflection

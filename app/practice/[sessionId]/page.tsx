@@ -150,7 +150,7 @@ export default function PracticePage() {
   if (error) {
     return (
       <div className="min-h-screen bg-zinc-50/50 flex flex-col items-center justify-center p-6 text-zinc-800">
-        <div className="max-w-md w-full bg-white border border-red-200 rounded-3xl p-8 shadow-sm text-center">
+        <div className="max-w-md w-full bg-white border border-red-200 rounded-xl p-8 shadow-sm text-center">
           <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 mx-auto flex items-center justify-center mb-4">
             <AlertCircle className="h-6 w-6" />
           </div>
@@ -180,7 +180,7 @@ export default function PracticePage() {
     return (
       <div className="min-h-screen bg-zinc-50/60 py-12 px-4 sm:px-6 flex justify-center">
         <div className="w-full max-w-4xl space-y-6">
-          <div className="bg-white border rounded-[2rem] p-4 sm:p-8 shadow-sm space-y-6">
+          <div className="bg-white border rounded-4xl p-4 sm:p-8 shadow-sm space-y-6">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-2">
                 <Sparkles className="h-3.5 w-3.5" /> ALICE Practice
@@ -232,7 +232,7 @@ export default function PracticePage() {
   return (
     <div className="min-h-screen bg-zinc-50/60 py-12 px-4 sm:px-6 flex justify-center">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="bg-white border rounded-[2rem] p-8 sm:p-10 shadow-sm space-y-6">
+        <div className="bg-white border rounded-4xl p-8 sm:p-10 shadow-sm space-y-6">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-2">
               <Sparkles className="h-3.5 w-3.5" /> ALICE Practice
@@ -268,7 +268,7 @@ export default function PracticePage() {
           )}
 
           {homework.length === 0 ? (
-            <div className="text-center py-12 text-zinc-400 border-2 border-dashed border-zinc-100 rounded-2xl">
+            <div className="text-center py-12 text-zinc-400 border-2 border-dashed border-zinc-100 rounded-xl">
               No practice tasks currently assigned for this session.
             </div>
           ) : (
@@ -282,7 +282,7 @@ export default function PracticePage() {
                     key={index}
                     type="button"
                     onClick={() => toggleTask(index)}
-                    className={`w-full flex items-start gap-4 p-4 rounded-2xl border text-left transition-all ${
+                    className={`w-full flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${
                       isDone
                         ? "bg-zinc-50/80 border-zinc-200 text-zinc-400"
                         : "bg-white border-zinc-200 hover:border-primary/40 hover:bg-zinc-50/40 text-zinc-800 shadow-sm"

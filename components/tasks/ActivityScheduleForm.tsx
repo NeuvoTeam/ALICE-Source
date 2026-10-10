@@ -100,7 +100,7 @@ function TimeBlockCell({ block, onChange, disabled }: TimeBlockCellProps) {
         rows={2}
         disabled={disabled}
         className={cn(
-          "w-full resize-none rounded bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60",
+          "w-full resize-none rounded-md bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60",
           "focus:outline-none focus:ring-0 border-none p-0"
         )}
       />
@@ -183,7 +183,7 @@ function MobileDayAccordion({ day, dayData, onChange, disabled }: MobileDayAccor
                   placeholder="What did you do?"
                   disabled={disabled}
                   className={cn(
-                    "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm",
+                    "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
                     "placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
                   )}
                 />

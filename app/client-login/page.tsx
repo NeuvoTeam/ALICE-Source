@@ -91,7 +91,7 @@ function ClientLoginForm() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="w-full border rounded-md px-3 py-2"
         />
 
         <input
@@ -99,7 +99,7 @@ function ClientLoginForm() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="w-full border rounded-md px-3 py-2"
         />
 
         {error && (
@@ -111,7 +111,7 @@ function ClientLoginForm() {
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="w-full bg-black text-white py-2 rounded"
+          className="w-full bg-black text-white py-2 rounded-md"
         >
           {loading ? "Logging in..." : "Login"}
         </button>

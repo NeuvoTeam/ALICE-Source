@@ -60,14 +60,14 @@ export function TwoChoiceWorksheetForm({
           const selectedAnswer = data.answers[i];
           
           return (
-            <div key={i} className="space-y-3 rounded-lg border bg-card p-6 shadow-sm">
+            <div key={i} className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
               <h3 className="font-medium">{prompt.question}</h3>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   disabled={disabled}
                   onClick={() => updateAnswer(i, 0)}
-                  className={`flex-1 rounded-lg border p-4 text-left transition-all ${
+                  className={`flex-1 rounded-md border p-4 text-left transition-all ${
                     selectedAnswer === 0
                       ? "border-primary bg-primary/10 ring-1 ring-primary shadow-sm"
                       : "hover:bg-accent hover:border-accent-foreground/20"
@@ -79,7 +79,7 @@ export function TwoChoiceWorksheetForm({
                   type="button"
                   disabled={disabled}
                   onClick={() => updateAnswer(i, 1)}
-                  className={`flex-1 rounded-lg border p-4 text-left transition-all ${
+                  className={`flex-1 rounded-md border p-4 text-left transition-all ${
                     selectedAnswer === 1
                       ? "border-primary bg-primary/10 ring-1 ring-primary shadow-sm"
                       : "hover:bg-accent hover:border-accent-foreground/20"

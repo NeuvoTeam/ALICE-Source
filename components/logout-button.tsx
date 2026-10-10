@@ -13,7 +13,7 @@ export default function LogoutButton() {
   items-center
   justify-center
   gap-2
-  rounded-lg
+  rounded-md
   border
   border-gray-200
   bg-gray-50

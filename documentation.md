@@ -1086,6 +1086,41 @@ gradle build        # compiles nothing today — all modules and src/main/java a
 - **Forms/validation:** `react-hook-form` + `zod` + `@hookform/resolvers` are available, but the
   shipped auth/client forms use `useState` + `alert()`. Follow the pattern of the file you are editing.
 
+#### Corner-radius scale
+
+Corner radii come from one ladder: `app/globals.css` defines `--radius: 0.75rem` and derives
+`--radius-sm/md/lg/xl` from it (8 / 10 / 12 / 16px), and Tailwind v4 still supplies `rounded-xs`
+(2px), `rounded-4xl` (32px) and `rounded-full`. Pick the token by role, not by eye:
+
+| Role | Class | Computed here | What uses it |
+| --- | --- | --- | --- |
+| indicator | `rounded-xs` | 2px | checkboxes, chart swatches, tooltip arrows, resize handles, dialog/sheet close buttons |
+| chip | `rounded-sm` | 8px | small inline badges, `<code>` chips, kbd |
+| control | `rounded-md` | 10px | buttons, inputs, selects, textareas, icon buttons — the shadcn control default |
+| panel | `rounded-lg` | 12px | containers nested inside a surface: inline callouts, table cells, inner rows |
+| surface | `rounded-xl` | 16px | page-level cards and panels, modals, dropdown panels — the shadcn `Card` default |
+| hero | `rounded-4xl` | 32px | the one decorative hero surface per view plus its immediate inner blocks |
+| pill | `rounded-full` | — | pills, avatars, progress bars, switches, sliders, round icon buttons |
+
+- **`rounded-2xl` is banned.** In this theme it computes to 1rem — byte-identical to `rounded-xl` —
+  so the two classes are indistinguishable and the choice between them is noise.
+- **Off-ladder values are out.** `rounded-3xl` (24px) and the bare `rounded` utility (4px, *not* the
+  themed `rounded-sm`) were removed everywhere. Two arbitrary forms survive, both justified:
+  `rounded-[inherit]` in `components/ui/scroll-area.tsx` (functional inheritance, not a value) and
+  `rounded-[calc(var(--radius) - 5px)]` in `components/ui/input-group.tsx` (derived from the theme
+  token, so it cannot drift).
+- **Hero is deliberate and singular:** at most one `rounded-4xl` surface per view — the
+  `VignetteGenerator` hero with its composer, its result card and the note inside it, plus the
+  practice-session content card. Nothing else may use that token.
+- **The legacy inline-styled auth screens** (`login`, `signup`, `forgot-password`, `ClientLanding`)
+  keep their `style` objects (see the Styling bullet above) and carry the token's px value directly:
+  `borderRadius: 16` is `rounded-xl`, `borderRadius: 10` is `rounded-md`.
+- **`components/ui/**` already follows the ladder** — it is the reference implementation. Do not
+  re-radius a vendored primitive for taste.
+- Adding a radius? Add a row to this table first. The scale was unified on 2026-10-10 (card
+  `t_923af17e`, on top of `8272327`); the changed-site list and the before/after measurements are in
+  `debug_reports/UI_RADIUS_SCALE_20261010.md`.
+
 ### 11.2 Data access
 
 - Only **one** origin to call: `CLINICAL_AI_API_BASE`. Never import `@supabase/supabase-js` in the

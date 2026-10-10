@@ -211,7 +211,7 @@ function ApprovalGate({ onConfirm, onCancel, isSubmitting }: ApprovalGateProps) 
   const [agreed, setAgreed] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 space-y-4">
+    <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 space-y-4">
       <div className="flex items-center gap-3">
         <ShieldCheck className="h-6 w-6 text-primary shrink-0" />
         <div>
@@ -228,7 +228,7 @@ function ApprovalGate({ onConfirm, onCancel, isSubmitting }: ApprovalGateProps) 
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+          className="mt-0.5 h-4 w-4 rounded-xs border-input accent-primary"
         />
         <span className="text-sm text-foreground">
           I confirm this is my completed work and I&apos;m ready for my

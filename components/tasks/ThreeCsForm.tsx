@@ -102,7 +102,7 @@ function StepCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border transition-all duration-300",
+        "rounded-xl border transition-all duration-300",
         isLocked
           ? "border-border/40 opacity-50"
           : isActive
@@ -113,7 +113,7 @@ function StepCard({
       {/* Header */}
       <div
         className={cn(
-          "flex items-center gap-3 px-5 py-4 rounded-t-2xl",
+          "flex items-center gap-3 px-5 py-4 rounded-t-xl",
           colour
         )}
       >
@@ -173,7 +173,7 @@ function EmotionRow({ emotion, onChange, onRemove, canRemove, disabled }: Emotio
           }
           disabled={disabled}
           className={cn(
-            "flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm",
+            "flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm",
             "focus:outline-none focus:ring-2 focus:ring-ring/40"
           )}
         >
@@ -190,7 +190,7 @@ function EmotionRow({ emotion, onChange, onRemove, canRemove, disabled }: Emotio
             type="button"
             onClick={onRemove}
             disabled={disabled}
-            className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             ×
           </button>
@@ -206,7 +206,7 @@ function EmotionRow({ emotion, onChange, onRemove, canRemove, disabled }: Emotio
           placeholder="Describe the emotion…"
           disabled={disabled}
           className={cn(
-            "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm",
+            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
             "focus:outline-none focus:ring-2 focus:ring-ring/40"
           )}
         />
@@ -334,7 +334,7 @@ export function ThreeCsForm({ data, onChange, disabled }: ThreeCsFormProps) {
               onClick={addEmotion}
               disabled={disabled}
               className={cn(
-                "rounded-lg px-3 py-1 text-xs font-medium text-primary",
+                "rounded-md px-3 py-1 text-xs font-medium text-primary",
                 "border border-primary/40 hover:bg-primary/10 transition-colors"
               )}
             >
