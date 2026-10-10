@@ -96,7 +96,7 @@ multi-module skeleton reserved for the domain/engine/runtime layers (see §12).
 | `app/homework/[sessionId]` | Legacy redirect shim — forwards an already-shared `/homework` link to `/practice/<id>`, carrying `?exp=&sig=` across unchanged (§4.7) |
 | `app/cases/[caseId]/sessions/[sessionId]` | Bookmark-compat redirect shim — selects the session in the store then `router.replace('/')` |
 | `app/api/analyze/session/route.ts` | **Legacy/dev-only** Next.js route calling a local Ollama instance. Not used by the shipped UI (see §7) |
-| `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
+| `components/` | Feature components: `ClientLanding`, `main-content`, `vignette-generator`, `client-view`, `dashboard-shell`, `dashboard-sidebar`, `auth-guard`, `logout-button`, `session-history-panel`, `theme-provider`, plus `components/sidebar/*` (the client→case→session tree) |
 | `components/tasks/` | Practice-task module: `DynamicTaskForm` (Typeform-style orchestrator with debounced auto-save + error banner + human-approval gate), `ActivityScheduleForm` (Handout 1 — weekly grid on desktop, day-accordion on mobile), `ThreeCsForm` (Handout 10 — progressive-disclosure 3-step thought record). All are `"use client"` and call the Worker via `apiFetch` — never Supabase directly |
 | `components/canvas/` | Reflection canvas module: `ReflectionCanvas` (HTML5 Canvas with native Pointer Events, stylus detection, palm rejection, Bézier rendering, undo/redo, background variants); `canvasUtils.ts` (rendering + compression pipeline — PNG then JPEG fallback to enforce ≤ 2 MB / ≤ 1 200 px); `canvasTypes.ts` (types + constants). Uploads go through `POST /reflections/upload` via `apiFetch` |
 | `components/ui/` | Generated shadcn/ui primitives (new-york style). Treat as vendored — regenerate rather than hand-edit |
@@ -281,6 +281,17 @@ whole shell takes its surface, text and hover colours from the `sidebar-*` token
 (`app/globals.css`) rather than hardcoded Tailwind greys, so it follows the dark theme.
 `components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
 (see §13).
+
+The shell that hosts the sidebar — `components/dashboard-shell.tsx`, which
+`app/dashboard/page.tsx` renders in place of the old `<div className="flex h-screen">` row — is
+responsive. At `lg` (1024px) and above it is the static 256px `<aside>` the desktop has always
+shown, with no extra chrome. Below `lg` it becomes a left `Sheet` (Radix Dialog) behind a 56px
+top bar carrying a real **Open navigation** button with `aria-expanded`; the sheet hosts the same
+`DashboardSidebar` element — never a second copy — traps focus, closes on Escape or its built-in
+close button, and returns focus to the trigger. Choosing a client or a session from the drawer (a
+change of `selectedClientId` or `selectedSessionId`) closes it, so it cannot keep covering the
+region it just navigated to, and crossing the breakpoint closes it too. No store, route, request
+or auth behaviour changed: the shell only reads those two store fields.
 
 ### 4.5 The AI workflow (notes + modalities → analysis → structured task)
 
@@ -869,6 +880,19 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   overflow; the header wraps rather than clipping a long client name, and **Change Client** is the
   shared `Button variant="outline"` rather than a raw `<button>`. Error banners and flag pills carry
   explicit `dark:` variants so they stay legible when the dark theme is applied.
+- `components/dashboard-shell.tsx` owns the responsive sidebar (§4.4). It renders exactly one
+  `DashboardSidebar` at a time and moves it between two slots: the static `hidden lg:flex` wrapper at
+  ≥1024px, and the `SheetContent` of a left `Sheet` below it. Which slot is live is decided after
+  mount by a `resize` listener that re-reads `matchMedia("(max-width: 1023px)")` (`isMobile` starts
+  `false`, so the server render and the first client render agree and there is no hydration
+  mismatch). The `hidden lg:flex` on the static slot means the pre-effect frame cannot paint a 256px
+  sidebar at 390px, and the drawer is closed only when the breakpoint is actually crossed — a
+  viewport change inside the same mode (an on-screen keyboard, say) leaves it open. The drawer is
+  `w-64 max-w-[85vw] gap-0 p-0`,
+  carries sr-only `SheetTitle` / `SheetDescription`, and the top bar holding the trigger is
+  `lg:hidden`, so no chrome is added on desktop. The repo's `hooks/use-mobile.ts` was not used: its
+  768px breakpoint would not line up with the `lg` chrome, leaving the sidebar unreachable between
+  768px and 1023px. Measurements and screenshots: `debug_reports/UI_MOBILE_DRAWER_20261010.md`.
 - `components/session-history-panel.tsx` renders the flagged-consideration cards with token colours
   (`text-muted-foreground`, `border-border`, amber with `dark:` variants); its expand toggle is
   `type="button"` with `aria-expanded` and a `focus-visible` ring.

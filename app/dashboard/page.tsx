@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useClientNavStore } from "@/stores/useClientNavStore";
-import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { MainContent } from "@/components/main-content";
 import { ClientView } from "@/components/client-view";
 import ClientLanding from "@/components/ClientLanding";
@@ -61,14 +61,12 @@ export default function Dashboard() {
       }}
     />
   ) : (
-    <div className="flex h-screen">
-      <DashboardSidebar
-        viewMode={viewMode}
-        activeTab={activeTab}
-        onViewModeChange={setViewMode}
-        onTabChange={setActiveTab}
-      />
-
+    <DashboardShell
+      viewMode={viewMode}
+      activeTab={activeTab}
+      onViewModeChange={setViewMode}
+      onTabChange={setActiveTab}
+    >
       {viewMode === "clinician" ? (
         <MainContent
           key={storeClient.id}
@@ -79,7 +77,7 @@ export default function Dashboard() {
       ) : (
         <ClientView client={storeClient} />
       )}
-    </div>
+    </DashboardShell>
   );
 
   return (
