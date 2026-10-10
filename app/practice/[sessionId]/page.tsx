@@ -7,9 +7,10 @@ import { CheckCircle2, Circle, Loader2, Sparkles, AlertCircle } from "lucide-rea
 import { DynamicTaskForm, type TaskVariant } from "@/components/tasks/DynamicTaskForm";
 import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
 
-type PracticePackage = {
-  homework: any[];
-};
+import type { PracticePackage } from "@/lib/practice-package";
+
+/** The shared PracticePackage projected to the single homework member this route returns. */
+type PracticeHomework = Pick<PracticePackage, "homework">;
 
 /** The clinician's chosen activity, as projected by GET /client-homework/:id. */
 type PracticeTask = {
@@ -38,21 +39,20 @@ function readPracticeTask(value: unknown): PracticeTask | null {
 type SessionData = {
   id?: string;
   name?: string;
-  practicePackage?: PracticePackage | null;
+  practicePackage?: PracticeHomework | null;
   practiceTask?: PracticeTask | null;
 };
 
-function getTaskLabel(item: any): string {
+function getTaskLabel(item: unknown): string {
   if (typeof item === "string") return item;
   if (!item || typeof item !== "object") return String(item);
-  return (
-    item.task ||
-    item.description ||
-    item.title ||
-    item.question ||
-    item.prompt ||
-    JSON.stringify(item)
-  );
+  const val =
+    ("task" in item && item.task) ||
+    ("description" in item && item.description) ||
+    ("title" in item && item.title) ||
+    ("question" in item && item.question) ||
+    ("prompt" in item && item.prompt);
+  return val ? String(val) : JSON.stringify(item);
 }
 
 export default function PracticePage() {
@@ -121,8 +121,8 @@ export default function PracticePage() {
         });
 
         setError(null);
-      } catch (err: any) {
-        setError(err?.message || "Unable to load practice tasks");
+      } catch (err) {
+        setError((err instanceof Error ? err.message : null) || "Unable to load practice tasks");
       } finally {
         setLoading(false);
       }
@@ -273,7 +273,7 @@ export default function PracticePage() {
             </div>
           ) : (
             <div className="space-y-3 pt-2">
-              {homework.map((item: any, index: number) => {
+              {homework.map((item, index: number) => {
                 const label = getTaskLabel(item);
                 const isDone = !!completed[index];
 
