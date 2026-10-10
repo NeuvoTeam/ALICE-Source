@@ -290,7 +290,11 @@ top bar carrying a real **Open navigation** button with `aria-expanded`; the she
 `DashboardSidebar` element — never a second copy — traps focus, closes on Escape or its built-in
 close button, and returns focus to the trigger. Choosing a client or a session from the drawer (a
 change of `selectedClientId` or `selectedSessionId`) closes it, so it cannot keep covering the
-region it just navigated to, and crossing the breakpoint closes it too. No store, route, request
+region it just navigated to, and crossing the breakpoint closes it too. `lg` — the media query
+Tailwind emits for it, `@media (min-width:64rem)` — is the single boundary for the CSS and the JS
+alike: `SheetContent` is rendered unconditionally (Radix mounts the portal only while the sheet is
+open, so a closed drawer costs no DOM), which means the trigger is never reachable without the
+drawer content it opens, at any width, fractional or not. No store, route, request
 or auth behaviour changed: the shell only reads those two store fields.
 
 ### 4.5 The AI workflow (notes + modalities → analysis → structured task)
@@ -880,14 +884,18 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   overflow; the header wraps rather than clipping a long client name, and **Change Client** is the
   shared `Button variant="outline"` rather than a raw `<button>`. Error banners and flag pills carry
   explicit `dark:` variants so they stay legible when the dark theme is applied.
-- `components/dashboard-shell.tsx` owns the responsive sidebar (§4.4). It renders exactly one
-  `DashboardSidebar` at a time and moves it between two slots: the static `hidden lg:flex` wrapper at
-  ≥1024px, and the `SheetContent` of a left `Sheet` below it. Which slot is live is decided after
-  mount by a `resize` listener that re-reads `matchMedia("(max-width: 1023px)")` (`isMobile` starts
+- `components/dashboard-shell.tsx` owns the responsive sidebar (§4.4). `lg` — the media query
+  Tailwind emits for it, `@media (min-width:64rem)` — is the single source of truth: the
+  `SheetContent` of the left `Sheet` is rendered unconditionally, so whenever the `lg:hidden` top bar
+  (and its **Open navigation** trigger) is reachable the drawer has content, at any width including a
+  fractional one produced by page zoom. The JS mirrors only the *negation* of that same query: the
+  `isMobile` flag (`matchMedia("(min-width: 64rem)")` inverted) decides which single slot holds the
+  one `DashboardSidebar` — the static `hidden lg:flex` wrapper, or the sheet below `lg` — and a
+  `resize` listener closes the drawer only when that boundary is actually crossed. `isMobile` starts
   `false`, so the server render and the first client render agree and there is no hydration
-  mismatch). The `hidden lg:flex` on the static slot means the pre-effect frame cannot paint a 256px
-  sidebar at 390px, and the drawer is closed only when the breakpoint is actually crossed — a
-  viewport change inside the same mode (an on-screen keyboard, say) leaves it open. The drawer is
+  mismatch; the `hidden lg:flex` on the static slot means the pre-effect frame cannot paint a 256px
+  sidebar at 390px, and a viewport change inside the same mode (an on-screen keyboard, say) leaves
+  the drawer open. The drawer is
   `w-64 max-w-[85vw] gap-0 p-0`,
   carries sr-only `SheetTitle` / `SheetDescription`, and the top bar holding the trigger is
   `lg:hidden`, so no chrome is added on desktop. The repo's `hooks/use-mobile.ts` was not used: its

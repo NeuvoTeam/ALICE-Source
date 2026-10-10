@@ -6,7 +6,10 @@ import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useClientNavStore } from "@/stores/useClientNavStore";
 
-const MOBILE_QUERY = "(max-width: 1023px)";
+// Note that rem in a media query resolves against the initial font size, so 64rem and 1024px
+// are the same boundary, and this string is byte-for-byte the one the compiled Tailwind sheet
+// uses for .lg\:hidden / .lg\:flex.
+const DESKTOP_QUERY = "(min-width: 64rem)";
 
 export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabChange, children }: {
   viewMode: "clinician" | "client";
@@ -25,12 +28,13 @@ export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabCha
   const lastMobile = useRef(false);
 
   useEffect(() => {
-    const query = window.matchMedia(MOBILE_QUERY);
+    const query = window.matchMedia(DESKTOP_QUERY);
 
     const sync = () => {
-      const next = query.matches;
+      const next = !query.matches;
       // `resize` re-reads the query on every viewport change, real or emulated; the
-      // breakpoint itself stays in one place (MOBILE_QUERY / the lg classes below).
+      // lg (1024px, emitted by Tailwind as `@media (min-width:64rem)`) is the single boundary.
+      // The JS only mirrors its negation for the static slot and closes the drawer on a crossing.
       // Only crossing the breakpoint closes the drawer: a viewport change that stays
       // inside the same mode (an on-screen keyboard, say) must leave it open.
       if (next !== lastMobile.current) setDrawerOpen(false);
@@ -70,13 +74,11 @@ export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabCha
           <span className="font-semibold">ALICE</span>
         </header>
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-        {isMobile && (
-          <SheetContent side="left" className="w-64 max-w-[85vw] gap-0 p-0">
-            <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SheetDescription className="sr-only">Client, case and session navigation.</SheetDescription>
-            {sidebar}
-          </SheetContent>
-        )}
+        <SheetContent side="left" className="w-64 max-w-[85vw] gap-0 p-0">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetDescription className="sr-only">Client, case and session navigation.</SheetDescription>
+          {sidebar}
+        </SheetContent>
       </Sheet>
     </div>
   );
