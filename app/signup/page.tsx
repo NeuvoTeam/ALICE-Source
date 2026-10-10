@@ -109,7 +109,7 @@ export default function SignupPage() {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
+    } catch (err) {
       console.error(
         "Signup Exception:",
         err
