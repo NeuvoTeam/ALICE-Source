@@ -340,6 +340,18 @@ export function DynamicTaskForm({
     initialSubmissionId ?? (externalSubmissionId || undefined)
   );
 
+  // DELIBERATELY RETAINED (lint rank 8g, register row B11). The triage register calls this effect
+  // redundant because the initialiser above already seeds the same prop — true at mount, and true
+  // for the two call sites that never pass a submission id (`app/practice/[sessionId]/page.tsx`
+  // runs with `persist={false}`; `components/client-view.tsx` passes none). It is NOT true at
+  // `components/vignette-generator.tsx:715`, which passes `submissionId={generatedSubmissionId}`:
+  // `handleRegenerateExplicit` sets a NEW draft id (`:513`) without changing `step`, so the form
+  // stays mounted and the prop changes underneath it. This effect is the only thing that
+  // re-points the mounted form at the new draft row; without it `performSave` would keep writing
+  // (`id: submissionId ?? null`) into the previous row while the new draft keeps the newly
+  // generated payload. The rule is left visible rather than disabled: the alternatives are a
+  // `key` remount, which unmounts the form and drops a pending autosave debounce, or a derived
+  // id, which diverges in the same post-save case.
   useEffect(() => {
     if (externalSubmissionId) {
       setSubmissionId(externalSubmissionId);

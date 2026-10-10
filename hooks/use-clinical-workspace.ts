@@ -26,6 +26,13 @@ export function useClinicalWorkspace() {
     saveClinicalHierarchy(hierarchy)
   }, [hierarchy])
 
+  // DELIBERATELY RETAINED (lint rank 8g, register row B15). A guarded derived-default: it returns
+  // early when the hierarchy is empty and again when the current selection is still valid, so in
+  // practice it writes only on mount, and it is correct today. It is not restructured because the
+  // hook has ZERO importers in this repo — the live workspace model is the store in `stores/
+  // useClientNavStore.ts` (§8.2), not this file — so a restructure could not be verified against
+  // any caller. The finding is reported rather than fixed, and wiring this hook up or deleting it
+  // is an operator dead-code decision.
   useLayoutEffect(() => {
     if (hierarchy.clients.length === 0) return
     if (selectedClientId && findClient(hierarchy, selectedClientId)) return

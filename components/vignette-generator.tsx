@@ -153,6 +153,15 @@ export default function VignetteGenerator({
   const notesLong = !notesTooLong && notesLength > SESSION_NOTES_WARN_CHARS
   const notesBudget = `≈${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`
 
+  // DELIBERATELY RETAINED (lint rank 8g, register row B13). This is the session-hydration latch:
+  // `lib/session-hydration.ts` decides wait/keep/hydrate and `tests/hydration-guard.test.mjs`
+  // locks fifteen cases around it, so a careless fix here is riskier than the finding. The writes
+  // below run only when the guard returns `hydrate` — once per session — and the derived-state
+  // alternative (computing the phase from the store during render) would re-derive on every store
+  // write: blur-saves, renames and the PATCH echo all replace the session object, and re-deriving
+  // would bounce the clinician out of the phase they are in and discard unsaved notes. The rule
+  // stays visible rather than silenced, because the guard's behaviour IS the behaviour the fifteen
+  // tests pin.
   useEffect(() => {
     if (!session) {
       hydratedSessionRef.current = null

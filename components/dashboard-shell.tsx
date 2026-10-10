@@ -22,9 +22,6 @@ export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabCha
   // Start isMobile as false so the server render and the first client render agree - no hydration mismatch.
   const [isMobile, setIsMobile] = useState(false);
 
-  const selectedClientId = useClientNavStore((s) => s.selectedClientId);
-  const selectedSessionId = useClientNavStore((s) => s.selectedSessionId);
-
   const lastMobile = useRef(false);
 
   useEffect(() => {
@@ -47,10 +44,22 @@ export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabCha
     return () => window.removeEventListener("resize", sync);
   }, []);
 
-  // Picking a client or a session is navigation and must close the drawer.
+  // Picking a client or a session is navigation and must close the drawer. This subscribes to the
+  // navigation store instead of deriving the close from the selected ids inside an effect (lint
+  // rank 8g, register row B14): the callback fires only when a selection actually changes, and a
+  // setState inside a subscription callback is not a synchronous state write in the effect body.
+  // It closes in the same update that navigates, so the drawer can never be left covering the
+  // region it just navigated to.
   useEffect(() => {
-    setDrawerOpen(false);
-  }, [selectedClientId, selectedSessionId]);
+    return useClientNavStore.subscribe((state, prev) => {
+      if (
+        state.selectedClientId !== prev.selectedClientId ||
+        state.selectedSessionId !== prev.selectedSessionId
+      ) {
+        setDrawerOpen(false);
+      }
+    });
+  }, []);
 
   const sidebar = (
     <DashboardSidebar
