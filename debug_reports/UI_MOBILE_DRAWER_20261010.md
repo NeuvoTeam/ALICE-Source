@@ -163,3 +163,189 @@ Full log: `%LOCALAPPDATA%\hermes\profiles\kuro\cache\scratch\gates-drawer.log`.
   portal's cleanup waits on an animation event.
 - Desktop screenshots are included for the "unchanged" claim; the 1440 numbers were taken from the
   same harness before and after the change rather than from the live app.
+
+## 9. 2026-10-10, second pass (`t_ee1a066e`) — the 1023–1024px dead band, reproduced on screen and closed
+
+The dead band §8 could only assert by static analysis is real, and it is now closed. Code commit
+`4b47789` on top of `c03cf4f` (branch `alan`, **not pushed**). Coding agent: Antigravity CLI (`agy`),
+model `Gemini 3.1 Pro (High)` — non-Claude, per the operator constraint. Harness, measurements and
+verification below are mine. §1–§8 are untouched: this is an appended section, not a rewrite.
+
+### 9.1 Reproducing a fractional viewport width
+
+Two obvious routes do not work and a third does:
+
+- `Emulation.setDeviceMetricsOverride` **rejects a fractional width** — the parameter is an int32
+  (`Failed to deserialize params.width - BINDINGS: int32 value expected`), so 1023.5 cannot be
+  emulated that way. `deviceScaleFactor` does not divide the layout width (`width=2046, dsf=2` →
+  `innerWidth 2046`) and neither does `scale` (`scale=1.1`, `width=1024` → `innerWidth 1024`).
+- An **iframe sized in fractional CSS px rounds up**: a 1023.5px frame reports `innerWidth 1024` and
+  `matchMedia("(min-width:64rem)") === true` — desktop mode, not the band.
+- **Real page zoom does produce a fractional layout viewport**, because the layout width is the
+  emulated window width divided by the zoom. Driven with trusted CDP key events
+  (`Input.dispatchKeyEvent` with `Ctrl` `=` / `Ctrl` `0`), Chrome's zoom ladder gives exact
+  fractional widths from integer window widths:
+
+  | layout viewport (CSS px) | emulated width | zoom | `dpr` |
+  | --- | --- | --- | --- |
+  | 1023.00 | 1023 | 100% | 1 |
+  | 1023.20 | 1279 | 125% | 1.25 |
+  | 1023.33 | 1535 | 150% | 1.5 |
+  | 1023.43 | 1791 | 175% | 1.75 |
+  | 1023.50 | 2047 | 200% | 2 |
+  | 1023.64 | 1126 | 110% | 1.1 |
+  | 1023.75 | 4095 | 400% | 4 |
+  | 1023.80 | 5119 | 500% | 5 |
+  | 1024.00 | 1024 | 100% | 1 |
+  | 1025.00 | 1025 | 100% | 1 |
+
+  Each width is verified from inside the page rather than assumed: at the 1023.64 state
+  `(max-width: 1023.5px)` is false and `(max-width: 1023.64px)` true, pinning the media viewport to
+  (1023.5, 1023.64] — the arithmetically exact `1126 / 1.1`. Chrome quantises the value it hands to
+  media queries to 1/64 px (1023.6364 → 1023.625), ~0.02px of noise that does not matter here.
+  **1023.90 exactly is not reachable** (`1023.9 × {1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5}` is never
+  an integer, and width/dsf/scale cannot make it one), so the band is covered by six other
+  fractional points spanning 1023.20–1023.80 instead.
+
+### 9.2 BEFORE (`c03cf4f`) — trigger visible, drawer opens empty
+
+Per state: media-query truth, then a trusted CDP mouse click at the trigger's own centre.
+
+| layout width | `@media (min-width:64rem)` (Tailwind `lg`) | `matchMedia("(max-width: 1023px)")` (old JS gate) | trigger visible | after the click |
+| --- | --- | --- | --- | --- |
+| 1023.00 | false | **true** | yes | `[role=dialog]` 1, one `aside` 256px **inside** it — works |
+| 1023.20 | false | false | yes | `aria-expanded="true"`, `[role=dialog]` **0**, no visible `aside` — **opens empty** |
+| 1023.33 | false | false | yes | **opens empty** |
+| 1023.43 | false | false | yes | **opens empty** |
+| 1023.50 | false | false | yes | **opens empty** |
+| 1023.64 | false | false | yes | **opens empty** |
+| 1023.75 | false | false | yes | **opens empty** |
+| 1023.80 | false | false | yes | **opens empty** |
+| 1024.00 | true | false | no (`header` `display:none`) | desktop |
+| 1025.00 | true | false | no | desktop |
+
+At every fractional width in the band the two sources of truth disagree exactly as the card
+described: `lg:hidden` paints the trigger, `matchMedia("(max-width: 1023px)")` says "not mobile", so
+`{isMobile && <SheetContent>}` renders nothing and the hamburger sets `drawerOpen` with no dialog in
+the DOM at all. The client-name row also disappears from view in those states — the one `aside`
+present is the static `hidden lg:flex` copy, which `lg` no longer un-hides (`asideCount` 1,
+`asideVisible` 0). `debug_reports/ui_deadband_before_1023_64_empty.png` is that state at 1023.64
+after the trigger was clicked.
+
+### 9.3 The fix (approach (b), with one correction to it)
+
+`lg` is now the single boundary, for the CSS and the JS alike:
+
+- **`SheetContent` is rendered unconditionally.** Radix `Dialog.Portal` mounts only while the sheet
+  is open, so a closed drawer still costs no DOM (verified: `[data-slot="sheet-content"]` count 0 in
+  the closed state at every width). The drawer therefore always has content whenever its trigger is
+  reachable — at any width, fractional or not. The failure mode is impossible by construction rather
+  than merely narrowed.
+- **The JS mirrors the *negation* of the same predicate**: `MOBILE_QUERY = "(max-width: 1023px)"`
+  became `DESKTOP_QUERY = "(min-width: 64rem)"` with `next = !query.matches`. That string is
+  byte-for-byte the media query this build's Tailwind emits for `lg` — `.lg\:hidden{display:none}`
+  and `.lg\:flex{display:flex}` both sit inside `@media (min-width:64rem){…}` in the compiled
+  stylesheet — so `!matches` is the exact complement of what decides the CSS, evaluated by the same
+  engine, and the two cannot disagree at a fractional width. This is why (b) closes the band where
+  (a) (`max-width: 1023.98px`) would only move the 0.02px hole: (a) keeps two independent
+  predicates.
+- `isMobile` keeps its other two jobs unchanged: it decides which single slot holds the one
+  `DashboardSidebar` (static `hidden lg:flex` wrapper, or the sheet — never both), and the `resize`
+  listener still closes the drawer only when the boundary is actually crossed.
+
+### 9.4 AFTER (`4b47789`) — measured
+
+Same states, same harness, one bundle rebuilt from the working tree:
+
+| layout width | `lg` | new JS gate (`!min-width:64rem`) | trigger visible | after the click |
+| --- | --- | --- | --- | --- |
+| 1023.00 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.20 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.33 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.43 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.50 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.64 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.75 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1023.80 | false | true | yes | dialog 1, one `aside` 256px inside |
+| 1024.00 | true | false | no | desktop, one static `aside` |
+| 1025.00 | true | false | no | desktop, one static `aside` |
+
+There is no width left where the trigger is visible and the drawer opens empty (acceptance 1), and
+the media-query pair that used to disagree now reads `lg` false **and** "not lg" true at every one of
+those widths.
+
+Acceptance 2 — one `DashboardSidebar`, no duplicated tree — holds at every state: `aside` count ≤ 1
+(0 while the drawer is closed below `lg`, 1 when open, and that one is inside `[role=dialog]`), the
+client row "Jane May Low" appears once as a leaf element in every state, and the document holds 244
+elements at desktop, 88 at 390px closed and 255 with the drawer open — never a static copy plus a
+sheet copy.
+
+`debug_reports/ui_deadband_after_1023_64_open.png` is the same clicked state as the "before" image,
+now drawer open.
+
+### 9.5 Regression: desktop and 390px (acceptance 3 and 4)
+
+Both trees measured back to back on the same harness (interleaved, two runs each), identical in
+every field:
+
+```
+                                                                BEFORE          AFTER
+1440px  innerWidth 1440  documentElement.clientWidth 1425       aside 1 @256    aside 1 @256
+        docScrollWidth 1425   header display:none  dialog 0      main 1169       main 1169
+        textarea 606   total elements 244                        (identical)     (identical)
+1024px  clientWidth 1009   aside 1 @256   header display:none    main 753        main 753
+1025px  clientWidth 1010   aside 1 @256                          main 754        main 754
+ 390px  clientWidth 375   docScrollWidth 375 (no overflow)      aside 0         aside 0
+        header/top bar visible, trigger visible                   main 375        main 375
+        textarea 301   total elements 88                          (identical)     (identical)
+```
+
+The 1440 row reproduces §5's `c03cf4f` baseline exactly (256 / 1169 / 606, no top bar). 390px closed
+reproduces §5's 375px full-width main and the 301px textarea.
+
+Interaction at 390px, AFTER, driven with trusted clicks/keys — unchanged from §6:
+
+| Step | Result |
+| --- | --- |
+| Closed | `aside` 0, main 375, `docScrollWidth == clientWidth == 375` |
+| Click the trigger | `[role=dialog]` 1, sr-only title `Navigation`, one `aside` 256px **inside** it, `aria-expanded=true`, focus moved inside the dialog, `body { pointer-events: none; overflow: hidden }` |
+| 3× `Tab` | focus still inside the dialog |
+| `Escape` | dialog gone, `aside` 0, body style cleared, focus back on the trigger |
+| Re-open, click *Session 2* | drawer closed, and on re-open the selection has moved Session 3 → Session 2 |
+| 390 → 1440 with the drawer open | drawer closed, `lg` static `aside` 256, main 1169, body style cleared |
+| 1023.64 → ≥`lg` with the drawer open | drawer closed, `lg` static `aside` 256 (the crossing still closes it from inside the band) |
+
+### 9.6 Gates
+
+```
+### 1. npx tsc --noEmit
+tsc exit=0
+### 2. npm test
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+test exit=0
+### 3. npm run build
+✓ Compiled successfully in 6.4s
+build exit=0
+```
+
+Full log: `%LOCALAPPDATA%\hermes\profiles\kuro\cache\scratch\gates-deadband.log`. The commit hook
+printed `docs:check — ok (documentation.md moved with 1 path(s))`.
+
+### 9.7 Harness files and observations
+
+- Harness: `%LOCALAPPDATA%\hermes\profiles\kuro\cache\scratch\` — `drawer-before.html` +
+  `drawer-before.js` (bundled from `alice-before-shell.tsx`, a byte-identical copy of the `c03cf4f`
+  `components/dashboard-shell.tsx`, md5 `e1aee22222822f8210b47025a1d0a3e9`), `drawer-after.html` +
+  `drawer-after.js` (the working tree), `harness-server.mjs`, `harness-frame.html` (the iframe
+  fractional-width experiment), `frac-probe-*.html`, and the raw results
+  `deadband-before.json` / `deadband-after.json`. Both bundles use the real `DashboardSidebar`,
+  `MainContent` and `DashboardShell` with `window.fetch` stubbed to reject: no credential, no Worker
+  call, no patient data.
+- `next build` rewrites the generated `next-env.d.ts` (dev path → `./.next/types/routes.d.ts`);
+  that churn was reverted rather than committed, so `git status --porcelain` shows only this card's
+  two new screenshots plus the pre-existing untracked `scratch/`.
+- The closing behaviour in §8's note still applies (a backgrounded tab freezes Radix's exit
+  animation); `Page.bringToFront` released it, as before.
+
