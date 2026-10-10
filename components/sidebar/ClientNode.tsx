@@ -23,15 +23,15 @@ export function ClientNode() {
   return (
     <div className="space-y-1">
       {/* Client header */}
-      <div className="flex items-center justify-between px-3 py-1">
+      <div className="group flex items-center justify-between px-3 py-1">
         <EditableName value={client.name} onSave={renameClient} />
 
         <button
           type="button"
           onClick={createCase}
-          className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+          className="rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 

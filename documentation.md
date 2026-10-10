@@ -273,6 +273,10 @@ The sidebar UI is `components/sidebar/ClientNode.tsx` → `CaseNode.tsx` → `Se
 `EditableName` inline rename. Each session row reveals three actions on hover: **Copy client link**
 and **Open client link** — both mint a fresh signed link through `apiFetch`, so an expired token is
 routed to `/login` rather than failing silently — and a `confirm()`-gated delete.
+The action rows are revealed by keyboard focus as well as hover (`group-focus-within`), and every
+interactive element in the tree carries a visible `focus-visible` ring. The whole shell takes its
+surface, text and hover colours from the `sidebar-*` tokens (`app/globals.css`) rather than hardcoded
+Tailwind greys, so it follows the dark theme.
 `components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
 (see §13).
 
@@ -1132,7 +1136,7 @@ local development, but several are user-visible or security-relevant.
 | Item | Detail |
 | --- | --- |
 | Two hierarchy models | `stores/useClientNavStore.ts` (Worker-backed, in use) vs `lib/clinical-hierarchy.ts` + `hooks/use-clinical-workspace.ts` + `lib/vignette-restore.ts` (localStorage-only, unused by the dashboard). Keeping both invites edits to the wrong one |
-| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; `components/sidebar/Sidebar.tsx` duplicates `dashboard-sidebar.tsx` without the app chrome. Neither is imported anywhere |
+| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; `components/sidebar/Sidebar.tsx` duplicates `dashboard-sidebar.tsx` without the app chrome; `components/sidebar/EditableText.tsx` exports an `EditableText` that nothing imports. None is imported anywhere |
 | Hard-coded API URLs | `components/ClientLanding.tsx`, `app/login/page.tsx` and `app/signup/page.tsx` repeat the Worker URL instead of importing `CLINICAL_AI_API_BASE` |
 | Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both); `src/memory.ts` is empty |
 | Empty placeholders | `ai-config/prompts/intake.txt`, `ai-config/prompts/session.txt`, `supabase/functions/`, `public/placeholder-*` |

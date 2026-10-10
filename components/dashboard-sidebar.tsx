@@ -27,7 +27,7 @@ export function DashboardSidebar({
   onTabChange,
 }: DashboardSidebarProps) {
   return (
-    <aside className="flex h-full w-64 flex-col border-r bg-white">
+    <aside className="flex h-full w-64 flex-col border-r bg-sidebar text-sidebar-foreground border-sidebar-border shrink-0">
 
       {/* HEADER */}
       <div className="flex items-center gap-3 border-b px-5 py-4">
@@ -41,16 +41,16 @@ export function DashboardSidebar({
 
       {/* VIEW SWITCH */}
       <div className="border-b px-3 py-3">
-        <p className="text-xs text-gray-400 px-2 mb-2">View</p>
+        <p className="text-xs text-muted-foreground px-2 mb-2">View</p>
 
         <div className="flex gap-2">
           <button
             onClick={() => onViewModeChange("clinician")}
             className={cn(
-              "flex-1 text-sm px-3 py-2 rounded",
+              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
               viewMode === "clinician"
-                ? "bg-gray-200"
-                : "bg-gray-50 hover:bg-gray-100"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "hover:bg-sidebar-accent/50"
             )}
           >
             <Stethoscope className="inline h-4 w-4 mr-1" />
@@ -60,10 +60,10 @@ export function DashboardSidebar({
           <button
             onClick={() => onViewModeChange("client")}
             className={cn(
-              "flex-1 text-sm px-3 py-2 rounded",
+              "flex-1 text-sm px-3 py-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
               viewMode === "client"
-                ? "bg-gray-200"
-                : "bg-gray-50 hover:bg-gray-100"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "hover:bg-sidebar-accent/50"
             )}
           >
             <User className="inline h-4 w-4 mr-1" />
@@ -78,7 +78,7 @@ export function DashboardSidebar({
 
           {/* CLIENT / CASE / SESSION TREE */}
           <div className="px-3 py-3">
-            <p className="text-xs text-gray-400 mb-2">Clients</p>
+            <p className="text-xs text-muted-foreground mb-2">Clients</p>
 
             {/* ✅ IMPORTANT: this must NOT handle routing */}
             <ClientNode />
@@ -86,15 +86,15 @@ export function DashboardSidebar({
 
           {/* TOOLS */}
           <div className="px-3 py-3">
-            <p className="text-xs text-gray-400 mb-2">Tools</p>
+            <p className="text-xs text-muted-foreground mb-2">Tools</p>
 
             <button
               onClick={() => onTabChange("vignette")}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded",
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                 activeTab === "vignette"
-                  ? "bg-gray-200"
-                  : "hover:bg-gray-100"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "hover:bg-sidebar-accent/50"
               )}
             >
               <FileText className="h-4 w-4" />
@@ -104,10 +104,10 @@ export function DashboardSidebar({
             <button
               onClick={() => onTabChange("summaries")}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded",
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                 activeTab === "summaries"
-                  ? "bg-gray-200"
-                  : "hover:bg-gray-100"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "hover:bg-sidebar-accent/50"
               )}
             >
               <ScrollText className="h-4 w-4" />
@@ -120,25 +120,25 @@ export function DashboardSidebar({
       {/* CLIENT MODE */}
       {viewMode === "client" && (
         <div className="flex-1 px-3 py-3">
-          <p className="text-xs text-gray-400 mb-2">My Materials</p>
+          <p className="text-xs text-muted-foreground mb-2">My Materials</p>
 
-          <div className="px-3 py-2 bg-gray-200 rounded text-sm">
+          <div className="rounded-md bg-sidebar-accent px-3 py-2 text-sm text-sidebar-accent-foreground">
             Assigned Vignettes
           </div>
         </div>
       )}
 
 
-{/* FOOTER */}
-<div className="mt-auto border-t px-3 py-2">
-  <LogoutButton />
+      {/* FOOTER */}
+      <div className="mt-auto border-t border-sidebar-border px-3 py-2">
+        <LogoutButton />
 
-  <div className="mt-2 text-center text-[11px] text-gray-400">
-    {viewMode === "clinician"
-      ? "Powered by ALICE v1.1"
-      : "Client learning materials"}
-  </div>
-</div>
+        <div className="mt-2 text-center text-[11px] text-muted-foreground">
+          {viewMode === "clinician"
+            ? "Powered by ALICE v1.1"
+            : "Client learning materials"}
+        </div>
+      </div>
 
     </aside>
   );

@@ -112,7 +112,7 @@ export function SessionNode({
       onClick={() => void selectSession(caseId, session.id)}
       className={cn(
         "group flex items-center justify-between px-3 py-1.5 rounded-md text-sm cursor-pointer",
-        "transition-all duration-150 hover:bg-sidebar-accent/50",
+        "transition-all duration-150 hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         isSelected && "bg-sidebar-accent font-medium"
       )}
     >
@@ -127,7 +127,7 @@ export function SessionNode({
       </div>
 
       {/* RIGHT ACTIONS */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-150">
 
         {/* COPY CLIENT LINK */}
         <button
@@ -136,14 +136,14 @@ export function SessionNode({
           disabled={busy !== null}
           title="Copy client link"
           className={cn(
-            "p-1 rounded transition disabled:opacity-50",
-            copied ? "bg-green-100" : "hover:bg-blue-100"
+            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:opacity-50",
+            copied ? "text-emerald-600" : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
           {copied ? (
-            <Check className="h-4 w-4 text-green-600" />
+            <Check className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <Copy className="h-4 w-4 text-blue-500 group-hover:text-blue-700" />
+            <Copy className="h-4 w-4" aria-hidden="true" />
           )}
         </button>
 
@@ -153,9 +153,9 @@ export function SessionNode({
           onClick={handleOpen}
           disabled={busy !== null}
           title="Open client link"
-          className="p-1 rounded hover:bg-gray-100 transition disabled:opacity-50"
+          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-sidebar-accent disabled:opacity-50"
         >
-          <ExternalLink className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
+          <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-sidebar-accent-foreground" aria-hidden="true" />
         </button>
 
         {/* DELETE */}
@@ -168,9 +168,9 @@ export function SessionNode({
             }
           }}
           title="Delete session"
-          className="p-1 rounded hover:bg-red-100 transition"
+          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-destructive/10"
         >
-          <Trash className="h-4 w-4 text-red-400 group-hover:text-red-600" />
+          <Trash className="h-4 w-4 text-muted-foreground group-hover:text-destructive" aria-hidden="true" />
         </button>
 
       </div>
