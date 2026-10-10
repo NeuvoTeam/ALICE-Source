@@ -309,6 +309,12 @@ write — blur-save, rename, the `PATCH` echo — therefore cannot reset the pha
 notes, and a failed `GET /sessions/:id` leaves Phase 1 empty rather than showing the stub.
 
 In Step 1, clinicians choose up to 3 evidence-based modalities (`CBT`, `ACT`, `DBT`) alongside session notes.
+`components/modality-selector.tsx` renders that choice as a **dropdown of checkboxes** (Radix `Popover` +
+the shared `Checkbox`): the trigger reads `Clinical Modalities (1-3)` followed by a live summary of the
+current selection, and the menu lists every value of `MODALITIES`. The control enforces the same contract as
+`ModalitiesSchema` — at least one, at most three, no duplicates, with `["CBT"]` as the fallback for an empty
+or invalid value — and when three are selected the remaining rows are disabled behind an in-menu hint. The
+component only reports the new array through `onChange`; the request schema is unchanged.
 Clicking **Analyze & Recommend** automatically infers the formulation and generates the most fitting structured activity.
 In Step 2, clinicians review the formulation and generated activity, with an override dropdown to re-generate into
 alternative formats (`activity_log`, `thought_record`, `two_choice_worksheet`, `reflection_prompt`) if desired.
@@ -837,6 +843,12 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   this approach; the hidden role-play/quiz blocks and the unreferenced `components/clinical-folder-tree.tsx`
   stub went with them, since neither had a consumer (the screen hid them and the PDF excludes them) and
   both were the only `tsc` errors. `npm run test:pdf` guards geometry, pagination, glyph hygiene and naming.
+- `components/modality-selector.tsx` is the only modality picker: a `Popover` trigger labelled
+  `Clinical Modalities (1-3)` with the live selection appended, opening a checkbox list built from
+  `MODALITIES` (`lib/ai/schemas.ts`). It is presentational only — the 1–3 / no-duplicate rule lives in
+  the component's `normalizedSelected` memo and `toggleModality`, and the parent
+  (`components/vignette-generator.tsx`) still owns the array. The prop contract
+  (`selectedModalities`, `onChange`, `disabled`) is unchanged.
 - `components/main-content.tsx` dynamically imports the generator with `ssr: false`; its History tab
   lists `GET /sessions?clientId=…` rows keyed on `created_at`.
 - `components/auth-guard.tsx` renders `Loading...` until `GET /auth/me` resolves, then either renders
