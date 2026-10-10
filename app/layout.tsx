@@ -9,6 +9,7 @@ const geist = Geist({
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -44,7 +45,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-  className={`${geist.className} antialiased`}
+  className={`${geist.className} ${geistMono.variable} antialiased`}
 >
   {children}
   <Toaster />

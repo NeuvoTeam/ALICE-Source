@@ -1,0 +1,30 @@
+ALICE lint 8b — emitted CSS, before vs after (built stylesheets, .next/static/chunks/*.css)
+before build: tree e3b77fa; after build: tree e3b77fa + app/layout.tsx + app/globals.css edits
+
+=== BEFORE: .font-mono rule ===
+.font-mono{font-family:Geist Mono,Geist Mono Fallback}
+
+=== BEFORE: @font-face font-family values ===
+font-family:Geist (x5, latin+Cyrillic+Greek+Vietnamese subsets)
+font-family:Geist Fallback (x1, src:local(Arial))
+font-family:Geist Mono (x6: latin + U+460-52F, U+301..., U+2000..., U+102-103..., U+100-2BA..., U+?? ranges)
+font-family:Geist Mono Fallback (x1, src:local(Arial), size-adjust:134.59%)
+-> the Geist Mono @font-face rules ALREADY existed before the change (the register claimed none was emitted: that claim is wrong for a Next 16.2.4/Turbopack build, see the evidence file).
+
+=== AFTER: .font-mono rule (final build) ===
+.font-mono{font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace}
+
+=== AFTER: the variable the rule resolves through ===
+.geist_mono_d6617093-module__z61v7q__variable{--font-geist-mono:"Geist Mono", "Geist Mono Fallback"}
+
+=== AFTER: @font-face font-family counts ===
+      5 font-family:Geist
+      1 font-family:Geist Fallback
+      6 font-family:Geist Mono
+      1 font-family:Geist Mono Fallback
+
+=== AFTER: built HTML body class (login.html) ===
+class="geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased"
+
+=== AFTER: --font-sans untouched ===
+83:  --font-sans: 'Geist', 'Geist Fallback';
