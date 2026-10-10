@@ -5,7 +5,34 @@ import { Loader2 } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
 import { Client } from "@/types";
+import type { PracticePackage } from "@/lib/practice-package";
+import type { StructuredTask } from "@/lib/ai/schemas";
 import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
+
+/**
+ * `GET /client/history` returns `practice_package` in whichever shape the Worker
+ * stored: a structured task (has `task_type`) or a PracticePackage from
+ * `/generate/practice-package`.
+ */
+function isStructuredTask(
+  pkg: StructuredTask | PracticePackage | null | undefined
+): pkg is StructuredTask {
+  return !!pkg && typeof pkg === "object" && "task_type" in pkg;
+}
+
+/** The three variants `DynamicTaskForm` renders — `reflection_prompt` uses the canvas instead. */
+const FORM_TASK_TYPES = ["two_choice_worksheet", "activity_log", "thought_record"] as const;
+
+/**
+ * A structured task this component can render. The body proves the narrowing
+ * (`isStructuredTask` plus the same three `task_type` literals the old filter used,
+ * in the same order), so the claim is exactly what was checked.
+ */
+function isRenderableTask(
+  pkg: StructuredTask | PracticePackage | null | undefined
+): pkg is Extract<StructuredTask, { task_type: (typeof FORM_TASK_TYPES)[number] }> {
+  return isStructuredTask(pkg) && FORM_TASK_TYPES.some((t) => t === pkg.task_type);
+}
 
 interface AssignedMaterial {
   id: string
@@ -17,7 +44,7 @@ interface AssignedMaterial {
   worksheetQuestions?: string[]
   createdAt?: string
   modality?: string
-  practice_package?: any
+  practice_package?: StructuredTask | PracticePackage | null
 }
 
 export function ClientView({ client }: { client: Client }) {
@@ -37,7 +64,7 @@ export function ClientView({ client }: { client: Client }) {
         const data: AssignedMaterial[] = await response.json()
         
         // Find the newest material that is a worksheet
-        const newest = data.find(m => m.practice_package?.task_type === 'two_choice_worksheet' || m.practice_package?.task_type === 'activity_log' || m.practice_package?.task_type === 'thought_record')
+        const newest = data.find(m => isRenderableTask(m.practice_package))
         setMaterial(newest || null)
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Unknown error"))
@@ -66,7 +93,7 @@ export function ClientView({ client }: { client: Client }) {
     )
   }
 
-  if (!material || !material.practice_package) {
+  if (!material || !isRenderableTask(material.practice_package)) {
     return (
       <main className="flex-1 flex items-center justify-center bg-background p-8 min-h-[50vh]">
         <div className="text-center">
