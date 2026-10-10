@@ -55,7 +55,7 @@ export function CaseNode({ caseData }: { caseData: Case }) {
         </button>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition">
+        <div className="mr-2 hidden items-center gap-1 group-hover:flex group-focus-within:flex">
           <button
             onClick={(e) => {
               e.stopPropagation();

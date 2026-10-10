@@ -127,7 +127,7 @@ export function SessionNode({
       </div>
 
       {/* RIGHT ACTIONS */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-150">
+      <div className="hidden items-center gap-1 group-hover:flex group-focus-within:flex">
 
         {/* COPY CLIENT LINK */}
         <button

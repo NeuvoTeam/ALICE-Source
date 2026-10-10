@@ -37,7 +37,7 @@ export default function EditableName({ value, onSave }: Props) {
 
           {/* ✅ Larger click target + subtle hover */}
           <div
-            className="rounded-md p-1 hover:bg-sidebar-accent/50 cursor-pointer opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
+            className="hidden cursor-pointer rounded-md p-1 hover:bg-sidebar-accent/50 group-hover:block group-focus-within:block"
             onClick={(e) => {
               e.stopPropagation()
               setIsEditing(true)

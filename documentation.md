@@ -273,10 +273,12 @@ The sidebar UI is `components/sidebar/ClientNode.tsx` → `CaseNode.tsx` → `Se
 `EditableName` inline rename. Each session row reveals three actions on hover: **Copy client link**
 and **Open client link** — both mint a fresh signed link through `apiFetch`, so an expired token is
 routed to `/login` rather than failing silently — and a `confirm()`-gated delete.
-The action rows are revealed by keyboard focus as well as hover (`group-focus-within`), and every
-interactive element in the tree carries a visible `focus-visible` ring. The whole shell takes its
-surface, text and hover colours from the `sidebar-*` tokens (`app/globals.css`) rather than hardcoded
-Tailwind greys, so it follows the dark theme.
+The action rows and the inline-rename pencil are rendered only on hover or keyboard focus
+(`hidden group-hover:flex group-focus-within:flex`), so a session name gets the full row
+width when idle instead of being permanently truncated to make room for icons that are not
+drawn; every interactive element in the tree carries a visible `focus-visible` ring. The
+whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
+(`app/globals.css`) rather than hardcoded Tailwind greys, so it follows the dark theme.
 `components/clinical-folder-tree.tsx` and `components/sidebar/Sidebar.tsx` are unused alternates
 (see §13).
 
