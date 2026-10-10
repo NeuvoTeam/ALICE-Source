@@ -1,0 +1,171 @@
+{
+ "harness": {
+  "dir": "D:\\Work\\Neuvo\\ALICE\\Source\\scratch\\rc-harness (untracked; eslint-ignored by the `scratch/**` globalIgnores entry)",
+  "files": {
+   "ReflectionCanvasPre.tsx": "pre-fix source: verbatim `git show HEAD:components/canvas/ReflectionCanvas.tsx`, with only the two relative imports rewritten to @/components/canvas/*",
+   "entry.tsx": "mounts the real working-tree component (post-fix) and ReflectionCanvasPre side by side; exposes window.__rcHarness = {read, setProps, upload, canvasRect}; stubs window.fetch to capture the FormData ids",
+   "index.html": "six cells: post/pre x seeded/empty, plus post/pre for the B1 handle A/B",
+   "bundle.js": "esbuild output",
+   "server.mjs": "present but NOT used — its background wrapper exited 1 with 'stdin is not a tty'; the page was loaded over file:// instead"
+  },
+  "build": "npx esbuild scratch/rc-harness/entry.tsx --bundle --outfile=scratch/rc-harness/bundle.js --format=iife --platform=browser --target=es2020 --jsx=automatic --tsconfig=tsconfig.json --define:process.env.NODE_ENV='\"production\"'",
+  "run": "open file:///D:/Work/Neuvo/ALICE/Source/scratch/rc-harness/index.html in Chromium over CDP, call Page.bringToFront (without it document.visibilityState is 'hidden', rAF never runs and the component's ResizeObserver never fires, so every canvas stays at the 300x150 default), scroll each mount into the 1264x569 viewport, then drive real Input.dispatchMouseEvent press/move/release input",
+  "notes": [
+   "All fixtures are synthetic geometry. No client identifiers, no PHI, no production credentials.",
+   "Only window.fetch was stubbed; the captured FormData names the real Worker URL but no request left the page."
+  ]
+ },
+ "b16_counter_paths": [
+  {
+   "step": "mount (empty)",
+   "undoCounter": 0,
+   "redoCounter": 0,
+   "undoDisabled": true,
+   "redoDisabled": true,
+   "clearDisabled": true,
+   "refStrokes": 0,
+   "refHasContent": false,
+   "status": "Draw with a stylus, finger, or mouse"
+  },
+  {
+   "step": "commit stroke A",
+   "undoCounter": 1,
+   "redoCounter": 0,
+   "undoDisabled": false,
+   "redoDisabled": true,
+   "clearDisabled": false,
+   "refStrokes": 1,
+   "refHasContent": true,
+   "status": "1 stroke"
+  },
+  {
+   "step": "commit stroke B",
+   "undoCounter": 2,
+   "redoCounter": 0,
+   "undoDisabled": false,
+   "redoDisabled": true,
+   "clearDisabled": false,
+   "refStrokes": 2,
+   "refHasContent": true,
+   "status": "2 strokes"
+  },
+  {
+   "step": "undo",
+   "undoCounter": 1,
+   "redoCounter": 1,
+   "undoDisabled": false,
+   "redoDisabled": false,
+   "clearDisabled": false,
+   "refStrokes": 1,
+   "refHasContent": true,
+   "status": "1 stroke"
+  },
+  {
+   "step": "redo",
+   "undoCounter": 2,
+   "redoCounter": 0,
+   "undoDisabled": false,
+   "redoDisabled": true,
+   "clearDisabled": false,
+   "refStrokes": 2,
+   "refHasContent": true,
+   "status": "2 strokes"
+  },
+  {
+   "step": "undo (redo armed)",
+   "undoCounter": 1,
+   "redoCounter": 1,
+   "undoDisabled": false,
+   "redoDisabled": false,
+   "clearDisabled": false,
+   "refStrokes": 1,
+   "refHasContent": true,
+   "status": "1 stroke"
+  },
+  {
+   "step": "commit stroke C after undo (redo branch discarded)",
+   "undoCounter": 2,
+   "redoCounter": 0,
+   "undoDisabled": false,
+   "redoDisabled": true,
+   "clearDisabled": false,
+   "refStrokes": 2,
+   "refHasContent": true,
+   "status": "2 strokes"
+  },
+  {
+   "step": "clear",
+   "undoCounter": 0,
+   "redoCounter": 0,
+   "undoDisabled": true,
+   "redoDisabled": true,
+   "clearDisabled": true,
+   "refStrokes": 0,
+   "refHasContent": false,
+   "status": "Draw with a stylus, finger, or mouse"
+  }
+ ],
+ "b16_seed_ab": {
+  "post-seed": {
+   "undoCounter": 3,
+   "redoCounter": 0,
+   "refStrokes": 3,
+   "status": "3 strokes",
+   "canvasPixels": "800x420"
+  },
+  "pre-seed": {
+   "undoCounter": 3,
+   "redoCounter": 0,
+   "refStrokes": 3,
+   "status": "3 strokes",
+   "canvasPixels": "800x420"
+  },
+  "post-empty": {
+   "undoCounter": 0,
+   "redoCounter": 0,
+   "refStrokes": 0,
+   "status": "Draw with a stylus, finger, or mouse",
+   "canvasPixels": "800x420"
+  },
+  "pre-empty": {
+   "undoCounter": 0,
+   "redoCounter": 0,
+   "refStrokes": 0,
+   "status": "Draw with a stylus, finger, or mouse",
+   "canvasPixels": "800x420"
+  }
+ },
+ "b1_upload_ab": {
+  "setup": "both mounts started with clientId=client-OLD, submissionId=submission-OLD and no initialData, then window.__rcHarness.setProps() re-rendered them with clientId=client-NEW, submissionId=submission-NEW; `background` never changed, so the pre-fix handle (deps [background]) is never recreated while the post-fix handle (deps [background, clientId, submissionId]) is",
+  "post_fix_deps_background_clientId_submissionId": {
+   "id": "b1-post",
+   "threw": null,
+   "result": {
+    "imageUrl": "stub://reflection.png",
+    "sizeBytes": 1
+   },
+   "sent": {
+    "url": "https://clinical-ai-backend.neuvoteam.workers.dev/reflections/upload",
+    "submissionId": "submission-NEW",
+    "clientId": "client-NEW",
+    "fileBytes": 8319
+   }
+  },
+  "pre_fix_deps_background_only": {
+   "id": "b1-pre",
+   "threw": null,
+   "result": {
+    "imageUrl": "stub://reflection.png",
+    "sizeBytes": 1
+   },
+   "sent": {
+    "url": "https://clinical-ai-backend.neuvoteam.workers.dev/reflections/upload",
+    "submissionId": "submission-OLD",
+    "clientId": "client-OLD",
+    "fileBytes": 8319
+   }
+  },
+  "verdict": "post-fix sends the NEW ids; pre-fix sends the STALE ids — the mis-attribution path, reproduced and closed"
+ },
+ "b1_note": "Scope check, found while type-checking the harness: the no-argument fallback is NOT reachable through the public type. `ReflectionCanvasHandle.uploadReflection` (components/canvas/ReflectionCanvas.tsx:83) declares `(submissionId: string, clientId: string)` with BOTH parameters REQUIRED, while the implementation takes them optional (`submissionIdParam?: string, clientIdParam?: string`). `npx tsc --noEmit` rejects `handle.uploadReflection()` with TS2554 'Expected 2 arguments, but got 0'. So the stale-props path needs either a relaxed interface signature or a caller that bypasses the type; the dependency fix is still correct and cheap (the handle's identity must track the props it closes over), but the exposure is narrower than the register's 'a future caller relying on the fallback' wording implies, and the two current call sites pass no `ref` at all."
+}

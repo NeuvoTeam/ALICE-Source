@@ -228,7 +228,12 @@ const ReflectionCanvas = React.forwardRef<
   );
   const [isDark, setIsDark]         = useState(false);
 
-  // Committed history + redo stack — kept in refs to avoid re-render churn
+  // Committed history + redo stack — kept in refs to avoid re-render churn.
+  // DELIBERATE LIMITATION (lint rank 8c): `initialData` is read once, at mount, and never
+  // re-synced afterwards — here, in `background` above, or anywhere else. That is the intended
+  // contract for a drawing surface: the undo/redo stacks are per-session state, so adopting new
+  // props mid-flight would silently discard the user's in-progress strokes. A parent that needs
+  // to load a different document must remount this component with a `key`.
   const strokesRef = useRef<Stroke[]>(initialData?.strokes ?? []);
   const redoRef    = useRef<Stroke[]>([]);
 
@@ -238,8 +243,11 @@ const ReflectionCanvas = React.forwardRef<
   // Whether any pointer is currently down (for palm rejection)
   const activePointerRef = useRef<number | null>(null);
 
-  // Force re-render only for UI counters (undo/redo availability)
-  const [historyLen, setHistoryLen] = useState(strokesRef.current.length);
+  // Force re-render only for UI counters (undo/redo availability).
+  // Seeded from the prop, never from `strokesRef`: a ref read in a render-path initialiser
+  // is a `react-hooks/refs` violation, and the prop is the same source this ref was seeded
+  // from (B16, lint rank 8c).
+  const [historyLen, setHistoryLen] = useState(() => initialData?.strokes?.length ?? 0);
   const [redoLen,    setRedoLen]    = useState(0);
 
   // ── Upload state ─────────────────────────────────────────────────────────
@@ -492,6 +500,10 @@ const ReflectionCanvas = React.forwardRef<
   }, [handleUndo, handleRedo]);
 
   // ── Imperative handle ─────────────────────────────────────────────────────
+  // `clientId` / `submissionId` are dependencies because `uploadReflection()` falls back to
+  // the closed-over props when called with no arguments (`submissionIdParam || submissionId`).
+  // Without them the handle would keep using the props as of the last `background` change and
+  // could attach a reflection image to the wrong client or submission (B1, lint rank 8c).
   useImperativeHandle(ref, () => ({
     exportVectorData(): CanvasVectorData {
       const canvas = canvasRef.current!;
@@ -562,7 +574,7 @@ const ReflectionCanvas = React.forwardRef<
     hasContent(): boolean {
       return strokesRef.current.length > 0;
     },
-  }), [background]);
+  }), [background, clientId, submissionId]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
