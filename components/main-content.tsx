@@ -17,13 +17,15 @@ import {
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api";
 import { apiFetch } from "@/lib/auth";
 import { Client } from "@/types";
-import { useClientNavStore } from "@/stores/useClientNavStore";
+import { useClientNavStore, type Session } from "@/stores/useClientNavStore";
 
 const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
   ssr: false,
 });
 
-type Vignette = any;
+/** `GET /sessions?clientId=` row (`formatSessionRow`, backend/CloudFlare.js:2469): the app's
+ *  Session plus the DB timestamp the History tab renders. */
+type Vignette = Session & { created_at: string | null };
 
 export function MainContent({
   client,
