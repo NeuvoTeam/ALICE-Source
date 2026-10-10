@@ -492,7 +492,8 @@ const ReflectionCanvas = React.forwardRef<
     const handler = (e: KeyboardEvent) => {
       if (e.target !== document.body && e.target !== document.documentElement) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-        e.shiftKey ? handleRedo() : handleUndo();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
       }
     };
     window.addEventListener("keydown", handler);

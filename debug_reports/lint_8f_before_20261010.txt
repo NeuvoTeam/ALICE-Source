@@ -1,0 +1,225 @@
+﻿
+> my-project@0.1.0 lint
+> eslint .
+
+
+D:\Work\Neuvo\ALICE\Source\app\forgot-password\page.tsx
+  63:42  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx
+  1288:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx:1288:21
+  1286 |   }, [submissionId]);
+  1287 |
+> 1288 |   useEffect(() => { fetchBundle(); }, [fetchBundle]);
+       |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  1289 |
+  1290 |   const isLocked = bundle?.submission.status === "approved";
+  1291 |   const readOnly  = isLocked;  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\backend\CloudFlare.js
+  190:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx
+  89:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx:89:5
+  87 |
+  88 |   useEffect(() => {
+> 89 |     fetchClients();
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |   }, []);
+  91 |
+  92 |   const fetchClient = async (id: string) => {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx
+  260:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx:260:5
+  258 |   useEffect(() => {
+  259 |     const mq = window.matchMedia("(prefers-color-scheme: dark)");
+> 260 |     setIsDark(mq.matches);
+      |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  261 |     const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+  262 |     mq.addEventListener("change", handler);
+  263 |     return () => mq.removeEventListener("change", handler);  react-hooks/set-state-in-effect
+  495:9  warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-expressions
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx
+  57:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx:57:5
+  55 |
+  56 |   useEffect(() => {
+> 57 |     setIsLoading(true)
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  58 |
+  59 |     const fetchVignettes = async () => {
+  60 |       try {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx
+  52:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx:52:5
+  50 |   // Picking a client or a session is navigation and must close the drawer.
+  51 |   useEffect(() => {
+> 52 |     setDrawerOpen(false);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  53 |   }, [selectedClientId, selectedSessionId]);
+  54 |
+  55 |   const sidebar = (  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx
+  90:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx:90:5
+  88 |
+  89 |   useEffect(() => {
+> 90 |     fetchVignettes();
+     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  91 |   }, [client.id, selectedSessionId]);
+  92 |
+  93 |   return (  react-hooks/set-state-in-effect
+  91:6  warning  React Hook useEffect has a missing dependency: 'fetchVignettes'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  109:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  345:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:345:7
+  343 |   useEffect(() => {
+  344 |     if (externalSubmissionId) {
+> 345 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  346 |     }
+  347 |   }, [externalSubmissionId]);
+  348 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  461:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:461:5
+  459 |   useEffect(() => {
+  460 |     if (!persist) return;
+> 461 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  462 |     return () => {
+  463 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  464 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\ThreeCsForm.tsx
+  314:50  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+  159:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:159:7
+  157 |     if (!session) {
+  158 |       hydratedSessionRef.current = null
+> 159 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  160 |       setStep(1)
+  161 |       setSessionInput("")
+  162 |       setAnalysis(null)  react-hooks/set-state-in-effect
+  216:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  412:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  422:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  423:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  500:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  509:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  510:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts
+  33:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts:33:5
+  31 |     if (selectedClientId && findClient(hierarchy, selectedClientId)) return
+  32 |     const c = hierarchy.clients[0]
+> 33 |     setSelectedClientId(c.id)
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |     setSelectedCaseId(c.cases[0]?.id ?? null)
+  35 |     setSelectedSessionId(c.cases[0]?.sessions[0]?.id ?? null)
+  36 |   }, [hierarchy, selectedClientId])  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts
+  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts:14:5
+  12 |     }
+  13 |     mql.addEventListener('change', onChange)
+> 14 |     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  15 |     return () => mql.removeEventListener('change', onChange)
+  16 |   }, [])
+  17 |  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\workers\mcp-gateway\src\index.ts
+  12:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+✖ 25 problems (0 errors, 25 warnings)
+

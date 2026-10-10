@@ -1,0 +1,6 @@
+﻿
+D:\Work\Neuvo\ALICE\Source\backend\probe-allowobject-fn.js
+  1:1  warning  Unexpected default export of anonymous function  import/no-anonymous-default-export
+
+✖ 1 problem (0 errors, 1 warning)
+

@@ -1,0 +1,119 @@
+﻿
+> my-project@0.1.0 test
+> node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs
+
+REQUEST POST /analyze/session
+PASS  1 analyze: JSON mode + reasoning_effort=low, single call
+REQUEST POST /analyze/session
+PASS  2 analyze: invalid JSON recovered by one temperature-0 retry
+REQUEST POST /analyze/session
+PASS  3 analyze: 502 BAD_AI_RESPONSE + reason/parseError  Expected double-quoted property name in JSON at position 73 (line 1 column 74)
+REQUEST POST /analyze/session
+PASS  4 analyze: truncation retried with max_completion_tokens=4096
+REQUEST POST /analyze/session
+PASS  5 analyze: 502 AI_TRUNCATED (not BAD_AI_RESPONSE)
+REQUEST POST /generate/practice-package
+REQUEST POST /generate/practice-package
+PASS  6 package: 502 and degraded 200 both carry a truthful code
+REQUEST POST /analyze/session
+PASS  7 analyze: retry that 429s reports GROQ_ERROR
+REQUEST GET /ai/probe
+REQUEST GET /ai/probe
+PASS  8 probe: reports attempts/reason/parse_error
+REQUEST GET /ai/health
+REQUEST POST /analyze/session
+PASS  9 health + non-reasoning model: no JSON mode, no reasoning_effort
+REQUEST POST /analyze/session
+PASS  10 GROQ_MAX_TOKENS => max_completion_tokens
+REQUEST POST /analyze/session
+PASS  11 persistence: analyze writes sessions + session_versions
+REQUEST POST /generate/practice-package
+PASS  12 persistence: package writes practice_package
+REQUEST POST /analyze/session
+REQUEST POST /generate/practice-package
+PASS  13 persistence: failed and degraded runs write nothing
+REQUEST POST /generate/practice-package
+PASS  14 package: a partial answer is retried and replaced, never filled with fallbacks
+REQUEST POST /generate/practice-package
+PASS  15 package: unwrapped partial answer => 502 BAD_AI_SHAPE, no writes
+REQUEST POST /analyze/session
+PASS  16 analyze: missing rationale/riskFlags => 502, never defaulted
+REQUEST POST /analyze/session
+PASS  17 analyze: partial answer recovered by the retry
+REQUEST POST /analyze/session
+PASS  18 schema rejection (400) degrades to json_object instead of failing
+REQUEST POST /generate/practice-package
+PASS  19 schema mismatch 400 => retried with the schema, not downgraded
+REQUEST POST /analyze/session
+PASS  20 GROQ_RESPONSE_FORMAT=schema sends strict json_schema
+REQUEST POST /analyze/session
+PASS  21 GROQ_RESPONSE_FORMAT=json_object sends json_object
+REQUEST POST /analyze/session
+REQUEST GET /ai/probe
+PASS  22 unescaped quote repaired without a retry (strategy=repaired)
+REQUEST POST /generate/practice-package
+PASS  23 nested unescaped quote repaired, package accepted
+REQUEST GET /clients
+REQUEST GET /clients
+PASS  24 guard: missing and malformed tokens are 401, nothing upstream
+REQUEST GET /clients
+REQUEST PATCH /sessions/sess-1
+PASS  25 guard: valid token 200, unauthenticated PATCH 401 with no write
+PASS  26 guard: OPTIONS preflight is exempt
+REQUEST GET /client-homework/session-0001
+PASS  27 public /client-homework: signed link, no token, no clinical fields
+REQUEST POST /auth/login
+PASS  28 guard: auth routes remain public
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+PASS  29 links: minting is clinician-only and its link opens anonymously
+REQUEST GET /client-link/session-0001
+PASS  30 links: ttl clamped to 30 days when 9999 was requested
+REQUEST GET /client-homework/session-0001
+REQUEST GET /client-homework/session-0001
+REQUEST GET /client-homework/session-0001
+REQUEST GET /client-homework/session-0001
+PASS  31 links: unsigned, tampered, expired, cross-session are all 403
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+PASS  32 links: missing CLIENT_LINK_SECRET fails closed
+REQUEST GET /client-homework/session-empty
+PASS  33 regression: no cross-session disclosure via submissions fallback
+REQUEST POST /generate/structured-task
+PASS  34 structured-task: normalizes nested 3 C's output from LLM
+REQUEST POST /generate/structured-task
+PASS  35 structured-task: invalid request schema returns 400
+
+35/35 checks passed
+PASS  1 geometry: 174 mm column, body stops at 275 mm, footer at 281 mm
+PASS  2 sanitize: ☐ dropped, ⚠ and arrows mapped, Latin-1 accents kept
+PASS  3 collect: string rows, { task } rows, blanks and a null package
+PASS  4 short package: single-page PDF  6881 bytes
+PASS  5 empty package: renders the empty-state copy on one page
+PASS  6 25 tasks: multi-page, nothing dropped, all baselines inside the printable box  2 pages, deepest body line 262.4 mm
+PASS  7 60 tasks: pagination scales  4 pages
+PASS  8 6000-character task: hard-split across pages without overflow  75 lines
+PASS  9 determinism: identical layout for identical input
+PASS  10 footer: 'Page x of y' stamped on every page
+PASS  11 filename: ALICE_PracticePackage_YYYYMMDD_ClientName.pdf  ALICE_PracticePackage_20260916_JaneMayLow.pdf
+PASS  12 filename: accents folded, illegal characters dropped, capped, no invented segment
+
+12/12 checks passed
+PASS  1 guard: wait on the stub, keep when latched, hydrate when the payload lands
+PASS  2 race: the GET /client/:id stub never latches
+PASS  3 race: the payload rehydrates the notes, the analysis and Phase 3
+PASS  4 later write cannot reset the phase or stomp edits
+PASS  5 empty session: hydration completes on Phase 1
+PASS  6 blur-save after Next keeps Phase 2 and the typed notes
+PASS  7 Adjust -> Back -> blur-save stays on Phase 1 with the edits
+PASS  8 placeholder advisory survives a later write
+PASS  9 no advisory for a real formulation
+PASS  10 failed GET /sessions/:id leaves an empty Phase 1
+PASS  11 remount hydrates immediately
+PASS  12 re-selecting the same session leaves the clinician where they were
+PASS  13 losing the session clears local state and re-arms the latch
+PASS  14 the cleared latch hydrates a returning session
+PASS  15 counter-example: the pre-c902331 effect stuck on an empty Phase 1
+
+15/15 checks passed

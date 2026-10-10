@@ -1,0 +1,106 @@
+=== rank 8f diff: the four intended files (worktree vs HEAD 89a55dc) ===
+(next-env.d.ts and documentation.md are excluded: next-env.d.ts is a build-generated file restored to HEAD; documentation.md is the same-commit docs update.)
+
+warning: in the working copy of 'components/tasks/ThreeCsForm.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'eslint.config.mjs', LF will be replaced by CRLF the next time Git touches it
+diff --git a/app/forgot-password/page.tsx b/app/forgot-password/page.tsx
+index 7412718..e5157d7 100644
+--- a/app/forgot-password/page.tsx
++++ b/app/forgot-password/page.tsx
+@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
+             marginBottom: 24,
+           }}
+         >
+-          Enter your email address and we'll send you a password reset link.
++          Enter your email address and we&apos;ll send you a password reset link.
+         </p>
+ 
+         <input
+diff --git a/components/canvas/ReflectionCanvas.tsx b/components/canvas/ReflectionCanvas.tsx
+index a0ca665..e612ce1 100644
+--- a/components/canvas/ReflectionCanvas.tsx
++++ b/components/canvas/ReflectionCanvas.tsx
+@@ -492,7 +492,8 @@ const ReflectionCanvas = React.forwardRef<
+     const handler = (e: KeyboardEvent) => {
+       if (e.target !== document.body && e.target !== document.documentElement) return;
+       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+-        e.shiftKey ? handleRedo() : handleUndo();
++        if (e.shiftKey) handleRedo();
++        else handleUndo();
+       }
+     };
+     window.addEventListener("keydown", handler);
+diff --git a/components/tasks/ThreeCsForm.tsx b/components/tasks/ThreeCsForm.tsx
+index b7db966..e4e53da 100644
+--- a/components/tasks/ThreeCsForm.tsx
++++ b/components/tasks/ThreeCsForm.tsx
+@@ -311,7 +311,7 @@ export function ThreeCsForm({ data, onChange, disabled }: ThreeCsFormProps) {
+             <span className="text-destructive ml-0.5">*</span>
+           </label>
+           <p className="text-xs text-muted-foreground">
+-            Write it exactly as it appeared — don't edit or censor it.
++            Write it exactly as it appeared — don&apos;t edit or censor it.
+           </p>
+           <Textarea
+             value={data.automaticThought}
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index 5aee167..ced0b13 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -18,31 +18,40 @@ export default defineConfig([
+   // --- Rule exceptions (each one deliberate; see documentation.md section 13.4) ---
+   {
+     rules: {
+-      // 51 pre-existing sites across 11 files. Removing `any` is a typing programme of its
+-      // own, not a lint-gate install, so it stays visible as a warning.
++      // 8 sites across 2 files after lint rank 8e: components/vignette-generator.tsx (7) and
++      // components/tasks/DynamicTaskForm.tsx (1). The other 43 of the original 51 are cleared;
++      // these 8 are recorded findings rather than omissions, because removing them surfaces
++      // genuine payload-shape errors, so the rule stays visible as a warning.
+       "@typescript-eslint/no-explicit-any": "warn",
+-      // 14 sites across 13 files: the codebase syncs state from props/fetch inside
+-      // useEffect. Real cascading-render risk, but every site needs a behavioural change
+-      // (derived state or useEffectEvent), so it stays visible as a warning.
++      // 11 sites across 10 files as of lint rank 8f: the codebase syncs state from props/fetch
++      // inside useEffect. Real cascading-render risk, but every site needs a behavioural change
++      // (derived state or useEffectEvent), so it stays visible as a warning. Rank 8g works this
++      // list and will move the count again: read 11/10 as this commit's measurement, not a
++      // fixed baseline.
+       "react-hooks/set-state-in-effect": "warn",
+-      // 1 site: components/canvas/ReflectionCanvas.tsx reads a ref during render.
++      // 0 sites since lint rank 8c fixed the one read (components/canvas/ReflectionCanvas.tsx).
++      // Dead downgrade; deleting it is a rule change that no card carries, so it stays and is
++      // an open operator decision.
+       "react-hooks/refs": "warn",
+-      // 0 sites after lint rank 8d (2026-10-10): the one site was components/ui/sidebar.tsx,
+-      // deleted as unreferenced (register row B4). The downgrade is now dead and is proposed
+-      // for deletion at rank 8f — deleting it here would be a rule change, which is 8f's scope.
++      // 0 sites since lint rank 8d deleted components/ui/sidebar.tsx (the Math.random site).
++      // Dead downgrade, same standing as react-hooks/refs above.
+       "react-hooks/purity": "warn",
+-      // 2 sites: a bare apostrophe in JSX text (forgot-password page, ThreeCsForm). One-line
+-      // escapes with no behaviour change, left for a follow-up edit rather than this card.
++      // 0 sites after lint rank 8f (2026-10-10) escaped both apostrophes (app/forgot-password/
++      // page.tsx and components/tasks/ThreeCsForm.tsx). Dead downgrade, same standing as the
++      // two above.
+       "react/no-unescaped-entities": "warn",
+     },
+   },
+ 
+-  // Root maintenance scripts are one-off CommonJS utilities; `require()` is their native
+-  // style, so the TypeScript-era import rule does not apply to them.
++  // The two Worker entry points — backend/CloudFlare.js and workers/mcp-gateway/src/index.ts —
++  // export the module-worker shape `export default { async fetch(request, env) { … } }`. That
++  // object literal is what `wrangler` requires and its members are named, so the rule's rationale
++  // (named exports for readable stack traces) is satisfied. `allowObject: true` scopes the
++  // exemption to object-literal default exports only: an anonymous `export default function() {}`
++  // inside these globs still reports.
+   {
+-    files: ["patch-cloudflare.js", "patch-tasks.js", "patch-vignette.js"],
+-    languageOptions: { sourceType: "commonjs" },
+-    rules: { "@typescript-eslint/no-require-imports": "off" },
++    files: ["backend/**/*.js", "workers/**/*.ts"],
++    rules: { "import/no-anonymous-default-export": ["warn", { allowObject: true }] },
+   },
+ 
+   // The Cloudflare Worker entry (backend/CloudFlare.js) is plain JS shipped with an explicit

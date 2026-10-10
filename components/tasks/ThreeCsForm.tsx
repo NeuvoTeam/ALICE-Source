@@ -311,7 +311,7 @@ export function ThreeCsForm({ data, onChange, disabled }: ThreeCsFormProps) {
             <span className="text-destructive ml-0.5">*</span>
           </label>
           <p className="text-xs text-muted-foreground">
-            Write it exactly as it appeared — don't edit or censor it.
+            Write it exactly as it appeared — don&apos;t edit or censor it.
           </p>
           <Textarea
             value={data.automaticThought}
