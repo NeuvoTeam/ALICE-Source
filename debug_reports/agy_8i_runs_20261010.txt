@@ -1,0 +1,78 @@
+ALICE card 8i - the two agy runs (delegation protocol: agy authors the edits)
+
+Engine for both runs: Antigravity CLI `agy`, model 'Gemini 3.1 Pro (High)' (non-Claude).
+Working directory pinned: D:\Work\Neuvo\ALICE\Source.
+Command shape:
+
+  agy -p "$(cat <brief>)" --model 'Gemini 3.1 Pro (High)' --dangerously-skip-permissions --print-timeout 10m
+
+--------------------------------------------------------------------------------
+RUN 1 - the measurement harness route. Brief: debug_reports/brief_8i_probe_20261010.md
+--------------------------------------------------------------------------------
+
+agy reported:
+
+  "I have created the requested file. Here is the report:
+
+   **Created file path:**
+   `D:\Work\Neuvo\ALICE\Source\app\__fontprobe\page.tsx`
+
+   **Output of `git status --porcelain`:**
+     M next-env.d.ts
+     ?? app/__fontprobe/
+     ?? debug_reports/agy_8h_run.txt
+     ?? debug_reports/build_8g_final_20261010.txt
+     ?? debug_reports/font_8i_css_before_20261010.txt
+     ?? scratch/"
+
+Reviewing-agent verification of that report:
+
+- The file existed at the reported path with the briefed content (47 lines, LF endings).
+- `M next-env.d.ts` was NOT agy's: it is the tracked route-types import that
+  `npm run build` rewrites between its dev and build variants (the reviewing agent's
+  own build did it, before agy ran). It was restored to HEAD before the commit.
+- Folder name correction, made by the reviewing agent and NOT by agy: `app/__fontprobe/`
+  is an App Router PRIVATE folder (a leading underscore excludes it from routing), so the
+  build emitted 13 routes and `/__fontprobe` 404ed. The folder was renamed to
+  `app/fontprobe/` (one `mv`, content untouched) and the next build emitted 14 routes with
+  `/fontprobe` returning 200. The harness is deleted before the commit either way; the
+  corrected content is what the brief quotes.
+
+--------------------------------------------------------------------------------
+RUN 2 - the one-line source edit. Brief: debug_reports/brief_8i_css_20261010.md
+--------------------------------------------------------------------------------
+
+agy's own reported diff, reproduced verbatim from its output:
+
+  diff --git a/app/globals.css b/app/globals.css
+  index 0fbc827..0113788 100644
+  --- a/app/globals.css
+  +++ b/app/globals.css
+  @@ -81,7 +81,7 @@
+   
+   @theme inline {
+     --font-sans: 'Geist', 'Geist Fallback';
+  -  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  +  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+     --color-background: var(--background);
+     --color-foreground: var(--foreground);
+     --color-card: var(--card);
+
+Reviewing-agent verification:
+
+- `git diff -- app/globals.css` in the tree is byte-identical to the diff above; the index
+  line `0fbc827` matches HEAD's blob for the file.
+- `git status --porcelain` after the run shows ` M app/globals.css` plus ` M next-env.d.ts`
+  (the build artefact above), `?? app/fontprobe/` (the renamed harness) and the untracked
+  scratch/debug logs - no other file was touched, and nothing was committed or pushed.
+
+--------------------------------------------------------------------------------
+Harness hygiene (card 1's standing requirement)
+--------------------------------------------------------------------------------
+
+`app/fontprobe/page.tsx` was deleted before the commit (moved out of the tree) and the
+shipped build was rebuilt without it: 13 routes, byte-identical to rank 8h's list
+(md5 bab5456e751481302dfcd14942ada88c), with zero occurrences of "fontprobe" in the build
+log. Its content is quoted verbatim in debug_reports/brief_8i_probe_20261010.md, and the
+CDP scripts that drove it are debug_reports/font_8i_probe_init_20261010.js and
+debug_reports/font_8i_probe_measure_20261010.js.

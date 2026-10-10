@@ -1,0 +1,40 @@
+ALICE card 8i - emitted production CSS, BEFORE vs AFTER (built stylesheets)
+
+BEFORE build: tree 3472ddf + the probe route only      (chunks: 01z_myb0w8k77.css = app CSS, 037.tcc7jhmtv.css = font CSS)
+AFTER  build: tree 3472ddf + the token change + probe   (chunks: 03ldxyk7-yiq1.css = app CSS, 037.tcc7jhmtv.css = font CSS)
+
+=== .font-mono rule ===
+BEFORE  .font-mono{font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace}
+AFTER   .font-mono{font-family:Geist Mono,ui-monospace,SFMono-Regular,Menlo,monospace}
+
+=== Tailwind root default family (mirrors the token) ===
+BEFORE  --default-mono-font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace
+AFTER   --default-mono-font-family:"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace
+
+=== app/globals.css @theme inline token (source) ===
+BEFORE  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+AFTER   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+=== @font-face in the emitted font CSS (037.tcc7jhmtv.css) ===
+BEFORE  5 x font-family:Geist           1 x Geist Fallback
+        6 x font-family:Geist Mono      1 x Geist Mono Fallback
+AFTER   5 x font-family:Geist           1 x Geist Fallback
+        6 x font-family:Geist Mono      1 x Geist Mono Fallback
+-> the Geist Mono faces are STILL emitted after the token stops referencing the variable:
+   dropping var(--font-geist-mono) from --font-mono does not remove the @font-face rules.
+
+The real face (one of the six subsets; the url hash is identical in both builds):
+@font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url(../media/797e433ab948586e-s.p.08e28id.o-okb.woff2)format("woff2");unicode-range:U+??,U+131,...}
+-> the family name is the literal string `Geist Mono`, so a literal reference resolves to it.
+
+The metric-adjusted shim (still emitted, now unreachable from .font-mono):
+@font-face{font-family:Geist Mono Fallback;src:local(Arial);ascent-override:74.67%;descent-override:21.92%;line-gap-override:0.0%;size-adjust:134.59%}
+
+=== the variable class (unchanged both sides) ===
+.geist_mono_d6617093-module__z61v7q__variable{--font-geist-mono:"Geist Mono", "Geist Mono Fallback"}
+
+=== sans token untouched ===
+BEFORE and AFTER: --font-sans: 'Geist', 'Geist Fallback';
+body class BEFORE and AFTER: geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased
+
+(Companion raw grep output of the AFTER build: font_8i_css_after_raw_grep_20261010.txt)
