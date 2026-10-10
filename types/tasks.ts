@@ -12,6 +12,7 @@
  * TGA / SaMD boundary: these types describe data structures only.
  * No diagnostic inference or autonomous outcome scoring is represented here.
  */
+import type { StructuredTask } from "@/lib/ai/schemas";
 
 // ---------------------------------------------------------------------------
 // 1. Shared primitives
@@ -97,6 +98,18 @@ export interface TwoChoiceWorksheetFormData {
   notes?: string;
 }
 
+/**
+ * `form_data` column on `practice_task_submissions`.
+ *
+ * The column holds either shape the domain writes: a completed submission (`FormData`, built by
+ * `components/tasks/DynamicTaskForm.tsx`) or the seed a clinician's generator upserts as a draft
+ * before the client fills it in (`StructuredTask` — the `/generate/structured-task` body,
+ * `components/vignette-generator.tsx`). `FormData` alone cannot describe it: the seed carries no
+ * `answers` / `reflection` for `two_choice_worksheet` (the client supplies those) and may be a
+ * `reflection_prompt` task, which is the canvas handout rather than a form.
+ */
+export type SubmissionFormData = FormData | StructuredTask;
+
 export type Modality = "CBT" | "ACT" | "DBT";
 
 /**
@@ -119,16 +132,16 @@ export interface CanvasData {
 /**
  * Row from `practice_task_submissions`.
  *
- * `form_data` is typed as `FormData` — callers must branch on
+ * `form_data` is typed as `SubmissionFormData` — callers must branch on
  * `row.form_data.task_type` to access task-specific fields.
  */
 export interface PracticeTaskSubmissionRow {
   id: UUID;
   client_id: UUID;
   practitioner_id: UUID;
-  /** Discriminant for `form_data`. Must match `FormData["task_type"]`. */
-  task_type: FormData["task_type"];
-  form_data: FormData;
+  /** Discriminant for `form_data`. Must match `SubmissionFormData["task_type"]`. */
+  task_type: SubmissionFormData["task_type"];
+  form_data: SubmissionFormData;
   status: TaskStatus;
   reviewed_at: ISODateTime | null;
   created_at: ISODateTime;
@@ -188,8 +201,8 @@ export interface NormalisedSubmission {
   id: UUID;
   clientId: UUID;
   practitionerId: UUID;
-  taskType: FormData["task_type"];
-  formData: FormData;
+  taskType: SubmissionFormData["task_type"];
+  formData: SubmissionFormData;
   status: TaskStatus;
   reviewedAt: ISODateTime | null;
   createdAt: ISODateTime;
@@ -235,8 +248,8 @@ export interface UpsertTaskDraftInput {
   id?: UUID;
   clientId: UUID;
   practitionerId: UUID;
-  taskType: FormData["task_type"];
-  formData: FormData;
+  taskType: SubmissionFormData["task_type"];
+  formData: SubmissionFormData;
 }
 
 /** Input to `commitTaskForReview`. */

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import type { PracticePackage } from '@/lib/practice-package'
+import type { PracticePackage, StoredPracticeTask } from '@/lib/practice-package'
 
 import { CLINICAL_AI_API_BASE as API } from '@/lib/clinical-ai-api'
 import { apiFetch } from '@/lib/auth'
@@ -26,7 +26,8 @@ export type Session = {
 
   quiz?: string[]
 
-  practicePackage?: PracticePackage | null
+  /** Either stored shape — see `StoredPracticeTask` in `lib/practice-package.ts`. */
+  practicePackage?: StoredPracticeTask | null
 
   analysis?: {
     rationale?: string
@@ -60,8 +61,8 @@ type RawSessionRow = {
   vignette?: string | null
   homework?: string[] | null
   quiz?: string[] | null
-  practicePackage?: PracticePackage | null
-  practice_package?: PracticePackage | null
+  practicePackage?: StoredPracticeTask | null
+  practice_package?: StoredPracticeTask | null
   analysis?: Session['analysis']
   modality?: string | null
 }

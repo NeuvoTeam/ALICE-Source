@@ -94,6 +94,53 @@ import type {
 
 export type TaskVariant = "activity_log" | "thought_record" | "two_choice_worksheet";
 
+/**
+ * The pre-populated payload `DynamicTaskForm` seeds its three wizards from. Every member is
+ * optional because the form reads only the handful its own seeding code touches, and it is
+ * handed three different producers: the structured task `/generate/structured-task` returns
+ * (enriched with the derived `homework` list — `components/vignette-generator.tsx`), whatever a
+ * session stored in `practice_package` (either shape — `StoredPracticeTask`), and the
+ * `GET /client-homework/:id` projection the signed-link page reads
+ * (`app/practice/[sessionId]/page.tsx`).
+ *
+ * `task_type` and `homework` are declared because they are the members those producers have in
+ * common with this bag: without a common member an all-optional target is not assignable from
+ * either the projection (which carries `task_type`) or the stored package (which carries
+ * `homework`).
+ *
+ * The camelCase aliases are the ones the seeding code below tolerates beside the wire's
+ * snake_case.
+ */
+export interface DynamicTaskInitialData {
+  task_type?: TaskVariant | "reflection_prompt";
+  homework?: string[];
+
+  // activity_log — the weekly grid travels as a JSON string (`createEmptySchedule`)
+  activity_description?: string;
+
+  // thought_record
+  situation?: string;
+  automatic_thought?: string;
+  automaticThought?: string;
+  emotions?: Array<{ label: string; intensity: number }>;
+  evidence_for?: string;
+  evidenceFor?: string;
+  evidence_against?: string;
+  evidenceAgainst?: string;
+  balanced_thought?: string;
+  balancedThought?: string;
+  outcome_emotion_intensity?: number;
+  outcomeEmotionIntensity?: number;
+
+  // two_choice_worksheet
+  title?: string;
+  prompts?: Array<{ question: string; options: [string, string] }>;
+  answers?: Array<0 | 1 | null>;
+  reflection?: string;
+  reflection_prompt?: string;
+  notes?: string;
+}
+
 interface DynamicTaskFormProps {
   /** Identifies the owning client for the submission. */
   clientId?: UUID;
@@ -105,8 +152,8 @@ interface DynamicTaskFormProps {
   initialSubmissionId?: UUID;
   /** Optional submissionId alias matching initialSubmissionId. */
   submissionId?: string | null;
-  /** Pre-populated task payload from the AI generator. */
-  initialData?: any;
+  /** Pre-populated task payload — see `DynamicTaskInitialData`. */
+  initialData?: DynamicTaskInitialData | null;
   /** Called after a successful final commit. */
   onSubmitted?: (submission: NormalisedSubmission) => void;
   /** Called when the user cancels. */

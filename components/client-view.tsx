@@ -5,20 +5,9 @@ import { Loader2 } from "lucide-react"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
 import { Client } from "@/types";
-import type { PracticePackage } from "@/lib/practice-package";
+import { isStructuredTask, type PracticePackage } from "@/lib/practice-package";
 import type { StructuredTask } from "@/lib/ai/schemas";
 import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
-
-/**
- * `GET /client/history` returns `practice_package` in whichever shape the Worker
- * stored: a structured task (has `task_type`) or a PracticePackage from
- * `/generate/practice-package`.
- */
-function isStructuredTask(
-  pkg: StructuredTask | PracticePackage | null | undefined
-): pkg is StructuredTask {
-  return !!pkg && typeof pkg === "object" && "task_type" in pkg;
-}
 
 /** The three variants `DynamicTaskForm` renders — `reflection_prompt` uses the canvas instead. */
 const FORM_TASK_TYPES = ["two_choice_worksheet", "activity_log", "thought_record"] as const;

@@ -21,7 +21,7 @@
 
 import { jsPDF } from "jspdf"
 
-import type { PracticePackage } from "@/lib/practice-package"
+import type { StoredPracticeTask } from "@/lib/practice-package"
 
 /* =========================
    GEOMETRY — A4 portrait, millimetres
@@ -203,9 +203,17 @@ export function buildPracticePackageFileName(meta: PracticePackagePdfMeta = {}):
   )
 }
 
-/** Mirrors the worksheet's own coercion (`item.task` for object rows). */
-export function collectHomeworkTasks(pkg: PracticePackage | null): string[] {
-  const raw: unknown[] = Array.isArray(pkg?.homework) ? pkg.homework : []
+/**
+ * Mirrors the worksheet's own coercion (`item.task` for object rows).
+ *
+ * `practice_package` holds either stored shape (`StoredPracticeTask`); both can carry the
+ * homework list — the generator enriches the structured task with one before it is stored — and
+ * that list is all this export reads, so the `in`-narrowed read below is behaviourally the
+ * `pkg?.homework` it replaces (absent `homework` still yields the empty list).
+ */
+export function collectHomeworkTasks(pkg: StoredPracticeTask | null): string[] {
+  const raw: unknown[] =
+    pkg && "homework" in pkg && Array.isArray(pkg.homework) ? pkg.homework : []
 
   return raw
     .map((item) => {
@@ -484,7 +492,7 @@ export type PracticePackagePdfMeta = {
 }
 
 export function buildPracticePackagePdf(
-  pkg: PracticePackage | null,
+  pkg: StoredPracticeTask | null,
   meta: PracticePackagePdfMeta = {}
 ): jsPDF {
   const resolved: ResolvedMeta = {
@@ -519,7 +527,7 @@ export function buildPracticePackagePdf(
 }
 
 export function downloadPracticePackagePdf(
-  pkg: PracticePackage | null,
+  pkg: StoredPracticeTask | null,
   meta: PracticePackagePdfMeta = {}
 ): void {
   const pdf = buildPracticePackagePdf(pkg, meta)

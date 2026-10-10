@@ -23,7 +23,7 @@ import {
   estimateTokens,
 } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
-import type { PracticePackage } from "@/lib/practice-package"
+import { isStructuredTask, type StoredPracticeTask } from "@/lib/practice-package"
 import { decideSessionHydration } from "@/lib/session-hydration"
 import { upsertTaskDraft } from "@/lib/tasks"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -36,11 +36,20 @@ import type { StructuredTask } from "@/lib/ai/schemas"
 type StepId = 1 | 2 | 3
 
 /**
- * `generatedTaskData` holds either the freshly generated structured task (enriched
- * with `homework` by `extractHomeworkList`) or the package hydrated from
- * `session.practicePackage` — the `practice_package` column carries both shapes.
+ * The `/generate/structured-task` body, as this component reads it. `res.ok` is tested *after*
+ * the parse, so one value has to cover every body the route can return: the structured task,
+ * the `?allowDegraded=1` placeholder (`degradedGroqPayload`, backend/CloudFlare.js — a bare
+ * `task_type` plus `degraded` / `warning`) and the route's JSON error envelope (`{ error }` /
+ * `{ detail }`). Each is read on its own branch below — the task's own fields only after
+ * `res.ok`, the envelope only in the `throw` — so this is the bag of members the component
+ * consumes, not a claim that one body carries all of them.
  */
-type StoredPracticeTask = StructuredTask | PracticePackage
+type StructuredTaskResponse = StructuredTask & {
+  degraded?: boolean
+  warning?: string
+  error?: string
+  detail?: string
+}
 
 const TASK_VARIANTS = ["activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"] as const
 
@@ -132,7 +141,7 @@ export default function VignetteGenerator({
   const [isSaving, setIsSaving] = useState(false)
 
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
-  const [practicePackage, setPracticePackage] = useState<PracticePackage | null>(null)
+  const [practicePackage, setPracticePackage] = useState<StoredPracticeTask | null>(null)
 
   const [selectedModalities, setSelectedModalities] = useState<Modality[]>(["CBT"])
   const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet">("thought_record")
@@ -220,13 +229,14 @@ export default function VignetteGenerator({
       )
     }
 
-    // Try to load practice package if in session (from GET /sessions/:id)
+    // Try to load practice package if in session (from GET /sessions/:id). The stored value is
+    // either shape (`StoredPracticeTask`); only the structured one carries an activity format.
     if (session.practicePackage) {
-      const pkg = session.practicePackage as any
-      setPracticePackage(session.practicePackage)
-      setGeneratedTaskData(pkg)
-      if (pkg.task_type) {
-        setActivityFormat(pkg.task_type)
+      const stored = session.practicePackage
+      setPracticePackage(stored)
+      setGeneratedTaskData(stored)
+      if (isStructuredTask(stored)) {
+        setActivityFormat(stored.task_type)
       }
       setStep(2)
     } else {
@@ -400,7 +410,7 @@ export default function VignetteGenerator({
       if (!genText) {
         throw new Error(`Server returned ${genRes.status} with empty response`)
       }
-      const taskData = JSON.parse(genText)
+      const taskData = JSON.parse(genText) as StructuredTaskResponse
 
       console.log("⬅️ RESPONSE", genUrl, genRes.status, taskData)
       if (!genRes.ok) {
@@ -418,7 +428,7 @@ export default function VignetteGenerator({
       }
 
       setGeneratedTaskData(enrichedTaskData)
-      setPracticePackage(enrichedTaskData as any)
+      setPracticePackage(enrichedTaskData)
 
       if (taskData?.degraded) {
         setDegradedWarning(taskData.warning || "AI generation was unavailable.")
@@ -428,8 +438,8 @@ export default function VignetteGenerator({
       const draft = await upsertTaskDraft({
         clientId,
         practitionerId: "00000000-0000-0000-0000-000000000000",
-        taskType: activityFormat as any,
-        formData: enrichedTaskData as any,
+        taskType: activityFormat,
+        formData: enrichedTaskData,
       })
 
       setGeneratedSubmissionId(draft.id)
@@ -493,7 +503,7 @@ export default function VignetteGenerator({
       if (!genText) {
         throw new Error(`Server returned ${genRes.status} with empty response`)
       }
-      const taskData = JSON.parse(genText)
+      const taskData = JSON.parse(genText) as StructuredTaskResponse
 
       if (!genRes.ok) {
         throw new Error(taskData?.detail || taskData?.error || "Structured task generation failed")
@@ -506,7 +516,7 @@ export default function VignetteGenerator({
       }
 
       setGeneratedTaskData(enrichedTaskData)
-      setPracticePackage(enrichedTaskData as any)
+      setPracticePackage(enrichedTaskData)
 
       if (taskData?.degraded) {
         setDegradedWarning(taskData.warning || "AI generation was unavailable.")
@@ -515,8 +525,8 @@ export default function VignetteGenerator({
       const draft = await upsertTaskDraft({
         clientId,
         practitionerId: "00000000-0000-0000-0000-000000000000",
-        taskType: activityFormat as any,
-        formData: enrichedTaskData as any,
+        taskType: activityFormat,
+        formData: enrichedTaskData,
       })
 
       setGeneratedSubmissionId(draft.id)

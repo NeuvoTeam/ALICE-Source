@@ -18,10 +18,14 @@ export default defineConfig([
   // --- Rule exceptions (each one deliberate; see documentation.md section 13.4) ---
   {
     rules: {
-      // 8 sites across 2 files after lint rank 8e: components/vignette-generator.tsx (7) and
-      // components/tasks/DynamicTaskForm.tsx (1). The other 43 of the original 51 are cleared;
-      // these 8 are recorded findings rather than omissions, because removing them surfaces
-      // genuine payload-shape errors, so the rule stays visible as a warning.
+      // 0 sites after lint rank 8h (2026-10-10, card t_75b9c1b0): the last 8 —
+      // components/vignette-generator.tsx (7) and components/tasks/DynamicTaskForm.tsx (1),
+      // recorded findings since rank 8e because removing them surfaced genuine payload-shape
+      // errors — were cleared by modelling `practice_package` and `form_data` as the unions the
+      // app already writes (`StoredPracticeTask` in lib/practice-package.ts, `SubmissionFormData`
+      // in types/tasks.ts). Dead downgrade; deleting it is a rule change that no card carries,
+      // so it stays and is an open operator decision, on the same standing as react-hooks/refs
+      // and react-hooks/purity below.
       "@typescript-eslint/no-explicit-any": "warn",
       // 4 sites across 3 files after lint rank 8g (2026-10-10, card t_2d4d0225), all four
       // DELIBERATELY RETAINED with a written reason in the source: components/tasks/

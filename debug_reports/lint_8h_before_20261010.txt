@@ -1,0 +1,81 @@
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  109:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  357:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:357:7
+  355 |   useEffect(() => {
+  356 |     if (externalSubmissionId) {
+> 357 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  358 |     }
+  359 |   }, [externalSubmissionId]);
+  360 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  482:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:482:5
+  480 |   useEffect(() => {
+  481 |     if (!persist) return;
+> 482 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  483 |     return () => {
+  484 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  485 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+  168:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:168:7
+  166 |     if (!session) {
+  167 |       hydratedSessionRef.current = null
+> 168 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  169 |       setStep(1)
+  170 |       setSessionInput("")
+  171 |       setAnalysis(null)  react-hooks/set-state-in-effect
+  225:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  421:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  431:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  432:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  509:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  518:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  519:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts
+  40:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts:40:5
+  38 |     if (selectedClientId && findClient(hierarchy, selectedClientId)) return
+  39 |     const c = hierarchy.clients[0]
+> 40 |     setSelectedClientId(c.id)
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  41 |     setSelectedCaseId(c.cases[0]?.id ?? null)
+  42 |     setSelectedSessionId(c.cases[0]?.sessions[0]?.id ?? null)
+  43 |   }, [hierarchy, selectedClientId])  react-hooks/set-state-in-effect
+
+✖ 12 problems (0 errors, 12 warnings)
+

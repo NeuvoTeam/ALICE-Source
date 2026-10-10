@@ -1,0 +1,56 @@
+=== A/B 1: hydration guard (legacy `if (pkg.task_type)` vs isStructuredTask) ===
+same    legacy=true  new=true   structured: thought_record
+same    legacy=true  new=true   structured: activity_log
+same    legacy=true  new=true   structured: two_choice_worksheet
+same    legacy=true  new=true   structured: reflection_prompt
+same    legacy=true  new=true   degraded placeholder (task_type=auto)
+same    legacy=false new=false  PracticePackage (no task_type)
+same    legacy=true  new=true   enriched structured + homework
+same    legacy=false new=false  null
+same    legacy=false new=false  undefined
+DIFFER  legacy=false new=true   stray falsy task_type
+same    legacy=true  new=true   stray unknown task_type
+same    legacy=false new=false  a string "x"
+same    legacy=false new=false  a number 42
+guard divergences: 1 of 13
+
+=== A/B 2: collectHomeworkTasks (HEAD vs working tree) ===
+same    PracticePackage with string homework
+        before: ["Weekly Activity Schedule","Complete 3 C's Thought Record"]
+        after : ["Weekly Activity Schedule","Complete 3 C's Thought Record"]
+same    PracticePackage, homework absent
+        before: []
+        after : []
+same    PracticePackage, homework empty
+        before: []
+        after : []
+same    enriched structured task
+        before: ["Reflection: r"]
+        after : ["Reflection: r"]
+same    structured task without homework
+        before: []
+        after : []
+same    degraded placeholder
+        before: []
+        after : []
+same    homework not an array
+        before: []
+        after : []
+same    null
+        before: []
+        after : []
+same    undefined
+        before: []
+        after : []
+same    package with object homework rows
+        before: ["Task A","Task B"]
+        after : ["Task A","Task B"]
+collectHomeworkTasks divergences: 0 of 10
+
+=== B: the whole PDF build is unchanged for both stored shapes ===
+raw-differs  PracticePackage  7765/7765 bytes, raw sha256 49748dee1402 / 61a7bb692042
+        after normalising 1/1 jsPDF date stamps and 1/1 trailer ids: IDENTICAL (sha256 eeff695cf902 / eeff695cf902)
+raw-differs  enriched structured task  6852/6852 bytes, raw sha256 f11aec91d6e8 / 790973ef3b25
+        after normalising 1/1 jsPDF date stamps and 1/1 trailer ids: IDENTICAL (sha256 1f8afbd3ad72 / 1f8afbd3ad72)
+raw-differs  null  5922/5922 bytes, raw sha256 a72b68116dc4 / a358369004d4
+        after normalising 1/1 jsPDF date stamps and 1/1 trailer ids: IDENTICAL (sha256 f26cc2ff47ee / f26cc2ff47ee)
