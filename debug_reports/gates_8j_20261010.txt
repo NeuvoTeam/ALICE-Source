@@ -1,0 +1,164 @@
+# ALICE rank 8j (card t_09ae9f3d) — raw gate output
+# archive the three orphaned kit files + record the orphaned embla dependency (no deletions)
+# branch alan, pre-commit HEAD = f766e92 (fix(ui): un-shadow the mono fallback — the mono token names the family literally (lint 8i)), date 2026-10-10T20:41:57+11:00
+
+## 1. byte-identity: archived copy vs git show <commit>:<path>
+$ git show 1c3cb44:components/ui/skeleton.tsx | sha256sum   # vs sha256sum archive/2026-10-10-unreferenced-ui-kit/components/ui/skeleton.tsx
+   archive : c3005a6a39bd1aaecf3c0c9c61860db480ec5cbd16381556e381bdc3a59b6ac6  276 bytes
+   git show: c3005a6a39bd1aaecf3c0c9c61860db480ec5cbd16381556e381bdc3a59b6ac6  276 bytes
+$ git show 1c3cb44:components/ui/tooltip.tsx | sha256sum   # vs sha256sum archive/2026-10-10-unreferenced-ui-kit/components/ui/tooltip.tsx
+   archive : b4182f90c2f9b02150e208d19e548dd909ca72f049a13c62ed0cd657a4358f70  1890 bytes
+   git show: b4182f90c2f9b02150e208d19e548dd909ca72f049a13c62ed0cd657a4358f70  1890 bytes
+$ git show bdc3923:hooks/use-mobile.ts | sha256sum   # vs sha256sum archive/2026-10-10-unreferenced-ui-kit/hooks/use-mobile.ts
+   archive : 0e8081df6f8a8371fabd194dbafd4bcb6930d007d7b97840625225b77fb4b3c6  986 bytes
+   git show: 0e8081df6f8a8371fabd194dbafd4bcb6930d007d7b97840625225b77fb4b3c6  986 bytes
+
+## 2. the move is a 100% rename (byte-identical blob in the index)
+$ git diff --cached --summary -M --find-renames
+ rename {components => archive/2026-10-10-unreferenced-ui-kit/components}/ui/skeleton.tsx (100%)
+ rename {components => archive/2026-10-10-unreferenced-ui-kit/components}/ui/tooltip.tsx (100%)
+ rename {hooks => archive/2026-10-10-unreferenced-ui-kit/hooks}/use-mobile.ts (100%)
+
+$ git ls-files -s archive/2026-10-10-unreferenced-ui-kit/
+100644 e3beb90241eeeca34da099f60f96e6d40411af00 0	archive/2026-10-10-unreferenced-ui-kit/components/ui/skeleton.tsx
+100644 ae092091c4d6b4dd2c352ee3756664859fc28d3b 0	archive/2026-10-10-unreferenced-ui-kit/components/ui/tooltip.tsx
+100644 1fb503cd3bd08707d6a71a5f6e5645ce9436e0c3 0	archive/2026-10-10-unreferenced-ui-kit/hooks/use-mobile.ts
+   (pre-move git hash-object of the same paths: e3beb90241eeeca34da099f60f96e6d40411af00, ae092091c4d6b4dd2c352ee3756664859fc28d3b, 1fb503cd3bd08707d6a71a5f6e5645ce9436e0c3 — unchanged)
+
+## 3. restore commands resolve
+   git cat-file -e 1c3cb44:components/ui/skeleton.tsx -> exit 0
+   git cat-file -e 1c3cb44:components/ui/tooltip.tsx -> exit 0
+   git cat-file -e bdc3923:hooks/use-mobile.ts -> exit 0
+
+## 3b. what git checkout ACTUALLY writes (core.autocrlf=true, no .gitattributes rule for these paths)
+$ git checkout <commit> -- <path> ; done, undone (worktree removed, index deletion re-staged)
+   components/ui/skeleton.tsx   checkout form: 289 bytes  sha256 68bf11609c04a24c046838df50485a010c92186134a1038ba0ec77af843ee6fb
+                                archive form : 276 bytes  sha256 c3005a6a39bd1aaecf3c0c9c61860db480ec5cbd16381556e381bdc3a59b6ac6
+   components/ui/tooltip.tsx    checkout form: 1951 bytes  sha256 2a7bfc824e44b1c06a0dff3f5e7ff2ad24d35d6f376340282397ebdb3b3061c3
+                                archive form : 1890 bytes  sha256 b4182f90c2f9b02150e208d19e548dd909ca72f049a13c62ed0cd657a4358f70
+   hooks/use-mobile.ts          checkout form:  bytes  sha256 
+                                archive form : 986 bytes  sha256 0e8081df6f8a8371fabd194dbafd4bcb6930d007d7b97840625225b77fb4b3c6
+   -> git cat-file blob / git show emit the raw blob and match the archive exactly; git checkout smudges LF->CRLF (+1 byte per line)
+
+   hooks/use-mobile.ts          checkout form: 1014 bytes  sha256 3a55e81d794a911eefa2d7ee81ba44f946650048c7ba53bd7acbf81b71e8efb8
+   (the same +1 byte per line: 289/1951/1014 vs 276/1890/986)
+
+## 4. eslint . — file count and findings, before vs after
+$ npx eslint . -f json   # before (tree f766e92, the three files live in components/ hooks/)
+files linted: 120
+errors: 0
+warnings: 4
+files with findings: 3
+  components/tasks/DynamicTaskForm.tsx  err 0 warn 2  [react-hooks/set-state-in-effect, react-hooks/set-state-in-effect]
+  components/vignette-generator.tsx  err 0 warn 1  [react-hooks/set-state-in-effect]
+  hooks/use-clinical-workspace.ts  err 0 warn 1  [react-hooks/set-state-in-effect]
+present? components/ui/skeleton.tsx -> true
+
+$ npx eslint . -f json   # after (archive in place, archive/** ignored)
+files linted: 117
+errors: 0
+warnings: 4
+files with findings: 3
+  components/tasks/DynamicTaskForm.tsx  err 0 warn 2  [react-hooks/set-state-in-effect, react-hooks/set-state-in-effect]
+  components/vignette-generator.tsx  err 0 warn 1  [react-hooks/set-state-in-effect]
+  hooks/use-clinical-workspace.ts  err 0 warn 1  [react-hooks/set-state-in-effect]
+present? components/ui/skeleton.tsx -> false
+
+$ diff <linted file list before> <linted file list after>
+79d78
+< components/ui/skeleton.tsx
+90d88
+< components/ui/tooltip.tsx
+94d91
+< hooks/use-mobile.ts
+   (exit 1 — exactly three removals, zero additions)
+
+## 5. npx tsc --noEmit
+   exit=0 (0)
+
+## 6. npm test
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+
+## 7. npm run build — routes
+$ sed -n '/^Route (app)/,/^└/p' <build log> | md5sum
+bab5456e751481302dfcd14942ada88c *debug_reports/routes_8j_after_20261010.txt
+$ diff routes_8j_after routes_8i_after (rank 8i's list)
+   identical, 13 routes
+
+## 8. emitted production stylesheet, before vs after
+   BEFORE (build with the three files restored at their live paths - reproduces the pre-change tree exactly):
+     total .next/static/chunks/*.css : 143136 bytes
+     037.tcc7jhmtv.css (font)        :   3628 bytes  md5 a613dfd35c72720e84d90b5eb48a9893
+     090g~df.wikk_.css (app)         : 139508 bytes  md5 f4114182fd89181fea915afddbce0152
+   AFTER  (committed tree, archive in place):
+     total .next/static/chunks/*.css : 142650 bytes   (-486)
+     037.tcc7jhmtv.css (font)        :   3628 bytes  md5 a613dfd35c72720e84d90b5eb48a9893   (unchanged)
+     0vlgq2asp-14v.css (app)         : 139022 bytes  md5 5bbddf0869336ca17cbabd08065a000b   (-486)
+   NOTE: the card expected the byte count to be unchanged. It is not, and the reason is measured, not guessed:
+   the three files sat inside a Tailwind scan root (`@source '../components'` / `'../hooks'`), so the
+   utilities whose ONLY occurrence was in them leave the stylesheet with them (see section 9). Keeping
+   the count byte-identical would require the archive to stay inside a @source root, which the card
+   forbids. The same phenomenon was measured at rank 8d (-10806 bytes when two kit files were deleted).
+
+=== selector counts (individual, commas split) ===
+before: 1295
+after : 1289
+removed: 6   added: 0
+
+=== removed selectors (present before, missing after) ===
+  - .animate-pulse
+  - .fade-in-0
+  - .fill-foreground
+  - .origin-\(--radix-tooltip-content-transform-origin\)
+  - .translate-y-\[calc\(-50\%_-_2px\)\]
+  - .zoom-in-95
+
+=== added selectors ===
+
+=== live-source cross-check ===
+live source files scanned : 117
+string literals scanned   : 5365
+distinct class candidates : 3470
+candidates with a rule BEFORE: 724
+candidates whose rule existed BEFORE and is MISSING AFTER: 0
+
+## 10. no live reference to the three files
+$ grep -rn -E 'components/ui/skeleton|components/ui/tooltip|hooks/use-mobile|useIsMobile' --include=*.ts --include=*.tsx --include=*.js --include=*.mjs app components hooks lib stores types workers backend tests scripts
+   (no match = exit 1)
+$ ls components/ui/skeleton.tsx components/ui/tooltip.tsx hooks/use-mobile.ts
+ls: cannot access 'components/ui/skeleton.tsx': No such file or directory
+ls: cannot access 'components/ui/tooltip.tsx': No such file or directory
+ls: cannot access 'hooks/use-mobile.ts': No such file or directory
+   components/ui/ and hooks/ still exist and are otherwise untouched:
+     components/ui/ : 50 files, no skeleton.tsx, no tooltip.tsx
+     hooks/         : use-clinical-workspace.ts
+use-toast.ts
+
+## 11. git status --porcelain (pre-commit)
+R  components/ui/skeleton.tsx -> archive/2026-10-10-unreferenced-ui-kit/components/ui/skeleton.tsx
+R  components/ui/tooltip.tsx -> archive/2026-10-10-unreferenced-ui-kit/components/ui/tooltip.tsx
+R  hooks/use-mobile.ts -> archive/2026-10-10-unreferenced-ui-kit/hooks/use-mobile.ts
+ M documentation.md
+ M eslint.config.mjs
+ M tsconfig.json
+?? archive/2026-10-10-unreferenced-ui-kit/README.md
+?? debug_reports/agy_8h_run.txt
+?? debug_reports/agy_8j_readme_run.txt
+?? debug_reports/agy_8j_run.txt
+?? debug_reports/build_8g_final_20261010.txt
+?? debug_reports/build_8j_after_20261010.txt
+?? debug_reports/build_8j_before_20261010.txt
+?? debug_reports/build_8j_before_probe_20261010.txt
+?? debug_reports/css_8j_delta_20261010.txt
+?? debug_reports/gates_8j_20261010.txt
+?? debug_reports/routes_8j_after_20261010.txt
+?? debug_reports/routes_8j_diff_20261010.txt
+?? debug_reports/test_8j_20261010.txt
+?? scratch/
+
+## 12. agy (Antigravity CLI, gemini-3.1-pro-high, no Claude engine) authored the edits
+   run logs: debug_reports/agy_8j_run.txt (brief 1: tsconfig/exclude, eslint globalIgnores, the four documentation.md rows)
+             debug_reports/agy_8j_readme_run.txt (brief 2: the archive README draft)
+   the byte-identical file move and every gate above were done by the reviewing agent (see the handoff).
