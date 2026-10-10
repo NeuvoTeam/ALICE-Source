@@ -906,10 +906,13 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   `type="button"` with `aria-expanded` and a `focus-visible` ring.
 - `components/auth-guard.tsx` renders `Loading...` until `GET /auth/me` resolves, then either renders
   the children or hard-redirects to `/login`.
-- Toast feedback is wired to `hooks/use-toast.ts`, and `components/ui/toaster.tsx` /
-  `components/ui/sonner.tsx` exist — but **no layout mounts `<Toaster />`**, so `toast()` calls (for
-  example the "Could not open client" notice in `app/dashboard/page.tsx`) render nothing today.
-  Mounting a `Toaster` in `app/layout.tsx` is a one-line fix.
+- Toast feedback is wired to `hooks/use-toast.ts`, and `app/layout.tsx` mounts `<Toaster />` from
+  `components/ui/toaster.tsx` inside `<body>` immediately after `{children}`, so every `toast()` call
+  renders — for example the "Could not open client" notice in `app/dashboard/page.tsx`.
+  `components/ui/toaster.tsx` reads `@/hooks/use-toast`, the same module the call sites use.
+  `components/ui/sonner.tsx` exports a second `Toaster`, but no call site uses sonner, so it is
+  deliberately not mounted. The Toaster is a client component, so the toast host mounts client-side
+  while `app/layout.tsx` stays a server component: the server-rendered HTML is unchanged.
 
 ---
 
@@ -1178,7 +1181,7 @@ local development, but several are user-visible or security-relevant.
 | `/forgot-password` | "Send Reset Link" only shows `alert("Reset password functionality will be connected next.")` — no GoTrue recovery call |
 | `/client-login` | Accepts credentials, then simply `router.push(redirect)`. It authenticates nothing |
 | `session-history-panel.tsx` | Declares `riskFlags?: string[]` while `analysis.riskFlags` entries are objects (`{ label, severity, confidence, evidence }`); nothing currently renders this component against real data |
-| Toasts never render | Nothing mounts `components/ui/toaster.tsx` or `components/ui/sonner.tsx`, so every `toast()` call in `app/dashboard/page.tsx` is silent (§8.5) |
+| Toasts now render | `app/layout.tsx` mounts `<Toaster />` from `components/ui/toaster.tsx` after `{children}`, so `toast()` calls such as the "Could not open client" notice in `app/dashboard/page.tsx` reach the DOM (§8.5) |
 
 ### 13.3 Duplication, drift and dead code
 
