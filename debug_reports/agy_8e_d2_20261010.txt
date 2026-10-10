@@ -1,0 +1,151 @@
+I've completed the task. Below is the report detailing the findings.
+
+### 1. `npx tsc --noEmit` on the final file
+The final file compilation exits `0`. (Raw output is empty as expected).
+
+### 2. Raw output of the honest-attempt `tsc` run
+When attempting to honestly clear all sites (removing `as any` and adding the `AnalysisResult` / `StructuredTask` types on `JSON.parse`), here are the verbatim errors:
+```text
+components/vignette-generator.tsx(214,15): error TS2339: Property 'task_type' does not exist on type 'PracticePackage'.
+components/vignette-generator.tsx(215,31): error TS2339: Property 'task_type' does not exist on type 'PracticePackage'.
+components/vignette-generator.tsx(358,25): error TS2339: Property 'detail' does not exist on type 'AnalysisResult'.
+components/vignette-generator.tsx(358,48): error TS2339: Property 'error' does not exist on type 'AnalysisResult'.
+components/vignette-generator.tsx(365,24): error TS2339: Property 'degraded' does not exist on type 'AnalysisResult'.
+components/vignette-generator.tsx(366,40): error TS2339: Property 'warning' does not exist on type 'AnalysisResult'.
+components/vignette-generator.tsx(394,21): error TS2339: Property 'detail' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'detail' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(395,23): error TS2339: Property 'error' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'error' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(408,26): error TS2345: Argument of type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to parameter of type 'SetStateAction<PracticePackage | null>'.
+  Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is not assignable to type 'SetStateAction<PracticePackage | null>'.
+    Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is missing the following properties from type 'PracticePackage': scenario, quiz
+components/vignette-generator.tsx(410,21): error TS2339: Property 'degraded' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'degraded' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(410,37): error TS2339: Property 'warning' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'warning' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(417,9): error TS2322: Type '"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet"' is not assignable to type '"activity_log" | "thought_record" | "two_choice_worksheet" | "behavioural_experiment"'.
+  Type '"reflection_prompt"' is not assignable to type '"activity_log" | "thought_record" | "two_choice_worksheet" | "behavioural_experiment"'.
+components/vignette-generator.tsx(418,9): error TS2322: Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to type 'FormData'.
+  Type '{ homework: string[]; task_type: "reflection_prompt"; prompt: string; suggested_background: "blank" | "lined" | "dotted"; notes?: string | undefined; }' is not assignable to type 'FormData'.
+    Type '{ homework: string[]; task_type: "reflection_prompt"; prompt: string; suggested_background: "blank" | "lined" | "dotted"; notes?: string | undefined; }' is missing the following properties from type 'TwoChoiceWorksheetFormData': title, prompts, answers, reflection, reflection_prompt
+components/vignette-generator.tsx(429,9): error TS2322: Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to type 'PracticePackage | null | undefined'.
+  Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is missing the following properties from type 'PracticePackage': scenario, quiz
+components/vignette-generator.tsx(485,35): error TS2339: Property 'detail' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'detail' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(485,55): error TS2339: Property 'error' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'error' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(495,26): error TS2345: Argument of type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to parameter of type 'SetStateAction<PracticePackage | null>'.
+  Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is not assignable to type 'SetStateAction<PracticePackage | null>'.
+    Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is missing the following properties from type 'PracticePackage': scenario, quiz
+components/vignette-generator.tsx(497,21): error TS2339: Property 'degraded' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'degraded' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(498,37): error TS2339: Property 'warning' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { task_type: "thought_record"; ... 7 more ...; notes?: string | undefined; } | { ...; } | { ...; }'.
+  Property 'warning' does not exist on type '{ task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }'.
+components/vignette-generator.tsx(504,9): error TS2322: Type '"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet"' is not assignable to type '"activity_log" | "thought_record" | "two_choice_worksheet" | "behavioural_experiment"'.
+  Type '"reflection_prompt"' is not assignable to type '"activity_log" | "thought_record" | "two_choice_worksheet" | "behavioural_experiment"'.
+components/vignette-generator.tsx(505,9): error TS2322: Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to type 'FormData'.
+  Type '{ homework: string[]; task_type: "reflection_prompt"; prompt: string; suggested_background: "blank" | "lined" | "dotted"; notes?: string | undefined; }' is not assignable to type 'FormData'.
+    Type '{ homework: string[]; task_type: "reflection_prompt"; prompt: string; suggested_background: "blank" | "lined" | "dotted"; notes?: string | undefined; }' is missing the following properties from type 'TwoChoiceWorksheetFormData': title, prompts, answers, reflection, reflection_prompt
+components/vignette-generator.tsx(511,9): error TS2322: Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; } | { homework: string[]; ... 8 more ...; notes?: string | undefined; } | { ...; } | { ...; }' is not assignable to type 'PracticePackage | null | undefined'.
+  Type '{ homework: string[]; task_type: "activity_log"; activity_date: string; activity_description: string; pleasure_rating: number; mastery_rating: number; notes?: string | undefined; }' is missing the following properties from type 'PracticePackage': scenario, quiz
+```
+
+### 3. ESLint Results
+- **errorCount:** 0
+- **warningCount:** 8
+- **`@typescript-eslint/no-explicit-any` count:** 7 (down from 12).
+
+### 4. Git Diff
+
+```diff
+diff --git a/components/vignette-generator.tsx b/components/vignette-generator.tsx
+index 0afa647..8d4bb1e 100644
+--- a/components/vignette-generator.tsx
++++ b/components/vignette-generator.tsx
+@@ -31,20 +31,29 @@ import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
+ import ReflectionCanvas from "@/components/canvas/ReflectionCanvas"
+ import { ModalitySelector } from "@/components/modality-selector"
+ import type { Modality } from "@/types/tasks"
++import type { StructuredTask } from "@/lib/ai/schemas"
+ 
+ type StepId = 1 | 2 | 3
+ 
++// Holds either the freshly generated structured task (enriched with homework) or the package hydrated from session.practicePackage
++type StoredPracticeTask = StructuredTask | PracticePackage
++
++const TASK_VARIANTS = ["activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"] as const
++function isTaskVariant(v: string): v is typeof TASK_VARIANTS[number] {
++  return (TASK_VARIANTS as readonly string[]).includes(v)
++}
++
+ interface AnalysisResult {
+   formulationId?: string
+   inferredModality?: string
+-  riskFlags: any[]
++  riskFlags: unknown[]
+   rationale: string
+ }
+ 
+ /** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
+ const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
+ 
+-function extractHomeworkList(task: any): string[] {
++function extractHomeworkList(task: StructuredTask & { homework?: string[] }): string[] {
+   if (!task || typeof task !== "object") return []
+   if (Array.isArray(task.homework) && task.homework.length > 0) {
+     return task.homework
+@@ -54,7 +63,7 @@ function extractHomeworkList(task: any): string[] {
+   if (task.task_type === "two_choice_worksheet") {
+     if (task.title) items.push(task.title)
+     if (Array.isArray(task.prompts)) {
+-      task.prompts.forEach((p: any, idx: number) => {
++      task.prompts.forEach((p, idx: number) => {
+         const q = typeof p === "string" ? p : p?.question
+         if (q) items.push(`${idx + 1}. ${q}`)
+       })
+@@ -123,7 +132,7 @@ export default function VignetteGenerator({
+   const [selectedModalities, setSelectedModalities] = useState<Modality[]>(["CBT"])
+   const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet">("thought_record")
+   const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
+-  const [generatedTaskData, setGeneratedTaskData] = useState<any>(null)
++  const [generatedTaskData, setGeneratedTaskData] = useState<StoredPracticeTask | null>(null)
+ 
+   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
+   const [linkStatus, setLinkStatus] = useState<string | null>(null)
+@@ -660,9 +669,9 @@ export default function VignetteGenerator({
+                   <div className="flex flex-col gap-3 sm:flex-row">
+                     <Select
+                       value={activityFormat}
+-                      onValueChange={(val: any) =>
+-                        setActivityFormat(val)
+-                      }
++                      onValueChange={(val: string) => {
++                        if (isTaskVariant(val)) setActivityFormat(val)
++                      }}
+                       disabled={isProcessing}
+                     >
+                       <SelectTrigger className="h-12 flex-1 rounded-md border-input bg-background">
+```
+```text
+ components/vignette-generator.tsx | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+```
+
+### 5. Final Findings Table
+
+| Line | Status / Resolution |
+|------|-----------------------|
+| **40**  | Cleared: `riskFlags: unknown[]` |
+| **47**  | Cleared: `extractHomeworkList(task: StructuredTask & { homework?: string[] })` |
+| **57**  | Cleared: `task.prompts.forEach((p, idx: number) => …)` (type inferred) |
+| **126** | Cleared: `useState<StoredPracticeTask \| null>(null)` with custom local type. |
+| **202** | Left as-is: The shared type does not admit the structured-task shape (e.g., `task_type`). + `error TS2339: Property 'task_type' does not exist on type 'PracticePackage'.` |
+| **344** (now 353)| Left as-is: Annotating `JSON.parse` with `AnalysisResult` causes `degraded`, `warning`, `detail` and `error` usages downstream to error as they do not exist on the type. |
+| **398** (now 409)| Left as-is: Pushing the enriched structured task into a state typed `PracticePackage \| null`. + `error TS2345: Argument of type [...] is not assignable to parameter of type 'SetStateAction<PracticePackage \| null>'` |
+| **408** (now 419)| Left as-is: `UpsertTaskDraftInput["taskType"]` expects `"behavioural_experiment"` instead of `"reflection_prompt"`. + `error TS2322: Type [...] is not assignable to type '"activity_log" \| "thought_record" \| "two_choice_worksheet" \| "behavioural_experiment"'.` |
+| **409** (now 420)| Left as-is: Pushing the enriched structured task into `UpsertTaskDraftInput.formData`, typed `FormData`. + `error TS2322: Type [...] is not assignable to type 'FormData'` (missing `title, prompts, answers...`). |
+| **473** (now 482)| Left as-is: Annotating `JSON.parse` with `StructuredTask` causes `degraded`, `warning`, `detail`, `error` usages, and `saveSessionContent()` to fail validation. |
+| **486** (now 498)| Left as-is: (Same error as Line 398) Pushing enriched task to `PracticePackage \| null`. |
+| **495** (now 507)| Left as-is: (Same error as Line 408) Assigning `activityFormat` to `UpsertTaskDraftInput["taskType"]`. |
+| **496** (now 508)| Left as-is: (Same error as Line 409) Assigning to `UpsertTaskDraftInput.formData`. |
+| **663** (now 674)| Cleared: Replaced with `(val: string)` and guarded by `isTaskVariant(val)`. |

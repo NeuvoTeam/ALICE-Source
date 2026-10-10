@@ -1,0 +1,150 @@
+## 1. `npx tsc --noEmit`
+
+Exit code: 0
+Raw output:
+```
+(empty output)
+```
+
+---
+
+## 2. ESLint per-file verification and `@typescript-eslint/no-explicit-any` counts
+
+### `app/dashboard/page.tsx`
+```bash
+$ npx eslint app/dashboard/page.tsx -f json -o /dev/null; echo $?
+0
+```
+`@typescript-eslint/no-explicit-any` count: **0**
+
+### `components/ClientLanding.tsx`
+```bash
+$ npx eslint components/ClientLanding.tsx -f json -o /dev/null; echo $?
+0
+```
+`@typescript-eslint/no-explicit-any` count: **0**
+
+### `app/signup/page.tsx`
+```bash
+$ npx eslint app/signup/page.tsx -f json -o /dev/null; echo $?
+0
+```
+`@typescript-eslint/no-explicit-any` count: **0**
+
+### `app/api/analyze/session/route.ts`
+```bash
+$ npx eslint app/api/analyze/session/route.ts -f json -o /dev/null; echo $?
+0
+```
+`@typescript-eslint/no-explicit-any` count: **0**
+
+---
+
+## 3. `git diff --stat` and full `git diff`
+
+### `git diff --stat`
+```
+ app/api/analyze/session/route.ts | 4 ++--
+ app/dashboard/page.tsx           | 5 +++--
+ app/signup/page.tsx              | 2 +-
+ components/ClientLanding.tsx     | 4 ++--
+ 4 files changed, 8 insertions(+), 7 deletions(-)
+```
+
+### Full `git diff`
+```diff
+diff --git a/app/api/analyze/session/route.ts b/app/api/analyze/session/route.ts
+index a928d04..d351583 100644
+--- a/app/api/analyze/session/route.ts
++++ b/app/api/analyze/session/route.ts
+@@ -30,12 +30,12 @@ export async function POST(request: Request) {
+     const data = await response.json();
+     return NextResponse.json({ vignette: data.response });
+ 
+-  } catch (error: any) {
++  } catch (error) {
+     // This logs the actual JS error (like "fetch failed") to your terminal
+     console.error("!!! BACKEND CRASH !!!", error);
+     
+     return NextResponse.json({ 
+-      error: "Internal Server Error: " + error.message 
++      error: "Internal Server Error: " + (error instanceof Error ? error.message : String(error)) 
+     }, { status: 500 });
+   }
+ }
+\ No newline at end of file
+diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
+index d674222..79457cf 100644
+--- a/app/dashboard/page.tsx
++++ b/app/dashboard/page.tsx
+@@ -8,6 +8,7 @@ import { ClientView } from "@/components/client-view";
+ import ClientLanding from "@/components/ClientLanding";
+ import { useToast } from "@/hooks/use-toast";
+ import AuthGuard from "@/components/auth-guard";
++import type { Client } from "@/types";
+ 
+ type ViewMode = "clinician" | "client";
+ type ClinicianTab = "vignette" | "summaries";
+@@ -36,8 +37,8 @@ export default function Dashboard() {
+   const content = !storeClient ? (
+     <ClientLanding
+       onSelectClient={async (
+-        client: any,
+-        options?: any
++        client: Client,
++        options?: { bootstrap?: boolean }
+       ) => {
+         await selectClient(
+           client.id,
+diff --git a/app/signup/page.tsx b/app/signup/page.tsx
+index a36ba4e..fb2dac2 100644
+--- a/app/signup/page.tsx
++++ b/app/signup/page.tsx
+@@ -109,7 +109,7 @@ export default function SignupPage() {
+       setEmail("");
+       setPassword("");
+       setConfirmPassword("");
+-    } catch (err: any) {
++    } catch (err) {
+       console.error(
+         "Signup Exception:",
+         err
+diff --git a/components/ClientLanding.tsx b/components/ClientLanding.tsx
+index a774fdb..6650572 100644
+--- a/components/ClientLanding.tsx
++++ b/components/ClientLanding.tsx
+@@ -16,8 +16,8 @@ const API_BASE =
+     onSelectClient,
+   }: {
+     onSelectClient: (
+-      client: any,
+-      options?: any
++      client: Client,
++      options?: { bootstrap?: boolean }
+     ) => void | Promise<void>;
+   }) {
+   const [clients, setClients] = useState<Client[]>([]);
+```
+
+---
+
+## 4. Per-file line changes
+
+- **[app/dashboard/page.tsx](file:///D:/Work/Neuvo/ALICE/Source/app/dashboard/page.tsx)**:
+  - Added line 11: `import type { Client } from "@/types";`
+  - Line 39 (`client: any,`) → Line 40: `client: Client,`
+  - Line 40 (`options?: any`) → Line 41: `options?: { bootstrap?: boolean }`
+- **[components/ClientLanding.tsx](file:///D:/Work/Neuvo/ALICE/Source/components/ClientLanding.tsx)**:
+  - Line 19 (`client: any,`) → Line 19: `client: Client,`
+  - Line 20 (`options?: any`) → Line 20: `options?: { bootstrap?: boolean }`
+- **[app/signup/page.tsx](file:///D:/Work/Neuvo/ALICE/Source/app/signup/page.tsx)**:
+  - Line 112 (`} catch (err: any) {`) → Line 112: `} catch (err) {`
+- **[app/api/analyze/session/route.ts](file:///D:/Work/Neuvo/ALICE/Source/app/api/analyze/session/route.ts)**:
+  - Line 33 (`} catch (error: any) {`) → Line 33: `} catch (error) {`
+  - Line 38 (`error: "Internal Server Error: " + error.message`) → Line 38: `error: "Internal Server Error: " + (error instanceof Error ? error.message : String(error))`
+
+---
+
+## 5. Unexpected findings
+
+nothing unexpected
