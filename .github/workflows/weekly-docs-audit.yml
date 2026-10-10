@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Scan DOCS: none overrides and generate debt report
+      - name: "Scan DOCS: none overrides and generate debt report"
         run: |
           echo "============================================================"
           echo "            WEEKLY DOCUMENTATION DEBT AUDIT REPORT          "
