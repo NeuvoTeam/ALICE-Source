@@ -16,8 +16,8 @@ const API_BASE =
     onSelectClient,
   }: {
     onSelectClient: (
-      client: any,
-      options?: any
+      client: Client,
+      options?: { bootstrap?: boolean }
     ) => void | Promise<void>;
   }) {
   const [clients, setClients] = useState<Client[]>([]);
