@@ -104,7 +104,8 @@ was captured), so an empty log is a real zero and not a broken hook.
 
 ## 5. Findings for the operator — recorded, not fixed, not filed
 
-**5.1 The destructive toast's text is invisible in the light theme.** `app/globals.css:26-27` defines
+**5.1 The destructive toast's text is invisible in the light theme.** (Found here; fixed after the
+operator's card 5 — see the note at the end of this section.) `app/globals.css:26-27` defines
 
 ```
 --destructive:            oklch(0.577 0.245 27.325);
@@ -122,6 +123,25 @@ as an unreadable red box. The dark theme's pair differs
 (`--destructive: oklch(0.396 0.141 25.723)` / `--destructive-foreground: oklch(0.637 0.237 25.331)`)
 but was not measured on screen. This is a token defect, not a mounting defect; it is not one of the
 four deferred cards, so it is reported here for the operator to triage rather than fixed or filed.
+
+**Fixed in card 5 (`t_7e8880de`, 2026-10-10, behind `9dcba1f` on `alan`).** The operator's card was
+raised on this finding, so it has moved from "reported" to "resolved", measured on the same real
+`next start` harness:
+
+- `--destructive-foreground` is now `oklch(1 0 0)` in **both** themes — the `#ffffff` that the
+  destructive `Button` and `Badge` already paint with a literal `text-white` — measuring **4.76:1** on
+  the light `--destructive` (`#e7000b`) and **10.06:1** on the dark one (`#82181a`), against **1.00:1**
+  and **2.63:1** before. `--destructive` itself is untouched.
+- `ToastDescription` gained `group-[.destructive]:opacity-100`: its inherited `opacity-90` composites
+  the description against the toast background and capped that node at **4.00:1** in the light theme,
+  below the 4.5:1 body-text target, with no token value able to fix it (white is already the
+  highest-contrast foreground on this red). Non-destructive toasts are unchanged.
+- Rendered-pixel measurements (title and description sampled from the captured screenshots) and the
+  before/after PNGs: `debug_reports/UI_DESTRUCTIVE_FOREGROUND_20261010.md`,
+  `debug_reports/toast_destructive_{before,after}_{light,dark}_20261010.png`.
+- New residual finding, recorded there and not filed: the toast's close icon
+  (`group-[.destructive]:text-red-300`, `toast.tsx:80`) measures **2.48:1** on the light toast — below
+  the 3:1 non-text threshold, and a different card's decision.
 
 ## 6. Gates and freeze
 

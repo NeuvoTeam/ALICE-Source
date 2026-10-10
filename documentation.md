@@ -909,6 +909,13 @@ No refresh token is persisted, so an expired token simply bounces the user to `/
   `components/ui/sonner.tsx` exports a second `Toaster`, but no call site uses sonner, so it is
   deliberately not mounted. The Toaster is a client component, so the toast host mounts client-side
   while `app/layout.tsx` stays a server component: the server-rendered HTML is unchanged.
+  The destructive variant's foreground is `--destructive-foreground: oklch(1 0 0)` in **both** themes —
+  the same white the `Button` and `Badge` destructive variants paint with a literal `text-white` —
+  measured at **4.76:1** on the light `--destructive` (`#e7000b`) and **10.06:1** on the dark one
+  (`#82181a`); `ToastDescription` also carries `group-[.destructive]:opacity-100`, because its
+  inherited `opacity-90` composites the description against the toast background and capped it at
+  4.00:1 (`debug_reports/UI_DESTRUCTIVE_FOREGROUND_20261010.md`). Before 2026-10-10 the light pair was
+  the same value twice, i.e. red text on red at 1.00:1.
 
 ---
 
@@ -1222,6 +1229,7 @@ local development, but several are user-visible or security-relevant.
 | `/forgot-password` | "Send Reset Link" only shows `alert("Reset password functionality will be connected next.")` — no GoTrue recovery call |
 | `/client-login` | Accepts credentials, then simply `router.push(redirect)`. It authenticates nothing |
 | Toasts now render | `app/layout.tsx` mounts `<Toaster />` from `components/ui/toaster.tsx` after `{children}`, so `toast()` calls such as the "Could not open client" notice in `app/dashboard/page.tsx` reach the DOM (§8.5) |
+| Destructive toast text (fixed 2026-10-10) | `--destructive-foreground` was the **same value as `--destructive`** in the light theme, so the app's only `toast()` call (`app/dashboard/page.tsx`, `variant: "destructive"`) painted red on red — measured 1.00:1 on the rendered toast, and 2.63:1 in the dark theme. Both themes are now `oklch(1 0 0)` (4.76:1 light / 10.06:1 dark), and `ToastDescription` carries `group-[.destructive]:opacity-100` because its inherited `opacity-90` capped the description at 4.00:1 (§8.5) |
 
 ### 13.3 Duplication, drift and dead code
 
@@ -1237,7 +1245,7 @@ local development, but several are user-visible or security-relevant.
 | Schema not fully migrated | `session_versions` (written on every save) and `sessions.practice_package` exist only in the live database — no migration in-repo |
 | Legacy Ollama route | `app/api/analyze/session/route.ts` (§7.4) |
 | Unrendered client projection fields | `GET /client-homework/:id` now projects the chosen structured activity via the `practiceTask` field, rendered on the signed-link page with no client-side persistence. It still returns `vignette`, `quiz` and `homework` unused. The unscoped `practice_task_submissions` fallback was removed to close a cross-session disclosure. |
-| Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` |
+| Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` (verified 2026-10-10 as **dead**: no source file imports `styles/`, it is absent from `.next/static`, and the rendered `/login` computes `--background` `#f6f9fb` and `--radius` `.75rem` — `app/globals.css`'s values, not `#ffffff` / `.625rem`. It is left in place: deletion is a separate card) |
 | Empty README | `README.md` is zero bytes; this document is not linked from anywhere in the repo |
 
 ### 13.4 Tooling and process gaps
