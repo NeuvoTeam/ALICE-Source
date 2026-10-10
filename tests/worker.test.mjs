@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"

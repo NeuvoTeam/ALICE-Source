@@ -116,7 +116,6 @@ export function renderStroke(
 
   // Last segment
   const last = pts[pts.length - 1];
-  const prev = pts[pts.length - 2];
   ctx.lineWidth = stroke.width * (0.5 + (last.pressure ?? 0.5) * 0.7);
   ctx.lineTo(last.x, last.y);
   ctx.stroke();

@@ -11,7 +11,6 @@ type Props = {
 export default function EditableName({ value, onSave }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(value)
-  const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
     const trimmed = name.trim()
@@ -21,9 +20,7 @@ export default function EditableName({ value, onSave }: Props) {
       return
     }
 
-    setLoading(true)
     await onSave(trimmed)
-    setLoading(false)
     setIsEditing(false)
   }
 

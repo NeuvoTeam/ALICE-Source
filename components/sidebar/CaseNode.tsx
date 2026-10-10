@@ -105,4 +105,3 @@ export function CaseNode({ caseData }: { caseData: Case }) {
     </div>
   );
 }
-``

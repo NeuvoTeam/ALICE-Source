@@ -25,7 +25,7 @@ import {
 import { apiFetch } from "@/lib/auth"
 import type { PracticePackage } from "@/lib/practice-package"
 import { decideSessionHydration } from "@/lib/session-hydration"
-import { generateStructuredTask, upsertTaskDraft } from "@/lib/tasks"
+import { upsertTaskDraft } from "@/lib/tasks"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm"
 import ReflectionCanvas from "@/components/canvas/ReflectionCanvas"
@@ -43,13 +43,6 @@ interface AnalysisResult {
 
 /** Must match the fallback string `handleAnalyze` returns in backend/CloudFlare.js. */
 const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable."
-
-const getDefaultActivity = (modalities: Modality[]): "activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet" => {
-  if (modalities.includes("CBT")) return "thought_record"
-  if (modalities.includes("DBT")) return "two_choice_worksheet"
-  if (modalities.includes("ACT")) return "reflection_prompt"
-  return "thought_record"
-}
 
 function extractHomeworkList(task: any): string[] {
   if (!task || typeof task !== "object") return []
@@ -129,10 +122,8 @@ export default function VignetteGenerator({
 
   const [selectedModalities, setSelectedModalities] = useState<Modality[]>(["CBT"])
   const [activityFormat, setActivityFormat] = useState<"activity_log" | "thought_record" | "reflection_prompt" | "two_choice_worksheet">("thought_record")
-  const [sessionContext, setSessionContext] = useState("")
   const [generatedSubmissionId, setGeneratedSubmissionId] = useState<string | null>(null)
   const [generatedTaskData, setGeneratedTaskData] = useState<any>(null)
-  const [reflectionPrompt, setReflectionPrompt] = useState<any>(null)
 
   const [degradedWarning, setDegradedWarning] = useState<string | null>(null)
   const [linkStatus, setLinkStatus] = useState<string | null>(null)
@@ -236,7 +227,7 @@ export default function VignetteGenerator({
       const text = await navigator.clipboard.readText()
       if (text.length < 5) return alert("Clipboard is empty.")
       setSessionInput(text)
-    } catch (err) {
+    } catch {
       alert("Please allow clipboard permissions.")
     }
   }

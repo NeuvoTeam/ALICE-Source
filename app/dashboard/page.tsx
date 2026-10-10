@@ -70,7 +70,6 @@ export default function Dashboard() {
       {viewMode === "clinician" ? (
         <MainContent
           key={storeClient.id}
-          activeTab={activeTab}
           client={storeClient}
           onChangeClient={clearClient}
         />

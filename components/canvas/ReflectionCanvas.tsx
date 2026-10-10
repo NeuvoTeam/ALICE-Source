@@ -46,7 +46,6 @@ import {
   Redo2,
   Trash2,
   Undo2,
-  Upload,
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
@@ -64,7 +63,6 @@ import {
 } from "./canvasTypes";
 
 import {
-  drawBackground,
   exportAsImageBlob,
   newStrokeId,
   redrawAll,

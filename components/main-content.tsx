@@ -26,11 +26,9 @@ const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
 type Vignette = any;
 
 export function MainContent({
-  activeTab,
   client,
   onChangeClient,
 }: {
-  activeTab: "vignette" | "summaries";
   client: Client;
   onChangeClient: () => void;
 }) {
@@ -191,4 +189,3 @@ export function MainContent({
     </main>
   );
 }
-``
