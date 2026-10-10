@@ -979,15 +979,20 @@ npm install          # or: pnpm install
 npm run dev          # Next.js dev server → http://localhost:3000
 npm run build        # production build (type errors are ignored, see §11)
 npm run start        # serve the production build
-npm run lint         # ⚠ currently broken — see below
+npm run lint         # ESLint 9 flat config; exits 0 — see the warning baseline below
 npm test             # worker + PDF + hydration suites (plain node, no dependencies)
 npm run docs:check   # fails a change that touched source without documentation.md (§14)
 ```
 
 - **Pick one package manager.** Both `package-lock.json` and `pnpm-lock.yaml` are committed. Mixing
   them produces large, noisy diffs; the lockfile you touch should be the one the team standardises on.
-- `npm run lint` runs `eslint .`, but ESLint is not in `devDependencies` and there is no
-  `eslint.config.mjs` / `.eslintrc.json`, so the command fails out of the box (§13).
+- `npm run lint` runs `eslint .` against the committed flat config `eslint.config.mjs` (ESLint 9 +
+  `eslint-config-next` 16.2.4, pinned to the installed `next`). It lints 130 files — `app/`,
+  `components/`, `hooks/`, `lib/`, `stores/`, `workers/`, `tests/`, `scripts/` plus `types/`,
+  `backend/` and the root configs — and exits **0** with a documented baseline of 0 errors /
+  98 warnings (2026-10-10, tree `cb3ac3a`). Every exception behind those numbers is listed
+  rule-by-rule inside the config file and summarised in §13.4. Next 16 dropped `next lint`, so
+  ESLint is driven directly.
 - `npm test` runs the three dependency-free Node harnesses of §13.4; `npm run test:pdf` and
   `npm run test:hydration` run them individually. `npm run docs:check` is the documentation gate of
   §14 — it also runs as the `.githooks/commit-msg` hook in this clone (`core.hooksPath=.githooks`)
@@ -1073,6 +1078,11 @@ gradle build        # compiles nothing today — all modules and src/main/java a
 - **Strict mode is on but not enforced at build time:** `next.config.mjs` sets
   `typescript.ignoreBuildErrors: true`, so `npm run build` will happily ship type errors. Run
   `npx tsc --noEmit` for a real check (`tsconfig.json` already has `noEmit: true`).
+- **Lint gate:** `npm run lint` (`eslint .` against `eslint.config.mjs`) is real and must exit 0.
+  It reports 0 errors / 98 warnings on a clean tree; the seven rule exceptions behind that number
+  are each downgraded to `warn` (so their findings stay printed and counted) or scoped off with a
+  one-line reason in the config — see §13.4. Prefer fixing a site over widening an exception, and
+  never add a blanket ignore of real source to make the gate pass.
 - **Styling:** Tailwind v4 utility classes with `cn()` from `lib/utils.ts`
   (`clsx` + `tailwind-merge`). No Tailwind config file — the theme lives in `app/globals.css` via
   `@theme`/CSS variables. Scanned sources are explicitly bounded using `@import 'tailwindcss' source(none);`
@@ -1237,9 +1247,9 @@ local development, but several are user-visible or security-relevant.
 | Tests | `npm test` → `node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs`: dependency-free harnesses. The worker one stubs `globalThis.fetch` (Groq, Supabase REST and `/auth/v1/user`) and drives the Worker's real `fetch` handler; 32 checks cover the AI contract/retry/repair, the auth guard, persistence payloads and client-link signing. Its Supabase stub models the session→client ownership chain that `checkSessionAccess` walks, and asserts "nothing was persisted" against writes only, because every `sessionId`-bearing AI route reads the session and its owner first. `npm test` is green as of 2026-09-18 (32 worker + 12 PDF + 15 hydration checks). `tests/hydration-guard.test.mjs` imports the real guard (`lib/session-hydration.ts`) under Node's type stripping and locks the race, the blur-save bounce, the placeholder advisory and the failed-fetch fallback; no harness renders React, so component-level regressions still rely on review |
 | Partial CI | `.github/workflows/docs-check.yml` runs `npm run docs:check` on push and pull requests as a non-blocking warning (`continue-on-error: true`), posting PR comments detailing uncommitted documentation gaps, while `.github/workflows/weekly-docs-audit.yml` audits `DOCS: none` overrides weekly. Nothing builds, lints or runs `npm test` on push yet |
 | Docs gate | `scripts/check-docs.mjs` (`npm run docs:check`, the `.githooks/commit-msg` hook, and the workflow above) checks changes touching `app/ components/ stores/ lib/ hooks/ backend/ workers/ supabase/migrations/ tests/` or root configs against `documentation.md`. In local `.githooks/commit-msg`, the failure output explicitly directs callers to bypass via `DOCS: none`. In CI, the gate issues a non-blocking warning and comments on PRs without failing the build, while weekly cron audits log `DOCS: none` bypass debt. `DOCS: none` in the commit message is the bypass, `DOCS_CHECK=off` the local env override |
-| Broken lint script | `npm run lint` → `eslint .`, but ESLint is absent from `devDependencies` and no config file exists |
+| Lint gate (added 2026-10-10, `t_95d7f790`) | `npm run lint` → `eslint .` against `eslint.config.mjs`: an ESLint 9 flat config extending `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`, with `eslint-config-next` pinned to the installed `next` 16.2.4. It lints 130 files and exits **0**: 0 errors / 98 warnings (tree `cb3ac3a`). The gate install deliberately did not remediate source — its first run was 73 errors / 29 warnings — so it encodes seven documented exceptions, each with a one-line reason in the config: `@typescript-eslint/no-explicit-any` → `warn` (51 sites of accumulated `any`), `react-hooks/set-state-in-effect` → `warn` (14 sites of the set-state-in-effect pattern), `react-hooks/refs` → `warn` (1 site, `ReflectionCanvas.tsx`), `react-hooks/purity` → `warn` (1 site, `Math.random` in `components/ui/sidebar.tsx`), `react/no-unescaped-entities` → `warn` (2 one-line apostrophe escapes), `@typescript-eslint/no-require-imports` off for the three root CommonJS `patch-*.js` maintenance scripts, and `@typescript-eslint/ban-ts-comment` off under `backend/` (the Worker's deliberate `@ts-nocheck`). Downgraded rules stay visible in every run rather than being ignored. Deliberately **not** wired into `.githooks`: a pre-commit lint step against this baseline would block every future commit |
 | Type errors not gated | `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; run `npx tsc --noEmit` manually |
-| Two lockfiles | `package-lock.json` and `pnpm-lock.yaml` are both tracked |
+| Two lockfiles | `package-lock.json` and `pnpm-lock.yaml` are both tracked. npm is the operative manager for this clone — `node_modules/.package-lock.json` exists, there is no `node_modules/.pnpm/` or `.modules.yaml`, `pnpm` is not on PATH, and no `.npmrc`/`packageManager` field pins one — so the 2026-10-10 eslint install updated `package-lock.json` only. `pnpm-lock.yaml` is therefore stale and does not list the eslint toolchain; deciding which one to keep (and deleting the other) is an operator call, not a worker's |
 | No Gradle wrapper | `gradlew` and `gradle/wrapper/` are absent; a local Gradle install is required |
 | Launch config port | `.vscode/launch.json` targets `http://localhost:8080` while `next dev` serves `3000` |
 
@@ -1252,7 +1262,8 @@ local development, but several are user-visible or security-relevant.
    run in Supabase).
 4. `/client-login` no longer breaks `npm run build` (its `useSearchParams` call is wrapped in `Suspense`).
 5. Decide on one client state model and delete the other.
-6. Introduce lint/type/test gates in CI, then delete the dead code listed in §13.3.
+6. Introduce lint/type/test gates in CI, then delete the dead code listed in §13.3. (The lint gate
+   itself now exists and runs locally — §13.4; only the CI wiring is outstanding.)
 7. The Groq model is now a `GROQ_MODEL` var rather than a code constant (§7). Llama 3.x IDs are
    Enterprise-only, so watch `/ai/models` and bump the var when Groq retires whatever is configured.
 
