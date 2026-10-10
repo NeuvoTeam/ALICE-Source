@@ -24,5 +24,8 @@ backend/deployed/
 .dev.vars
 tsconfig.tsbuildinfo
 
+# Gradle build output (Gradle's own project cache; never committed)
+.gradle/
+
 # Local junctions/sync
 .obsidian_sync/
