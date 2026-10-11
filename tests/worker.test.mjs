@@ -232,6 +232,10 @@ async function call(method, path, payload, overrideEnv = env, options = {}) {
     headers.Authorization = options.token || VALID_TOKEN
   }
 
+  if (options.headers) {
+    Object.assign(headers, options.headers)
+  }
+
   const res = await worker.fetch(
     new Request(`https://worker.test${path}`, {
       method,
@@ -1061,6 +1065,7 @@ async function main() {
   )
   assert.ok(auditCall, "status_audit_log write must be attempted")
   assert.equal(auditCall.body.submission_id, "sub-draft-01")
+  assert.equal(auditCall.body.previous_status, "draft", "audit log previous_status must be 'draft' on draft update transition")
   assert.equal(auditCall.body.new_status, "pending_practitioner_review")
   assert.equal(auditCall.body.changed_by_user_id, null, "audit log changed_by_user_id must be null")
 
@@ -1157,7 +1162,124 @@ async function main() {
     { token: null }
   )
   assert.equal(r.status, 413)
+
+  // 37e. Content-Length header cap (> 64 KB) returns 413 before body read
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    {
+      token: null,
+      headers: { "Content-Length": "70000" },
+    }
+  )
+  assert.equal(r.status, 413)
+  assert.ok(r.body.error.includes("64 KB"))
   pass("client-submission: allowlist 400, non-draft 409, case_formulations client_id fallback, and 413 payload cap")
+
+  /* 39. Client submission: truthful previous_status in status_audit_log (F5) */
+  const directSessId = "session-direct-01"
+  const directExp = inAnHour()
+  const directSig = await signLink(directSessId, directExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: directSessId, client_id: "client-direct-123", name: "Session Direct" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        return [{ id: "sub-direct-new", session_id: directSessId, client_id: "client-direct-123", status: "pending_practitioner_review" }]
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-direct-01" }]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${directSessId}?exp=${directExp}&sig=${directSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Direct pending submission" },
+      status: "pending_practitioner_review",
+    },
+    env,
+    { token: null }
+  )
+
+  assert.equal(r.status, 200)
+  const directAuditCall = supabaseCalls().find(
+    (c) => c.url.includes("status_audit_log") && c.method === "POST"
+  )
+  assert.ok(directAuditCall, "status_audit_log write must be attempted on direct commit")
+  assert.equal(directAuditCall.body.previous_status, null, "direct insert commit must record null previous_status")
+  assert.equal(directAuditCall.body.new_status, "pending_practitioner_review")
+  assert.equal(directAuditCall.body.changed_by_user_id, null)
+  pass("client-submission: direct insert commit records null previous_status in audit log")
+
+  /* 40. Client submission: task_type allowlist rejects garbage and accepts all allowed types (F2) */
+  const taskTypeSessId = "session-tasktype-01"
+  const taskTypeExp = inAnHour()
+  const taskTypeSig = await signLink(taskTypeSessId, taskTypeExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: taskTypeSessId, client_id: "client-tt", name: "Session TT" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        return [{ id: "sub-tt", session_id: taskTypeSessId, client_id: "client-tt", status: "draft" }]
+      }
+      return undefined
+    },
+  })
+
+  // Disallowed task_type is rejected with 400
+  r = await call(
+    "POST",
+    `/client-submissions/${taskTypeSessId}?exp=${taskTypeExp}&sig=${taskTypeSig}`,
+    {
+      task_type: "unrecognized_garbage_task",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 400)
+  assert.ok(r.body.error.includes("task_type"), "must reject task_type outside allowlist")
+
+  // Each of the 5 allowed values is accepted (200)
+  const allowedTaskTypes = [
+    "activity_log",
+    "thought_record",
+    "behavioural_experiment",
+    "two_choice_worksheet",
+    "reflection_prompt",
+  ]
+  for (const allowedType of allowedTaskTypes) {
+    r = await call(
+      "POST",
+      `/client-submissions/${taskTypeSessId}?exp=${taskTypeExp}&sig=${taskTypeSig}`,
+      {
+        task_type: allowedType,
+        form_data: { test: true },
+        status: "draft",
+      },
+      env,
+      { token: null }
+    )
+    assert.equal(r.status, 200, `task_type '${allowedType}' must be accepted`)
+    assert.equal(r.body.status, "draft")
+  }
+  pass("client-submission: task_type allowlist refuses garbage (400) and accepts each allowed value")
 }
 
 // Derived from the number of pass() calls in this file so adding a check never stales the count.

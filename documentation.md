@@ -385,7 +385,7 @@ Base URL: `https://clinical-ai-backend.neuvoteam.workers.dev`
 | --- | --- |
 | `/auth/*` (`signup`, `login`, `me`) | No session exists yet, and `GET /auth/me` validates the token it is handed |
 | `/client-homework/:sessionId` | Read by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§4.7, §5.2) |
-| `/client-submissions/:sessionId` | Written by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§5.2, §5.8). Scoped strictly by path session, writes explicit null `practitioner_id`, enforces status allowlist (`draft` / `pending_practitioner_review`), rate limited, and caps `form_data` payload |
+| `/client-submissions/:sessionId` | Written by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§5.2, §5.8). Scoped strictly by path session, writes explicit null `practitioner_id`, enforces allowlists on status (`draft` / `pending_practitioner_review`) and `task_type`, rate limited (per-isolate sliding window; abuse mitigation, not security boundary), and caps request body at 64 KB (Content-Length + streaming cap before JSON.parse, plus form_data cap) |
 
 `requireUser(request, env, cors, baseUrl)` performs the check by calling Supabase
 `GET ${SUPABASE_URL}/auth/v1/user` with the anon key plus the caller's token — the same call
@@ -597,11 +597,18 @@ Frontend callers use the server-action wrappers in `lib/tasks.ts`; types live in
 The client-facing submission route (`POST /client-submissions/:sessionId`) is token-free, authenticated by the HMAC
 signature in query params, and strictly scoped by the path session.
 
+Key integrity and abuse controls:
+- **`task_type` allowlist (F2)**: Strictly limited to five recognised types: `activity_log`, `thought_record`, `behavioural_experiment`, `two_choice_worksheet`, and `reflection_prompt`. Anything else is refused with `400`.
+- **Status allowlist**: Strictly `draft` and `pending_practitioner_review`. Updating existing non-draft submissions is refused with `409`.
+- **Truthful `previous_status` in `status_audit_log` (F5)**: Transitioning to `pending_practitioner_review` appends an audit row (`changed_by_user_id: null`) recording `previous_status: "draft"` only when the write transitioned an existing draft (the PATCH path); records `previous_status: null` when a submission is created directly as pending (direct INSERT).
+- **Dual-layer request body size cap (64 KB, F1)**: Checked via `Content-Length` header when present (fast reject) and enforced via a streaming byte-cap on body chunks before `JSON.parse` (aborts and cancels the stream as soon as 64 KB is exceeded to protect against buffering DoS on chunked/unbounded streams), in addition to capping serialized `form_data` payload size.
+- **Rate limiting caveat (F4)**: `clientSubmissionRateLimits` uses an in-memory module-level `Map` (sliding window of 60 req/min per IP:session). In Cloudflare Workers, isolate memory is per-isolate and ephemeral across worker instances. It provides legitimate abuse and accidental double-submission mitigation, but is **not** a hard distributed security boundary against multi-isolate attackers. The IP extraction chain prioritises Cloudflare's platform-verified `cf-connecting-ip` header before falling back to `x-forwarded-for` or direct connection.
+
 | Method | Path | Body / notes | Response |
 | --- | --- | --- | --- |
 | `POST` | `/tasks/submissions` | `{ id?, client_id, practitioner_id?, task_type, form_data }` — omit `id` to create, supply it to update a draft (`practitioner_id` is enforced from `authUser.id` on INSERT) | Upserted `practice_task_submissions` row. `409` if `id` exists with status ≠ `draft` |
 | `POST` | `/tasks/submissions/:id/commit` | Empty body — `id` is in the path | Updated row with `status: "pending_practitioner_review"`. Appends a `status_audit_log` row (best-effort). `409` if status ≠ `draft` |
-| `POST` | `/client-submissions/:sessionId` | query `exp` + `sig` (signed link required). Body: `{ id?, task_type, form_data, status? }` (`status` allowlist: `draft` \| `pending_practitioner_review`). `practitioner_id` is sent as explicit JSON `null`; `client_id` resolved from session/case; `submitted_at` written transactionally on commit. Rate limited (60 req/min per IP:session); `form_data` capped at 64 KB | `200 { id, status }` (receipt only — no cross-row read). `400` invalid status/fields; `403` invalid link/signature; `404` session or scoped submission not found; `409` if `id` exists with status ≠ `draft`; `413` form_data > 64 KB; `429` rate limit exceeded |
+| `POST` | `/client-submissions/:sessionId` | query `exp` + `sig` (signed link required). Body: `{ id?, task_type, form_data, status? }` (`task_type` allowlist: `activity_log`, `thought_record`, `behavioural_experiment`, `two_choice_worksheet`, `reflection_prompt`; `status` allowlist: `draft` \| `pending_practitioner_review`). `practitioner_id` is sent as explicit JSON `null`; `client_id` resolved from session/case; `submitted_at` written transactionally on commit. Rate limited (60 req/min per IP:session per isolate); request body capped at 64 KB (Content-Length + streaming read cap before JSON.parse, plus form_data cap) | `200 { id, status }` (receipt only — no cross-row read). `400` invalid task_type/status/fields; `403` invalid link/signature; `404` session or scoped submission not found; `409` if `id` exists with status ≠ `draft`; `413` payload exceeds 64 KB; `429` rate limit exceeded |
 | `GET` | `/tasks/submissions/:id/bundle` | — | `{ submission, reflections[], practitioner_notes[], audit_log[] }` — all related rows in one round-trip. `audit_log` is best-effort (empty array on failure) |
 | `POST` | `/tasks/submissions/:id/notes` | `{ practitioner_id?, notes }` | Newly created `submission_practitioner_notes` row. Notes are append-only |
 | `POST` | `/tasks/submissions/:id/approve` | Empty body — `id` is in the path | Updated row with `status: "approved"`, `reviewed_at: ISO timestamp`. Immutability lock applies. Appends `status_audit_log` row. `409` if already approved |
@@ -1404,6 +1411,20 @@ and §13.4 (CI, lint config, dead code).
 | Implementation | Pure helper `fmtAuditActor(id: string | null | undefined)` in `lib/audit-actor.ts`. Inert parity: formats valid UUIDs with first 8 characters and ellipsis identically to `fmtShortId`. Tolerates `null`, `undefined`, `""`, and whitespace strings by returning `'unknown actor'`. |
 | Test suite | `tests/audit-actor.test.mjs` — pure stdlib Node harness executing 5 checks verifying null safety, undefined safety, empty string tolerance, 8-character truncation parity, and absence of fabricated client attribution. Wired into `npm test` and `npm run test:audit`. |
 | Evidence | `npx tsc --noEmit` exit 0; `npm test` all 76 checks green across 5 suites (38 worker, 12 PDF, 15 hydration, 6 canvas pad, 5 audit actor); `npm run docs:check` exit 0; `npm run build` exit 0. |
+
+---
+
+### 13.14 Closure record — Client Link Submission Audit Hardening (2026-10-11)
+
+| Item | Detail |
+| --- | --- |
+| Context | Addressed four non-blocking findings from Rook's audit of `POST /client-submissions/:sessionId` (`backend/CloudFlare.js`, commit `df4bf71`). |
+| F1 — Size cap DoS control | Dual-layer 64 KB cap: checks `Content-Length` header when present (fast reject), and reads `request.body` stream chunk-by-chunk with a byte cap before `JSON.parse` (canceling the stream reader as soon as 64 KB is exceeded to prevent buffering DoS on chunked requests), alongside maintaining the `form_data` integrity cap. Inline comments updated to accurately describe the layered control. |
+| F2 — `task_type` allowlist | Restricts `task_type` to the 5 recognized types: `activity_log`, `thought_record`, `behavioural_experiment`, `two_choice_worksheet` (`types/tasks.ts`), plus `reflection_prompt` (`CLIENT_PRACTICE_TASK_FIELDS`). Rejects unlisted strings with 400. |
+| F4 — Rate limiting architecture caveat | Documented that `clientSubmissionRateLimits` (in-memory Map) is per-isolate in Workers and serves as abuse/double-submission mitigation, not a distributed security boundary against multi-isolate attackers. Noted that IP resolution correctly prefers Cloudflare-set `cf-connecting-ip` over spoofable `x-forwarded-for`. |
+| F5 — Truthful `previous_status` in audit row | `status_audit_log` insert records `previous_status: "draft"` only on the PATCH path transitioning an existing draft row, and `previous_status: null` on direct INSERTs created as `pending_practitioner_review`. |
+| Test suite | Regression tests in `tests/worker.test.mjs` expanded to 40 checks: verified truthful null `previous_status` on direct insert (check 39), `task_type` allowlist refusal of garbage and acceptance of all 5 types (check 40), and oversized `Content-Length` fast-rejection with 413 (check 38e). |
+| Evidence | `npx tsc --noEmit` exit 0; `npm test` all 78 checks green across 5 suites (40 worker, 12 PDF, 15 hydration, 6 canvas pad, 5 audit actor); `npm run docs:check` exit 0; `npm run build` exit 0. |
 
 ---
 

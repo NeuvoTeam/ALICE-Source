@@ -188,12 +188,20 @@ function clientLinkTtlDays(value) {
 }
 
 /* ===============================
-   ✅ CLIENT SUBMISSION RATE LIMITING
+   ✅ CLIENT SUBMISSION RATE LIMITING & PAYLOAD CAP
    =============================== */
 const CLIENT_SUBMISSION_MAX_REQUESTS = 60
 const CLIENT_SUBMISSION_WINDOW_MS = 60 * 1000
-const MAX_FORM_DATA_BYTES = 64 * 1024 // 64 KB cap on form_data payload
+const MAX_CLIENT_SUBMISSION_BYTES = 64 * 1024 // 64 KB request body cap
+const MAX_FORM_DATA_BYTES = 64 * 1024 // 64 KB integrity cap on form_data payload
 const clientSubmissionRateLimits = new Map()
+const CLIENT_SUBMISSION_ALLOWED_TASK_TYPES = new Set([
+  "activity_log",
+  "thought_record",
+  "behavioural_experiment",
+  "two_choice_worksheet",
+  "reflection_prompt",
+])
 
 function isClientSubmissionRateLimited(key) {
   const now = Date.now()
@@ -1523,9 +1531,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
          - IDOR protection: every UPDATE is scoped by session_id=eq.<path>&id=eq.<id>&status=eq.draft.
          - Status allowlist: exactly 'draft' and 'pending_practitioner_review'. Only draft rows can be updated (409 gate).
          - submitted_at is written transactionally in the same statement when transitioning to pending_practitioner_review.
-         - Payload size capped at 64 KB (form_data); rate limited (60 req/min per IP:session).
+         - Payload size capped at 64 KB on request body (Content-Length check + streaming byte-cap before JSON.parse, plus form_data cap); rate limited (60 req/min per IP:session).
          - Receipt returns only { id, status } - no cross-row reads.
-         - Status audit log insert is best-effort with changed_by_user_id = null.
+         - Status audit log insert is best-effort with changed_by_user_id = null and truthful previous_status ('draft' on update, null on direct insert).
       ------------------------------------------------------------------ */
       if (method === "POST" && (cleanPath === "/client-submissions" || cleanPath.startsWith("/client-submissions/"))) {
         const sessionId = cleanPath.split("/")[2]
@@ -1557,8 +1565,69 @@ if (method === "GET" && cleanPath === "/auth/me") {
           return respond({ error: "Too many requests. Please try again later." }, cors, 429)
         }
 
-        // 3. Validate body
-        const body = await safeJson(request)
+        // 3. Payload size check: Content-Length header (if present)
+        const contentLengthHeader = request.headers.get("content-length")
+        if (contentLengthHeader !== null) {
+          const contentLength = Number(contentLengthHeader)
+          if (Number.isFinite(contentLength) && contentLength > MAX_CLIENT_SUBMISSION_BYTES) {
+            return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+          }
+        }
+
+        // 4. Read body stream with byte-level cap before JSON.parse
+        // Streaming cap aborts reading chunks once MAX_CLIENT_SUBMISSION_BYTES is exceeded,
+        // mitigating memory buffering DoS on chunked/unbounded requests.
+        let rawBody = ""
+        if (request.body && typeof request.body.getReader === "function") {
+          const reader = request.body.getReader()
+          const chunks = []
+          let totalBytes = 0
+          let tooLarge = false
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              totalBytes += value.byteLength
+              if (totalBytes > MAX_CLIENT_SUBMISSION_BYTES) {
+                tooLarge = true
+                await reader.cancel()
+                break
+              }
+              chunks.push(value)
+            }
+          } finally {
+            reader.releaseLock()
+          }
+
+          if (tooLarge) {
+            return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+          }
+
+          const allBytes = new Uint8Array(totalBytes)
+          let offset = 0
+          for (const chunk of chunks) {
+            allBytes.set(chunk, offset)
+            offset += chunk.byteLength
+          }
+          rawBody = new TextDecoder().decode(allBytes)
+        } else {
+          try {
+            rawBody = await request.text()
+            if (new TextEncoder().encode(rawBody).length > MAX_CLIENT_SUBMISSION_BYTES) {
+              return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+            }
+          } catch {
+            return respond({ error: "Invalid request body" }, cors, 400)
+          }
+        }
+
+        let body
+        try {
+          body = JSON.parse(rawBody)
+        } catch {
+          return respond({ error: "Invalid JSON body" }, cors, 400)
+        }
+
         if (!body || typeof body !== "object") {
           return respond({ error: "Invalid JSON body" }, cors, 400)
         }
@@ -1567,13 +1636,25 @@ if (method === "GET" && cleanPath === "/auth/me") {
           return respond({ error: "Missing required fields: task_type, form_data" }, cors, 400)
         }
 
-        // 4. Cap form_data payload size (64 KB)
+        // 5. Allowlist task_type (F2)
+        if (!CLIENT_SUBMISSION_ALLOWED_TASK_TYPES.has(body.task_type)) {
+          return respond(
+            {
+              error:
+                "Invalid task_type: only 'activity_log', 'thought_record', 'behavioural_experiment', 'two_choice_worksheet', and 'reflection_prompt' are allowed",
+            },
+            cors,
+            400
+          )
+        }
+
+        // 6. Cap form_data payload size (64 KB)
         const formDataStr = JSON.stringify(body.form_data)
         if (new TextEncoder().encode(formDataStr).length > MAX_FORM_DATA_BYTES) {
           return respond({ error: "form_data exceeds maximum allowed size (64 KB)" }, cors, 413)
         }
 
-        // 5. Status allowlist: exactly 'draft' or 'pending_practitioner_review'
+        // 7. Status allowlist: exactly 'draft' or 'pending_practitioner_review'
         let targetStatus = "draft"
         if (body.status !== undefined && body.status !== null) {
           if (body.status !== "draft" && body.status !== "pending_practitioner_review") {
@@ -1586,7 +1667,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
           targetStatus = body.status
         }
 
-        // 6. Resolve client_id from session row (never from body)
+        // 8. Resolve client_id from session row (never from body)
         const sessionRes = await fetch(
           `${SUPABASE_URL}/sessions?id=eq.${encodeURIComponent(sessionId)}&select=client_id,case_formulations(client_id)`,
           { headers: HEADERS }
@@ -1603,9 +1684,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
 
         const now = new Date().toISOString()
         let row
+        let previousStatus = null
 
         if (body.id) {
-          // 7. UPDATE: Scoped by id, session_id, and status=draft
+          // 9. UPDATE: Scoped by id, session_id, and status=draft
           const checkRes = await fetch(
             `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
             { headers: HEADERS }
@@ -1620,6 +1702,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
           if (existing[0].status !== "draft") {
             return respond({ error: "Only draft submissions can be updated" }, cors, 409)
           }
+
+          previousStatus = existing[0].status
 
           const patchPayload = {
             task_type: body.task_type,
@@ -1645,7 +1729,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
           }
           row = Array.isArray(patchData) ? patchData[0] : patchData
         } else {
-          // 8. INSERT: Explicit null practitioner_id, session_id from path, client_id from session
+          // 10. INSERT: Explicit null practitioner_id, session_id from path, client_id from session
+          previousStatus = null
           const insertPayload = {
             client_id: sessionClientId,
             session_id: sessionId,
@@ -1668,7 +1753,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
           row = Array.isArray(insertData) ? insertData[0] : insertData
         }
 
-        // 9. Best-effort audit log entry on commit (changed_by_user_id is null)
+        // 11. Best-effort audit log entry on commit (changed_by_user_id is null)
         if (targetStatus === "pending_practitioner_review") {
           try {
             await fetch(`${SUPABASE_URL}/status_audit_log`, {
@@ -1676,7 +1761,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
               headers: HEADERS,
               body: JSON.stringify({
                 submission_id: row.id,
-                previous_status: "draft",
+                previous_status: previousStatus,
                 new_status: "pending_practitioner_review",
                 changed_by_user_id: null,
                 changed_at: now,
@@ -1687,7 +1772,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
           }
         }
 
-        // 10. Receipt returns ONLY id and status (no cross-row reads)
+        // 12. Receipt returns ONLY id and status (no cross-row reads)
         return respond({ id: row.id, status: row.status }, cors)
       }
 
