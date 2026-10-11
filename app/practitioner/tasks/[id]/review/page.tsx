@@ -31,6 +31,7 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/auth";
 import { CLINICAL_AI_API_BASE as API } from "@/lib/clinical-ai-api";
+import { fmtAuditActor } from "@/lib/audit-actor";
 import AuthGuard from "@/components/auth-guard";
 
 import {
@@ -264,7 +265,7 @@ function AuditStrip({ submission, auditLog }: AuditStripProps) {
     items.push({
       icon: <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />,
       label: "Reviewer ID",
-      value: fmtShortId(approveEntry.changedByUserId),
+      value: fmtAuditActor(approveEntry.changedByUserId),
     });
   }
 
@@ -363,7 +364,7 @@ function AuditLogPanel({ auditLog }: { auditLog: NormalisedAuditLogEntry[] }) {
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground font-mono">
-                  {fmtDate(entry.changedAt)} · by {fmtShortId(entry.changedByUserId)}
+                  {fmtDate(entry.changedAt)} · by {fmtAuditActor(entry.changedByUserId)}
                 </p>
               </li>
             );
