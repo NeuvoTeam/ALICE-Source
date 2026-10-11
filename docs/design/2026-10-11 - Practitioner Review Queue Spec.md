@@ -260,7 +260,20 @@ clinician gets feedback that they are on top of things, and it is cheap.
 
 - **Loading**: 3 skeleton rows per client group (`animate-pulse`, `bg-muted`,
   `rounded-xl h-[68px]`). Never a spinner for a list — the shape must be stable.
-- **Error**: one inline `role="alert"` card with `Try again`; do not blank the page.
+- **Error, two states — and the distinction is a contract fact, not copy.** The page branches
+  on the response's machine-readable `code`, **never on message text**, so the copy and the
+  contract cannot drift.
+  - **Retryable** (network failure, timeout, unknown 5xx): one inline `role="alert"` card
+    with `Try again`; do not blank the page.
+  - **Not retryable** (fail-closed 503, auth failures): **no retry CTA** — "Submissions are
+    unavailable right now." A retry the user cannot succeed at is a small lie, and it is the
+    signal that leads someone to read a *misconfigured* feature as a *broken* one.
+  - **An unrecognised `code` is treated as retryable.** Only a *known* non-retryable code
+    suppresses the CTA — an **allowlist that suppresses retry**, never a denylist that
+    permits it. The asymmetry is the reason: a useless retry wastes one tap, whereas
+    suppressing a retry that would have worked leaves the user with no path forward and no
+    way to know one existed. The default must be written as a comment in the branch, so the
+    next person adding a code knows it is deliberate rather than incidental.
 - **Partial**: a client group whose fetch fails shows an inline "Couldn't load <name>'s
   submissions" row inside its own group, leaving the rest of the list usable. With a
   single collection endpoint this is moot, but design for it: the route may end up
@@ -359,7 +372,12 @@ Requirements the audit must confirm:
 - **Historical rows keep `submitted_at = NULL`.** No backfill (§4.1 of the Item 1 spec).
   The row must render an unknown wait ("submitted date unknown") rather than a
   fabricated one, and the FIFO sort must place nulls **last**, deterministically, not
-  wherever the database happens to put them.
+  wherever the database happens to put them. The **words** belong in the queue row
+  ("submitted date unknown"), and an unknown wait must never be escalated to overdue —
+  it cannot be known to be late. The gateway's audit strip renders the same absence as
+  "—", which is deliberate: a row has room for a sentence and an audit strip is a labelled
+  key/value pair. **Neither should be "unified" into the other**, and the same applies to
+  the escalation flags — an unknown wait is neither amber nor overdue.
 - **`counts` and `pending_total` are different scopes, and the difference is load-bearing.**
 
   | Field | Scope | Drives |
@@ -399,6 +417,13 @@ Requirements the audit must confirm:
   `(submitted_at is null), submitted_at, id` with the null-flag carried **inside the
   signed cursor**. Settling this encoding after cursors are in flight invalidates them
   mid-scroll.
+- **Fail-closed is part of the contract, not an error message.** When the cursor-signing
+  secret is unconfigured the endpoint returns **503** with a stable machine-readable `code`
+  (`CURSOR_SECRET_UNCONFIGURED`) and a message naming the variable. The page branches on
+  `code` (§3.7). A bare 500 would be indistinguishable from a transient fault, so a client
+  could not tell "retry" from "misconfigured" — which is why the status and the code belong
+  in the contract rather than in the copy. **503** specifically, because the condition is
+  unavailability rather than a faulty request.
 - **`client_name`** must be resolved server-side. The alternative (fetch `/clients`, then
   join in the browser) leaks the full client roster into the page payload.
 - **Tenant scoping is mandatory at the query level, for rows *and* counts.** Reuse the
