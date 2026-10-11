@@ -26,12 +26,16 @@ import React, {
   useRef,
   useState,
   useTransition,
+  Suspense,
 } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/auth";
 import { CLINICAL_AI_API_BASE as API } from "@/lib/clinical-ai-api";
 import { fmtAuditActor } from "@/lib/audit-actor";
+import { TASK_LABELS, taskLabel } from "@/lib/task-labels";
+import { STATUS_CONFIG, StatusBadge } from "@/components/status-pill";
 import AuthGuard from "@/components/auth-guard";
 
 import {
@@ -100,16 +104,6 @@ interface TimeBlock {
 type WeeklySchedule = Record<Day, Record<string, TimeBlock>>;
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const TASK_LABELS: Record<string, string> = {
-  activity_log: "Weekly Activity Schedule",
-  thought_record: "The 3 C's Worksheet",
-  behavioural_experiment: "Behavioural Experiment",
-};
-
-// ---------------------------------------------------------------------------
 // Normalisation helpers (same contract as lib/tasks.ts but runs client-side)
 // ---------------------------------------------------------------------------
 
@@ -121,6 +115,7 @@ function normalizeSubmission(row: PracticeTaskSubmissionRow): NormalisedSubmissi
     taskType: row.task_type,
     formData: row.form_data,
     status: row.status,
+    submittedAt: row.submitted_at ?? null,
     reviewedAt: row.reviewed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -176,51 +171,6 @@ function fmtShortId(id: string): string {
   return id.slice(0, 8) + "…";
 }
 
-// ---------------------------------------------------------------------------
-// StatusBadge
-// ---------------------------------------------------------------------------
-
-const STATUS_CONFIG: Record<TaskStatus, { label: string; cls: string }> = {
-  draft: {
-    label: "Draft",
-    cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  },
-  pending_practitioner_review: {
-    label: "Pending Review",
-    cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
-  },
-  reviewed: {
-    label: "Reviewed",
-    cls: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
-  },
-  approved: {
-    label: "Approved & Locked",
-    cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
-  },
-  revision_requested: {
-    label: "Revision Requested",
-    cls: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
-  },
-  archived: {
-    label: "Archived",
-    cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500",
-  },
-};
-
-function StatusBadge({ status }: { status: TaskStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
-        cfg.cls
-      )}
-    >
-      {status === "approved" && <Lock className="h-3 w-3" />}
-      {cfg.label}
-    </span>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // AuditStrip — metadata bar sourced from status_audit_log
@@ -239,7 +189,7 @@ function AuditStrip({ submission, auditLog }: AuditStripProps) {
     {
       icon: <Clock className="h-3.5 w-3.5" />,
       label: "Submitted",
-      value: fmtDate(submission.createdAt),
+      value: fmtDate(submission.submittedAt ?? null),
     },
     {
       icon: <User className="h-3.5 w-3.5" />,
@@ -1084,10 +1034,12 @@ function RevisionDialog({ onConfirm, onCancel, isLoading }: RevisionDialogProps)
 interface DecisionBarProps {
   status: TaskStatus;
   submissionId: UUID;
+  backUrl?: string;
   onActionComplete: (updated: NormalisedSubmission) => void;
 }
 
-function DecisionBar({ status, submissionId, onActionComplete }: DecisionBarProps) {
+function DecisionBar({ status, submissionId, backUrl, onActionComplete }: DecisionBarProps) {
+  const router = useRouter();
   const [showApprove,  setShowApprove]  = useState(false);
   const [showRevision, setShowRevision] = useState(false);
   const [actionError,  setActionError]  = useState<string | null>(null);
@@ -1109,7 +1061,10 @@ function DecisionBar({ status, submissionId, onActionComplete }: DecisionBarProp
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
       const row = await res.json() as PracticeTaskSubmissionRow;
-      startTransition(() => { onActionComplete(normalizeSubmission(row)); });
+      startTransition(() => {
+        onActionComplete(normalizeSubmission(row));
+        if (backUrl) router.push(backUrl);
+      });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Approve failed");
     } finally {
@@ -1135,7 +1090,10 @@ function DecisionBar({ status, submissionId, onActionComplete }: DecisionBarProp
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
       const row = await res.json() as PracticeTaskSubmissionRow;
-      startTransition(() => { onActionComplete(normalizeSubmission(row)); });
+      startTransition(() => {
+        onActionComplete(normalizeSubmission(row));
+        if (backUrl) router.push(backUrl);
+      });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Revision request failed");
     } finally {
@@ -1245,7 +1203,11 @@ function DecisionBar({ status, submissionId, onActionComplete }: DecisionBarProp
 function ReviewPageInner() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const submissionId = params.id;
+
+  const fromTab = searchParams?.get("tab") || "pending_practitioner_review";
+  const backUrl = `/practitioner/submissions?tab=${encodeURIComponent(fromTab)}`;
 
   const [bundle, setBundle]         = useState<SubmissionBundle | null>(null);
   const [loading, setLoading]       = useState(true);
@@ -1343,14 +1305,13 @@ function ReviewPageInner() {
 
         {/* Navigation + title row */}
         <div className="flex items-start gap-4">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => router.back()}
-            className="mt-0.5 shrink-0"
+          <Link
+            href={backUrl}
+            className="mt-0.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ArrowLeft className="h-4 w-4" />
-          </Button>
+            Submissions
+          </Link>
           <div className="flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-3">
               <LabelEditor
@@ -1401,6 +1362,7 @@ function ReviewPageInner() {
         <DecisionBar
           status={submission.status}
           submissionId={submission.id}
+          backUrl={backUrl}
           onActionComplete={(updated) =>
             setBundle((prev) =>
               prev ? { ...prev, submission: updated } : prev
@@ -1420,7 +1382,16 @@ function ReviewPageInner() {
 export default function PractitionerReviewPage() {
   return (
     <AuthGuard>
-      <ReviewPageInner />
+      <Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="text-muted-foreground">Loading submission…</span>
+          </div>
+        }
+      >
+        <ReviewPageInner />
+      </Suspense>
     </AuthGuard>
   );
 }

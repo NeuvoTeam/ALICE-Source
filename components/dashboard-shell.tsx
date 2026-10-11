@@ -11,11 +11,17 @@ import { useClientNavStore } from "@/stores/useClientNavStore";
 // uses for .lg\:hidden / .lg\:flex.
 const DESKTOP_QUERY = "(min-width: 64rem)";
 
-export function DashboardShell({ viewMode, activeTab, onViewModeChange, onTabChange, children }: {
-  viewMode: "clinician" | "client";
-  activeTab: "vignette" | "summaries";
-  onViewModeChange: (mode: "clinician" | "client") => void;
-  onTabChange: (tab: "vignette" | "summaries") => void;
+export function DashboardShell({
+  viewMode = "clinician",
+  activeTab = "vignette",
+  onViewModeChange = () => {},
+  onTabChange = () => {},
+  children,
+}: {
+  viewMode?: "clinician" | "client";
+  activeTab?: "vignette" | "summaries";
+  onViewModeChange?: (mode: "clinician" | "client") => void;
+  onTabChange?: (tab: "vignette" | "summaries") => void;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);

@@ -1,31 +1,67 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
+  ClipboardCheck,
   FileText,
+  LayoutDashboard,
   ScrollText,
   Sparkles,
   User,
   Stethoscope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/auth";
+import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
+import { formatBadgeCount } from "@/lib/review-queue";
 import { ClientNode } from "@/components/sidebar/ClientNode";
 import LogoutButton from "@/components/logout-button";
+
 type ViewMode = "clinician" | "client";
 type ClinicianTab = "vignette" | "summaries";
 
 interface DashboardSidebarProps {
-  viewMode: ViewMode;
-  activeTab: ClinicianTab;
-  onViewModeChange: (mode: ViewMode) => void;
-  onTabChange: (tab: ClinicianTab) => void;
+  viewMode?: ViewMode;
+  activeTab?: ClinicianTab;
+  onViewModeChange?: (mode: ViewMode) => void;
+  onTabChange?: (tab: ClinicianTab) => void;
 }
 
 export function DashboardSidebar({
-  viewMode,
-  activeTab,
-  onViewModeChange,
-  onTabChange,
+  viewMode = "clinician",
+  activeTab = "vignette",
+  onViewModeChange = () => {},
+  onTabChange = () => {},
 }: DashboardSidebarProps) {
+  const pathname = usePathname();
+  const [pendingTotal, setPendingTotal] = useState<number>(0);
+
+  // Shell badge: fetches count_only=1 on mount to avoid paginating submission lists.
+  // Spec: §4 Browser tab / badge & Constraint 1
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await apiFetch(`${CLINICAL_AI_API_BASE}/tasks/submissions?count_only=1`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && data && typeof data.pending_total === "number") {
+          setPendingTotal(data.pending_total);
+        }
+      } catch {
+        // Silently tolerate network/auth failures for shell badge
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const badgeText = formatBadgeCount(pendingTotal);
+  const isReviewActive = pathname?.startsWith("/practitioner/submissions") ?? false;
+  const isDashboardActive = (pathname === "/dashboard" || pathname === "/") && !isReviewActive;
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-sidebar text-sidebar-foreground border-sidebar-border shrink-0">
 
@@ -75,6 +111,45 @@ export function DashboardSidebar({
       {/* CLINICIAN MODE */}
       {viewMode === "clinician" && (
         <div className="flex-1 overflow-y-auto">
+
+          {/* NAVIGATION */}
+          <div className="px-3 py-3 border-b border-sidebar-border space-y-1">
+            <Link
+              href="/dashboard"
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                isDashboardActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "hover:bg-sidebar-accent/50"
+              )}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span>Dashboard</span>
+            </Link>
+
+            <Link
+              href="/practitioner/submissions"
+              className={cn(
+                "w-full flex items-center justify-between px-3 py-2 text-sm rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                isReviewActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "hover:bg-sidebar-accent/50"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                <span>Review</span>
+              </span>
+              {badgeText && (
+                <span
+                  aria-label={`${pendingTotal} pending submissions`}
+                  className="rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                >
+                  {badgeText}
+                </span>
+              )}
+            </Link>
+          </div>
 
           {/* CLIENT / CASE / SESSION TREE */}
           <div className="px-3 py-3">

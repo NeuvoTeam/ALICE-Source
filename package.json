@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs && node tests/canvas-pad.test.mjs && node tests/audit-actor.test.mjs",
+    "test": "node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs && node tests/canvas-pad.test.mjs && node tests/audit-actor.test.mjs && node tests/review-queue.test.mjs",
     "test:pdf": "node tests/pdf-export.test.mjs",
     "test:hydration": "node tests/hydration-guard.test.mjs",
     "test:canvas": "node tests/canvas-pad.test.mjs",
     "test:audit": "node tests/audit-actor.test.mjs",
+    "test:queue": "node tests/review-queue.test.mjs",
     "docs:check": "node scripts/check-docs.mjs && copy /Y D:\\Work\\Neuvo\\ALICE\\Source\\documentation.md D:\\Work\\Neuvo\\ALICE\\Source\\.obsidian_sync\\ALICE_Master_Docs.md"
   },
   "dependencies": {

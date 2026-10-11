@@ -138,14 +138,19 @@ export interface CanvasData {
 export interface PracticeTaskSubmissionRow {
   id: UUID;
   client_id: UUID;
-  practitioner_id: UUID;
+  practitioner_id: UUID | null;
   /** Discriminant for `form_data`. Must match `SubmissionFormData["task_type"]`. */
   task_type: SubmissionFormData["task_type"];
   form_data: SubmissionFormData;
   status: TaskStatus;
+  submitted_at?: ISODateTime | null;
   reviewed_at: ISODateTime | null;
   created_at: ISODateTime;
   updated_at: ISODateTime;
+  session_id?: UUID | null;
+  session_name?: string | null;
+  client_name?: string | null;
+  reflection_count?: number;
 }
 
 /** Row from `submission_practitioner_notes`. */
@@ -200,13 +205,55 @@ export interface SubmissionBundle {
 export interface NormalisedSubmission {
   id: UUID;
   clientId: UUID;
-  practitionerId: UUID;
+  practitionerId: UUID | null;
   taskType: SubmissionFormData["task_type"];
   formData: SubmissionFormData;
   status: TaskStatus;
+  submittedAt?: ISODateTime | null;
   reviewedAt: ISODateTime | null;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
+  sessionId?: UUID | null;
+  sessionName?: string | null;
+  clientName?: string | null;
+  reflectionCount?: number;
+}
+
+/** Wire row from `GET /tasks/submissions` */
+export interface ReviewQueueRow {
+  id: UUID;
+  client_id: UUID;
+  client_name: string | null;
+  task_type: string;
+  status: TaskStatus;
+  submitted_at: ISODateTime | null;
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
+  reflection_count: number;
+  session_id: UUID | null;
+  session_name: string | null;
+}
+
+export interface ReviewQueueCounts {
+  pending_practitioner_review?: number;
+  draft?: number;
+  reviewed?: number;
+  approved?: number;
+  revision_requested?: number;
+  archived?: number;
+  [status: string]: number | undefined;
+}
+
+export interface ReviewQueueResponse {
+  rows: ReviewQueueRow[];
+  counts: ReviewQueueCounts;
+  pending_total: number;
+  next_cursor: string | null;
+}
+
+export interface ReviewQueueCountOnlyResponse {
+  counts: ReviewQueueCounts;
+  pending_total: number;
 }
 
 /** Normalised (camelCase) clientReflection for app state. */
