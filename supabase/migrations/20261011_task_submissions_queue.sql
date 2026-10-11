@@ -62,3 +62,13 @@ from pg_indexes
 where schemaname = 'public'
   and tablename = 'practice_task_submissions'
 order by indexname;
+
+-- The existing is_nullable checks are necessary but NOT sufficient, because a
+-- CHECK constraint, a column DEFAULT, or a BEFORE INSERT trigger can each still
+-- block or override a NULL actor after DROP NOT NULL. All three returning empty
+-- rows is what actually proves the client-link insert is unblocked.
+select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid in ('public.practice_task_submissions'::regclass, 'public.status_audit_log'::regclass) and contype = 'c';
+
+select column_name, column_default from information_schema.columns where table_schema = 'public' and ((table_name = 'practice_task_submissions' and column_name = 'practitioner_id') or (table_name = 'status_audit_log' and column_name = 'changed_by_user_id'));
+
+select tgname, tgrelid::regclass from pg_trigger where not tgisinternal and tgrelid = 'public.practice_task_submissions'::regclass;
