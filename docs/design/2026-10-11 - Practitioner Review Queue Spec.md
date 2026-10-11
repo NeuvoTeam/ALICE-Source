@@ -407,6 +407,11 @@ Requirements the audit must confirm:
   worth holding, because the failure mode is not a missing check — it is a naive decoder
   that lets any cursor field reach the query, which turns tampering into filter injection.
   HMAC-signing the cursor is defence in depth *on top of* that, never a substitute for it.
+  The remedy is therefore explicit, not implied: **decode the cursor into a fixed set of
+  expected fields, and reject the payload rather than ignore unknown keys.** Silently
+  ignoring an unexpected field and rejecting it are different guarantees, and **only
+  rejection fails closed**. Stating it is the point — a reader left to invent the remedy
+  will invent the permissive one, because that is the one that does not error.
 - **The cursor must carry its direction, and a mismatch is a 400.** One tab sorts ascending
   and the rest descending (§3.2), and the tab is a URL param the caller can change while
   holding the same cursor. Silent mispositioning would show a clinician the wrong work
