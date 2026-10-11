@@ -628,10 +628,10 @@ or read the tables. What follows is the contract the current code actually depen
 | `sessions` | `id`, `case_id`, `client_id`, `name`, `session_notes`, `vignette`, `homework` (jsonb), `quiz` (jsonb), `practice_package` (jsonb), `analysis` (jsonb), `modality` (text), `created_at`, `updated_at` | every session route |
 | `session_versions` | `session_id`, `session_notes`, `vignette`, `homework`, `quiz`, `practice_package`, `modality`, `analysis`, `created_at` (written only — nothing reads it yet) | `saveSessionVersion` |
 | `profiles` | `id`, `*` | `GET /auth/me` |
-| `practice_task_submissions` | `id`, `client_id`, `practitioner_id`, `task_type`, `form_data` (jsonb), `status`, `reviewed_at`, `created_at`, `updated_at` | `POST /tasks/submissions`, `POST /tasks/submissions/:id/commit`, `GET /tasks/submissions/:id/bundle` |
+| `practice_task_submissions` | `id`, `client_id`, `session_id` (nullable — §6.2), `practitioner_id` (**nullable** since 2026-10-11 — the signed client link carries no user identity), `task_type`, `form_data` (jsonb), `status`, `submitted_at` (nullable — §6.2), `reviewed_at`, `created_at`, `updated_at` | `POST /tasks/submissions`, `POST /tasks/submissions/:id/commit`, `GET /tasks/submissions/:id/bundle` |
 | `submission_practitioner_notes` | `id`, `submission_id`, `practitioner_id`, `notes`, `created_at` | `POST /tasks/submissions/:id/notes`, `GET /tasks/submissions/:id/bundle` |
 | `client_reflections` | `id`, `submission_id`, `client_id`, `canvas_data` (jsonb), `image_url`, `notes`, `created_at` | `GET /tasks/submissions/:id/bundle` (read-only from the Worker; written by client pages) |
-| `status_audit_log` | `id`, `submission_id`, `previous_status`, `new_status`, `changed_by_user_id`, `changed_at` | Written by `POST /tasks/submissions/:id/commit`, `:id/approve`, and `:id/request-revision` (best-effort, non-fatal). **Read** by `GET /tasks/submissions/:id/bundle` — exposed as `audit_log[]` in the bundle and used by the Practitioner Review Gateway to surface the true reviewer identity from `changed_by_user_id` |
+| `status_audit_log` | `id`, `submission_id`, `previous_status`, `new_status`, `changed_by_user_id`, `changed_at` | Written by `POST /tasks/submissions/:id/commit`, `:id/approve`, and `:id/request-revision` (best-effort, non-fatal). **Read** by `GET /tasks/submissions/:id/bundle` — exposed as `audit_log[]` in the bundle and used by the Practitioner Review Gateway to surface the true reviewer identity from `changed_by_user_id`. `changed_by_user_id` is **nullable** since 2026-10-11 (§6.2) — a transition made through a client link has no actor — so every render site must null-guard it (§13.10) |
 
 Notes:
 
@@ -665,6 +665,8 @@ This migration does **not** cover `practice_package` (written by the Worker) and
 `supabase/migrations/20260914_worksheet_submissions.sql` adds `worksheet_submissions`
 (`client_id`, `session_id`, `answers` jsonb, `created_at` + indexes) which backs
 `POST /client/worksheet`. Run it in the Supabase SQL editor before that route can persist anything.
+
+`supabase/migrations/20261011_task_submissions_queue.sql` (authored 2026-10-11, **not yet applied** — see §13.10) prepares the Phase 2 client submit-for-review surface: nullable `session_id` (FK to `sessions(id)`, `on delete set null`), `submitted_at timestamptz`, `DROP NOT NULL` on `practice_task_submissions.practitioner_id` and `status_audit_log.changed_by_user_id`, and three indexes (`session_id`; `(client_id, status, updated_at desc)`; partial `(client_id, submitted_at) where status = 'pending_practitioner_review'`). It is idempotent, transactional, and carries **no backfill** — existing rows keep `session_id = NULL` and `submitted_at = NULL`, whose defined meaning is *session unknown (pre-migration)* and *wait unknown*. The decision record is `docs/design/2026-10-11 - Client Submit-for-Review UX Spec.md` §4.
 
 ### 6.3 JSON payload shapes stored on `sessions`
 
@@ -1350,6 +1352,18 @@ and §13.4 (CI, lint config, dead code).
 | Causes | 1. In `vignette-generator.tsx`, `saveSessionContent` was called without `practicePackage` or `homework`, leaving the session row in Supabase devoid of practice package content.<br>2. In `CloudFlare.js`, `GET /client-homework/:sessionId` only read `row.practice_package.homework` as an array. When structured tasks (`two_choice_worksheet`, `thought_record`, `activity_log`, `reflection_prompt`) were present without an explicit `.homework` array, it defaulted to `[]` and ignored `row.homework` and `practice_task_submissions`.<br>3. In `app/practice/[sessionId]/page.tsx`, the client page strictly expected `data.practiceHomework` and did not fall back to `data.homework`, and lacked interactive task completion. |
 | Fix | 1. In `vignette-generator.tsx`, enriched generated tasks with `homework` arrays via `extractHomeworkList`, persisting `practicePackage` and `homework` during both initial generation and regeneration, and restored step 2 hydration on existing sessions.<br>2. In `CloudFlare.js`, implemented `extractHomeworkFromPracticePackage` to extract human-readable task items from structured task schemas, with cascading fallbacks to `row.homework` and `practice_task_submissions` records.<br>3. In `app/practice/[sessionId]/page.tsx`, added cascading fallback to `data.homework`, structured object task formatting, and an interactive client checkbox tracker with progress bar. |
 | Evidence | `npx tsc --noEmit` exit 0; `npm test` all 61 checks green (34 worker, 12 PDF, 15 hydration); `npm run docs:check` exit 0 |
+
+---
+
+### 13.10 Open — Phase 2 schema authored, not yet applied (2026-10-11)
+
+| Item | Detail |
+| --- | --- |
+| Migration authored | `supabase/migrations/20261011_task_submissions_queue.sql` (§6.2) — idempotent, transactional, no backfill |
+| Status | **NOT APPLIED.** Operator authorisation for this migration was given 2026-10-11. Applying it is a Supabase SQL-editor action: the Worker holds no DDL path and the MCP gateway (`/tools`) exposes no schema tool, so no agent can apply it from this repo |
+| What is gated on it | Item 1 Phase 2 (the signed client-submit route) has no storage until it runs — that route writes `practitioner_id = NULL` and needs `session_id` on the row. The Practitioner Review Queue's session grouping and its `submitted_at` sort key depend on the same two columns |
+| Null-actor hazard | The actor columns become nullable in the schema, but the review gateway's render is still unguarded: `fmtShortId(id: string) { return id.slice(0, 8) + "…" }` (`app/practitioner/tasks/[id]/review/page.tsx:174`), called at `:267` and `:366`, throws a `TypeError` on a `null` actor — for exactly the client-path submissions the queue exists to show. A null-safe render must ship with, or before, any row that carries a null actor |
+| Provenance | Rook's bundled schema ruling on HEAD `924d57a`; the full decision record is `docs/design/2026-10-11 - Client Submit-for-Review UX Spec.md` §4 (that spec is untracked in Git — recorded as an open hygiene item, not committed here) |
 
 ---
 
