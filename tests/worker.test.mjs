@@ -154,7 +154,7 @@ function installFetch(steps, { supabaseRows } = {}) {
     }
 
     if (!isGroq) {
-      const override = supabaseRows ? supabaseRows(href) : undefined
+      const override = supabaseRows ? supabaseRows(href, init) : undefined
 
       if (override !== undefined) {
         return new Response(JSON.stringify(override), {
@@ -918,6 +918,246 @@ async function main() {
   assert.equal(r.status, 400);
   assert.equal(r.body.error, "INVALID_REQUEST");
   pass("structured-task: invalid request schema returns 400");
+
+  /* 35. Client submission scoping guard: body id belonging to another session or null session_id must be refused */
+  const clientSessId = "session-path-01"
+  const clientExp = inAnHour()
+  const clientSig = await signLink(clientSessId, clientExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: clientSessId,
+            client_id: "client-sess-owner",
+            name: "Session Path 01",
+          },
+        ]
+      }
+      if (href.includes("practice_task_submissions")) {
+        // Scoped check must return [] if the submission does not belong to this path session
+        if (href.includes("session_id=eq.session-path-01")) {
+          return []
+        }
+        // If an unscoped check were performed:
+        return [
+          {
+            id: "foreign-sub-01",
+            session_id: "session-other-99",
+            status: "draft",
+          },
+        ]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${clientSessId}?exp=${clientExp}&sig=${clientSig}`,
+    {
+      id: "foreign-sub-01",
+      task_type: "thought_record",
+      form_data: { situation: "Attacking foreign session" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 404)
+  assert.equal(r.body.error, "Submission not found")
+  const checkSubCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "GET"
+  )
+  assert.ok(checkSubCall, "must query practice_task_submissions")
+  assert.ok(
+    checkSubCall.url.includes("session_id=eq.session-path-01"),
+    "submission lookup MUST be scoped by session_id"
+  )
+  assert.ok(
+    checkSubCall.url.includes("id=eq.foreign-sub-01"),
+    "submission lookup must include id"
+  )
+  assert.equal(writeCalls().length, 0, "must not write anything when scoping check fails")
+  pass("client-submission: foreign body id is refused and strictly scoped by path session")
+
+  /* 36. Valid client-link commit: sends explicit null practitioner_id, resolves client_id from session, writes submitted_at, and receipt returns only id and status */
+  const commitSessId = "session-valid-01"
+  const commitExp = inAnHour()
+  const commitSig = await signLink(commitSessId, commitExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: commitSessId,
+            client_id: "client-resolved-123",
+            name: "Session Valid 01",
+          },
+        ]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("id=eq.sub-draft-01") && href.includes("session_id=eq.session-valid-01")) {
+          const isPatch = href.includes("status=eq.draft")
+          return [
+            {
+              id: "sub-draft-01",
+              session_id: commitSessId,
+              client_id: "client-resolved-123",
+              status: isPatch ? "pending_practitioner_review" : "draft",
+            },
+          ]
+        }
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-01" }]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${commitSessId}?exp=${commitExp}&sig=${commitSig}`,
+    {
+      id: "sub-draft-01",
+      task_type: "thought_record",
+      form_data: { situation: "Valid thought record" },
+      status: "pending_practitioner_review",
+      practitioner_id: "fake-doctor-id",
+      client_id: "fake-client-id",
+    },
+    env,
+    { token: null }
+  )
+
+  assert.equal(r.status, 200)
+  assert.deepEqual(Object.keys(r.body).sort(), ["id", "status"])
+  assert.equal(r.body.id, "sub-draft-01")
+  assert.equal(r.body.status, "pending_practitioner_review")
+
+  const patchCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "PATCH"
+  )
+  assert.ok(patchCall, "PATCH call must have been made")
+  assert.ok(
+    patchCall.url.includes("id=eq.sub-draft-01") &&
+      patchCall.url.includes("session_id=eq.session-valid-01") &&
+      patchCall.url.includes("status=eq.draft"),
+    "PATCH filter must be id=eq.<id>&session_id=eq.<path>&status=eq.draft"
+  )
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(patchCall.body, "practitioner_id"),
+    "practitioner_id must be present in PATCH body"
+  )
+  assert.equal(patchCall.body.practitioner_id, null, "practitioner_id must be explicitly null")
+  assert.equal(patchCall.body.status, "pending_practitioner_review")
+  assert.ok(patchCall.body.submitted_at, "submitted_at must be written in the same statement")
+
+  const auditCall = supabaseCalls().find(
+    (c) => c.url.includes("status_audit_log") && c.method === "POST"
+  )
+  assert.ok(auditCall, "status_audit_log write must be attempted")
+  assert.equal(auditCall.body.submission_id, "sub-draft-01")
+  assert.equal(auditCall.body.new_status, "pending_practitioner_review")
+  assert.equal(auditCall.body.changed_by_user_id, null, "audit log changed_by_user_id must be null")
+
+  pass("client-submission: valid commit sends explicit null practitioner_id, submitted_at, and scoped receipt")
+
+  /* 37. Client submission security gates: 409 on non-draft update, 400 on disallowed status, case_formulations client_id fallback, and 413 on payload limit */
+  const secSessId = "session-sec-01"
+  const secExp = inAnHour()
+  const secSig = await signLink(secSessId, secExp)
+
+  // 37a. Disallowed status returns 400
+  installFetch([{ content: VALID }])
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "approved",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 400)
+  assert.ok(r.body.error.includes("status"), "must reject status outside allowlist")
+
+  // 37b. Cannot update non-draft submission (409)
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: secSessId, client_id: "c1", name: "Sec Sess" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        return [{ id: "sub-already-pending", session_id: secSessId, status: "pending_practitioner_review" }]
+      }
+      return undefined
+    },
+  })
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      id: "sub-already-pending",
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, "Only draft submissions can be updated")
+
+  // 37c. Case formulations client_id fallback when sessions.client_id is null
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: secSessId, client_id: null, case_formulations: { client_id: "client-from-cf" } }]
+      }
+      return undefined
+    },
+  })
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Fresh draft" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  const insertCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "POST"
+  )
+  assert.ok(insertCall, "INSERT call must be made")
+  assert.equal(insertCall.body.client_id, "client-from-cf", "client_id must resolve from case_formulations")
+  assert.equal(insertCall.body.practitioner_id, null, "practitioner_id must be explicit null on insert")
+  assert.equal(insertCall.body.session_id, secSessId, "session_id must match path")
+
+  // 37d. Payload size limit (64 KB) returns 413
+  const hugeFormData = { huge: "x".repeat(65 * 1024) }
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: hugeFormData,
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 413)
+  pass("client-submission: allowlist 400, non-draft 409, case_formulations client_id fallback, and 413 payload cap")
 }
 
 // Derived from the number of pass() calls in this file so adding a check never stales the count.

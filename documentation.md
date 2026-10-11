@@ -379,12 +379,13 @@ Base URL: `https://clinical-ai-backend.neuvoteam.workers.dev`
 
 ### 5.0 Caller authentication
 
-**Every route requires `Authorization: Bearer <supabase access token>` except two public families:**
+**Every route requires `Authorization: Bearer <supabase access token>` except three public families:**
 
 | Public | Why |
 | --- | --- |
 | `/auth/*` (`signup`, `login`, `me`) | No session exists yet, and `GET /auth/me` validates the token it is handed |
 | `/client-homework/:sessionId` | Read by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§4.7, §5.2) |
+| `/client-submissions/:sessionId` | Written by the client-facing pages without a login — but only with a valid `?exp=&sig=` signed link (§5.2, §5.8). Scoped strictly by path session, writes explicit null `practitioner_id`, enforces status allowlist (`draft` / `pending_practitioner_review`), rate limited, and caps `form_data` payload |
 
 `requireUser(request, env, cors, baseUrl)` performs the check by calling Supabase
 `GET ${SUPABASE_URL}/auth/v1/user` with the anon key plus the caller's token — the same call
@@ -593,10 +594,14 @@ All practitioner task routes require a clinician bearer token and verify `checkC
 row. They are declared **above** the catch-all `if (method === "POST")` AI block in `backend/CloudFlare.js`.
 Frontend callers use the server-action wrappers in `lib/tasks.ts`; types live in `types/tasks.ts`.
 
+The client-facing submission route (`POST /client-submissions/:sessionId`) is token-free, authenticated by the HMAC
+signature in query params, and strictly scoped by the path session.
+
 | Method | Path | Body / notes | Response |
 | --- | --- | --- | --- |
 | `POST` | `/tasks/submissions` | `{ id?, client_id, practitioner_id?, task_type, form_data }` — omit `id` to create, supply it to update a draft (`practitioner_id` is enforced from `authUser.id` on INSERT) | Upserted `practice_task_submissions` row. `409` if `id` exists with status ≠ `draft` |
 | `POST` | `/tasks/submissions/:id/commit` | Empty body — `id` is in the path | Updated row with `status: "pending_practitioner_review"`. Appends a `status_audit_log` row (best-effort). `409` if status ≠ `draft` |
+| `POST` | `/client-submissions/:sessionId` | query `exp` + `sig` (signed link required). Body: `{ id?, task_type, form_data, status? }` (`status` allowlist: `draft` \| `pending_practitioner_review`). `practitioner_id` is sent as explicit JSON `null`; `client_id` resolved from session/case; `submitted_at` written transactionally on commit. Rate limited (60 req/min per IP:session); `form_data` capped at 64 KB | `200 { id, status }` (receipt only — no cross-row read). `400` invalid status/fields; `403` invalid link/signature; `404` session or scoped submission not found; `409` if `id` exists with status ≠ `draft`; `413` form_data > 64 KB; `429` rate limit exceeded |
 | `GET` | `/tasks/submissions/:id/bundle` | — | `{ submission, reflections[], practitioner_notes[], audit_log[] }` — all related rows in one round-trip. `audit_log` is best-effort (empty array on failure) |
 | `POST` | `/tasks/submissions/:id/notes` | `{ practitioner_id?, notes }` | Newly created `submission_practitioner_notes` row. Notes are append-only |
 | `POST` | `/tasks/submissions/:id/approve` | Empty body — `id` is in the path | Updated row with `status: "approved"`, `reviewed_at: ISO timestamp`. Immutability lock applies. Appends `status_audit_log` row. `409` if already approved |
@@ -1361,7 +1366,7 @@ and §13.4 (CI, lint config, dead code).
 | --- | --- |
 | Migration authored | `supabase/migrations/20261011_task_submissions_queue.sql` (§6.2) — idempotent, transactional, no backfill |
 | Status | **NOT APPLIED.** Operator authorisation for this migration was given 2026-10-11. Applying it is a Supabase SQL-editor action: the Worker holds no DDL path and the MCP gateway (`/tools`) exposes no schema tool, so no agent can apply it from this repo |
-| What is gated on it | Item 1 Phase 2 (the signed client-submit route) has no storage until it runs — that route writes `practitioner_id = NULL` and needs `session_id` on the row. The Practitioner Review Queue's session grouping and its `submitted_at` sort key depend on the same two columns |
+| What is gated on it | Item 1 Phase 2 (the signed client-submit route) Worker handler is now implemented (`POST /client-submissions/:sessionId`); persistence to Supabase requires this migration to have executed in production. That route writes `practitioner_id = NULL` and scopes by `session_id` on the row. The Practitioner Review Queue's session grouping and its `submitted_at` sort key depend on the same two columns |
 | Null-actor hazard | The actor columns become nullable in the schema, but the review gateway's render is still unguarded: `fmtShortId(id: string) { return id.slice(0, 8) + "…" }` (`app/practitioner/tasks/[id]/review/page.tsx:174`), called at `:267` and `:366`, throws a `TypeError` on a `null` actor — for exactly the client-path submissions the queue exists to show. A null-safe render must ship with, or before, any row that carries a null actor |
 | Provenance | Rook's bundled schema ruling on HEAD `924d57a`; the full decision record is `docs/design/2026-10-11 - Client Submit-for-Review UX Spec.md` §4 (that spec is untracked in Git — recorded as an open hygiene item, not committed here) |
 
@@ -1375,6 +1380,17 @@ and §13.4 (CI, lint config, dead code).
 | Test suite | `tests/canvas-pad.test.mjs` — pure stdlib Node harness executing the six regression tests from `docs/design/2026-10-11 - Reflection Canvas Pad Spec.md` §9 |
 | Guards implemented | 1. Blank pad fill: `drawBackground(ctx, w, h, "blank", false)` fills every pixel `#FBFAF7`; early return skips guides only.<br>2. Contrast: calculated ink-on-paper contrast ≥ 4.5:1 in both themes (16.09:1 light, 13.87:1 dark).<br>3. Eraser fidelity: `renderStroke` with eraser tool uses `source-over` and sets `strokeStyle` to paper colour (`#FBFAF7` light, `#EDE9E1` dark; alpha 255).<br>4. Opaque export: `exportAsImageBlob` fills offscreen canvas with paper colour before `drawImage`.<br>5. Background wiring: bare `<ReflectionCanvas />` (`"blank"`) and `defaultBackground="dotted"` paint different backgrounds on first paint.<br>6. Toolbar findability: `BACKGROUND_OPTIONS` uses Lucide icon components (`Square`, `AlignLeft`, `Grip`) and renders no text glyphs (`"□"`, `"≡"`, `"⋯"`). |
 | Evidence | Both the blank-background fill and opaque erased export guards were proven to fire (verbatim FAIL captured upon defect reintroduction), then restored to green. `npx tsc --noEmit` exit 0; `npm test` all 68 checks green (35 worker, 12 PDF, 15 hydration, 6 canvas pad); `npm run docs:check` exit 0. |
+
+---
+
+### 13.12 Closure record — Client Link Submission Route (2026-10-11)
+
+| Item | Detail |
+| --- | --- |
+| Context | Implemented the Phase 2 client-link submission route (`POST /client-submissions/:sessionId?exp=<int>&sig=<hex>`) in `backend/CloudFlare.js` as specified by `docs/design/2026-10-11 - Client Submit-for-Review UX Spec.md` §4 and §6 |
+| Security constraints implemented | 1. **HMAC link verification**: Uses `verifyClientLink(sessionId, url.searchParams, env)` matching the GET `/client-homework/:sessionId` scheme.<br>2. **Session scoping & IDOR prevention**: Every UPDATE query filter is strictly `id=eq.<id>&session_id=eq.<path>&status=eq.draft`. Foreign or historical (null `session_id`) row lookups are refused (404).<br>3. **Session-derived client_id**: `client_id` is resolved from `sessions` (with `case_formulations(client_id)` fallback) and never taken from request body.<br>4. **Explicit null practitioner_id**: `practitioner_id: null` is explicitly serialized in the JSON payload sent to Supabase on both insert and update.<br>5. **Status allowlist**: Strictly `draft` and `pending_practitioner_review`. Updating non-draft submissions is refused (409).<br>6. **Transactional submitted_at**: Written in the same statement when committing to `pending_practitioner_review`.<br>7. **Rate limiting & size cap**: Rate limited to 60 requests/minute per IP:session (429); `form_data` payload capped at 64 KB (413).<br>8. **No cross-row reads**: Receipt returns exclusively `{ id, status }`.<br>9. **Best-effort audit log**: Appends `status_audit_log` with `changed_by_user_id: null`. |
+| Test suite | Focused regression tests added to `tests/worker.test.mjs` (checks 36–38) proving the scoping guard, explicit null `practitioner_id`, `submitted_at` writing, status gates, `case_formulations` fallback, and payload limit. |
+| Evidence | `npx tsc --noEmit` exit 0; `npm test` all 71 checks green (38 worker, 12 PDF, 15 hydration, 6 canvas pad); `npm run docs:check` exit 0; `npm run build` exit 0. |
 
 ---
 

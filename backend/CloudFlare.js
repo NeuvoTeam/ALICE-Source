@@ -187,6 +187,38 @@ function clientLinkTtlDays(value) {
   return Math.min(Math.floor(parsed), CLIENT_LINK_MAX_TTL_DAYS)
 }
 
+/* ===============================
+   ✅ CLIENT SUBMISSION RATE LIMITING
+   =============================== */
+const CLIENT_SUBMISSION_MAX_REQUESTS = 60
+const CLIENT_SUBMISSION_WINDOW_MS = 60 * 1000
+const MAX_FORM_DATA_BYTES = 64 * 1024 // 64 KB cap on form_data payload
+const clientSubmissionRateLimits = new Map()
+
+function isClientSubmissionRateLimited(key) {
+  const now = Date.now()
+  if (clientSubmissionRateLimits.size > 1000) {
+    for (const [k, ts] of clientSubmissionRateLimits.entries()) {
+      if (!ts.length || ts[ts.length - 1] <= now - CLIENT_SUBMISSION_WINDOW_MS) {
+        clientSubmissionRateLimits.delete(k)
+      }
+    }
+  }
+  let timestamps = clientSubmissionRateLimits.get(key)
+  if (!timestamps) {
+    timestamps = []
+    clientSubmissionRateLimits.set(key, timestamps)
+  }
+  while (timestamps.length > 0 && timestamps[0] <= now - CLIENT_SUBMISSION_WINDOW_MS) {
+    timestamps.shift()
+  }
+  if (timestamps.length >= CLIENT_SUBMISSION_MAX_REQUESTS) {
+    return true
+  }
+  timestamps.push(now)
+  return false
+}
+
 export default {
   async fetch(request, env) {
 
@@ -266,7 +298,9 @@ export default {
     const isPublicRoute =
       cleanPath.startsWith("/auth/") ||
       cleanPath === "/client-homework" ||
-      cleanPath.startsWith("/client-homework/")
+      cleanPath.startsWith("/client-homework/") ||
+      cleanPath === "/client-submissions" ||
+      cleanPath.startsWith("/client-submissions/")
 
     function devBypassUser(env, url) {
       const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"
@@ -1474,6 +1508,187 @@ if (method === "GET" && cleanPath === "/auth/me") {
         }
 
         return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /client-submissions/:sessionId?exp=<int>&sig=<hex>
+         Client-link submission route (Phase 2 contract, item 1).
+         Signed bearer link write surface - token-free, guarded by HMAC.
+         Upserts a practice-task submission in `draft` or `pending_practitioner_review`.
+
+         Security constraints:
+         - Signed link HMAC verification via verifyClientLink(sessionId, url.searchParams, env).
+         - client_id is resolved strictly from the session row (with case_formulations fallback), never from body.
+         - practitioner_id is sent as an EXPLICIT null JSON value (never omitted, never fabricated).
+         - IDOR protection: every UPDATE is scoped by session_id=eq.<path>&id=eq.<id>&status=eq.draft.
+         - Status allowlist: exactly 'draft' and 'pending_practitioner_review'. Only draft rows can be updated (409 gate).
+         - submitted_at is written transactionally in the same statement when transitioning to pending_practitioner_review.
+         - Payload size capped at 64 KB (form_data); rate limited (60 req/min per IP:session).
+         - Receipt returns only { id, status } - no cross-row reads.
+         - Status audit log insert is best-effort with changed_by_user_id = null.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && (cleanPath === "/client-submissions" || cleanPath.startsWith("/client-submissions/"))) {
+        const sessionId = cleanPath.split("/")[2]
+
+        if (!sessionId || sessionId.length < 10) {
+          return respond({ error: "Invalid session ID" }, cors, 400)
+        }
+
+        // 1. Auth: verify signed client link HMAC
+        const link = await verifyClientLink(sessionId, url.searchParams, env)
+        if (!link.ok) {
+          console.warn(
+            `Client link rejected (${link.reason}) for ${String(sessionId).slice(0, 8)}…`
+          )
+          return respond(
+            {
+              error:
+                "This link is invalid or has expired. Please ask your clinician for a new one.",
+            },
+            cors,
+            403
+          )
+        }
+
+        // 2. Rate limit
+        const clientIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "direct"
+        const rateLimitKey = `${clientIp}:${sessionId}`
+        if (isClientSubmissionRateLimited(rateLimitKey)) {
+          return respond({ error: "Too many requests. Please try again later." }, cors, 429)
+        }
+
+        // 3. Validate body
+        const body = await safeJson(request)
+        if (!body || typeof body !== "object") {
+          return respond({ error: "Invalid JSON body" }, cors, 400)
+        }
+
+        if (!body.task_type || !body.form_data || typeof body.form_data !== "object") {
+          return respond({ error: "Missing required fields: task_type, form_data" }, cors, 400)
+        }
+
+        // 4. Cap form_data payload size (64 KB)
+        const formDataStr = JSON.stringify(body.form_data)
+        if (new TextEncoder().encode(formDataStr).length > MAX_FORM_DATA_BYTES) {
+          return respond({ error: "form_data exceeds maximum allowed size (64 KB)" }, cors, 413)
+        }
+
+        // 5. Status allowlist: exactly 'draft' or 'pending_practitioner_review'
+        let targetStatus = "draft"
+        if (body.status !== undefined && body.status !== null) {
+          if (body.status !== "draft" && body.status !== "pending_practitioner_review") {
+            return respond(
+              { error: "Invalid status: only 'draft' and 'pending_practitioner_review' are allowed" },
+              cors,
+              400
+            )
+          }
+          targetStatus = body.status
+        }
+
+        // 6. Resolve client_id from session row (never from body)
+        const sessionRes = await fetch(
+          `${SUPABASE_URL}/sessions?id=eq.${encodeURIComponent(sessionId)}&select=client_id,case_formulations(client_id)`,
+          { headers: HEADERS }
+        )
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id
+        if (!sessionClientId) {
+          return respond({ error: "Client not found for session" }, cors, 404)
+        }
+
+        const now = new Date().toISOString()
+        let row
+
+        if (body.id) {
+          // 7. UPDATE: Scoped by id, session_id, and status=draft
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!checkRes.ok) throw new Error(await checkRes.text())
+          const existing = await checkRes.json()
+
+          if (!existing || !existing.length) {
+            return respond({ error: "Submission not found" }, cors, 404)
+          }
+
+          if (existing[0].status !== "draft") {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+
+          const patchPayload = {
+            task_type: body.task_type,
+            form_data: body.form_data,
+            practitioner_id: null,
+            status: targetStatus,
+            updated_at: now,
+            ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+          }
+
+          const patchRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&session_id=eq.${encodeURIComponent(sessionId)}&status=eq.draft`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify(patchPayload),
+            }
+          )
+          if (!patchRes.ok) throw new Error(await patchRes.text())
+          const patchData = await patchRes.json()
+          if (!patchData || (Array.isArray(patchData) && patchData.length === 0)) {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+          row = Array.isArray(patchData) ? patchData[0] : patchData
+        } else {
+          // 8. INSERT: Explicit null practitioner_id, session_id from path, client_id from session
+          const insertPayload = {
+            client_id: sessionClientId,
+            session_id: sessionId,
+            practitioner_id: null,
+            task_type: body.task_type,
+            form_data: body.form_data,
+            status: targetStatus,
+            created_at: now,
+            updated_at: now,
+            ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+          }
+
+          const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify(insertPayload),
+          })
+          if (!insertRes.ok) throw new Error(await insertRes.text())
+          const insertData = await insertRes.json()
+          row = Array.isArray(insertData) ? insertData[0] : insertData
+        }
+
+        // 9. Best-effort audit log entry on commit (changed_by_user_id is null)
+        if (targetStatus === "pending_practitioner_review") {
+          try {
+            await fetch(`${SUPABASE_URL}/status_audit_log`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify({
+                submission_id: row.id,
+                previous_status: "draft",
+                new_status: "pending_practitioner_review",
+                changed_by_user_id: null,
+                changed_at: now,
+              }),
+            })
+          } catch (auditErr) {
+            console.error("status_audit_log insert failed (non-fatal):", auditErr)
+          }
+        }
+
+        // 10. Receipt returns ONLY id and status (no cross-row reads)
+        return respond({ id: row.id, status: row.status }, cors)
       }
 
       /* ------------------------------------------------------------------
