@@ -188,6 +188,70 @@ function clientLinkTtlDays(value) {
 }
 
 /* ===============================
+   ✅ REVIEW QUEUE CURSOR SIGNING (HMAC-SHA256)
+   =============================== */
+/**
+ * Signs keyset pagination cursors for `GET /tasks/submissions`.
+ * Carries:
+ *   - `id`: submission UUID (tie-breaker)
+ *   - `submitted_at`: ISO string or null (sort key)
+ *   - `is_null`: boolean (Clause 1: cross the NULL block safely)
+ *   - `dir`: 'asc' | 'desc' (Clause 2: direction enforcement)
+ */
+async function signReviewQueueCursor(payload, secret) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  const jsonStr = JSON.stringify(payload)
+  const encodedPayload = base64UrlFromBytes(new TextEncoder().encode(jsonStr))
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`cursor|${encodedPayload}`)
+  )
+
+  return `${encodedPayload}.${base64UrlFromBytes(new Uint8Array(signature))}`
+}
+
+async function verifyReviewQueueCursor(cursorStr, secret) {
+  if (typeof cursorStr !== "string") return null
+  const parts = cursorStr.split(".")
+  if (parts.length !== 2) return null
+  const [encodedPayload, encodedSig] = parts
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    )
+
+    const sigBytes = base64UrlToBytes(encodedSig)
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      sigBytes,
+      new TextEncoder().encode(`cursor|${encodedPayload}`)
+    )
+
+    if (!valid) return null
+
+    const payloadBytes = base64UrlToBytes(encodedPayload)
+    const decodedStr = new TextDecoder().decode(payloadBytes)
+    return JSON.parse(decodedStr)
+  } catch {
+    return null
+  }
+}
+
+/* ===============================
    ✅ CLIENT SUBMISSION RATE LIMITING & PAYLOAD CAP
    =============================== */
 const CLIENT_SUBMISSION_MAX_REQUESTS = 60
@@ -1364,6 +1428,319 @@ if (method === "GET" && cleanPath === "/auth/me") {
    ✅ TASK SUBMISSION ROUTES
    New routes MUST stay above the catch-all "if (method === 'POST')" AI block.
    ========================= */
+
+      /* ------------------------------------------------------------------
+         GET /tasks/submissions
+         Collection endpoint for the practitioner review queue.
+
+         Query params:
+           - status: allowlisted TaskStatus values (CSV or in.(...))
+           - client_id: UUID; intersected with caller's clients (never substituted)
+           - limit: integer in [1, 200], default 50. Non-integers/<=0 refused; >200 clamped
+           - cursor: HMAC-signed keyset carrying null-flag and direction
+           - order: 'asc' | 'desc'. Default: 'asc' for pending_practitioner_review (FIFO), 'desc' otherwise
+           - count_only: '1' -> returns { counts, pending_total } (no rows/cursor)
+
+         Tenant Scoping & Security:
+           - Authenticated only (requireUser, not in isPublicRoute, exact cleanPath match)
+           - Query-level scoping: clinician_clients -> client_id IN (...)
+           - client_id intersected: client_id=in.(caller) AND client_id=eq.<param>
+           - status rebuilt server-side from allowlist (never passed raw)
+           - No form_data in list payload
+           - No N+1: session_name and reflection_count arrive in the same single query via PostgREST embed
+           - counts and pending_total are tenant-scoped; counts respects client_id, pending_total does not
+           - Keyset cursor is HMAC-signed, direction-validated (Clause 2), and crosses NULL boundary (Clause 1)
+           - NULL submitted_at rows sort LAST deterministically
+      ------------------------------------------------------------------ */
+      if (method === "GET" && cleanPath === "/tasks/submissions") {
+        // 1. Parse & validate client_id parameter (Amendment 4)
+        const rawClientId = url.searchParams.get("client_id")
+        let clientIdPredicate = ""
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (rawClientId !== null && rawClientId !== undefined && rawClientId.trim() !== "") {
+          const targetClientId = rawClientId.trim()
+          if (!UUID_REGEX.test(targetClientId)) {
+            return respond({ error: "Invalid client_id: must be a valid UUID" }, cors, 400)
+          }
+          // Intersect with caller's set; never substitute.
+          clientIdPredicate = `&client_id=eq.${encodeURIComponent(targetClientId)}`
+        }
+
+        // 2. Parse & validate status parameter (Amendment 3)
+        const rawStatus = url.searchParams.get("status")
+        const ALLOWED_TASK_STATUSES = new Set([
+          "draft",
+          "pending_practitioner_review",
+          "reviewed",
+          "approved",
+          "revision_requested",
+          "archived",
+        ])
+        let selectedStatuses = []
+        let statusPredicate = ""
+        if (rawStatus !== null && rawStatus !== undefined && rawStatus.trim() !== "") {
+          let cleaned = rawStatus.trim()
+          if (cleaned.startsWith("in.(") && cleaned.endsWith(")")) {
+            cleaned = cleaned.slice(4, -1)
+          }
+          const parts = cleaned.split(",").map((s) => s.trim()).filter(Boolean)
+          if (parts.length === 0) {
+            return respond({ error: "Invalid status parameter" }, cors, 400)
+          }
+          for (const st of parts) {
+            if (!ALLOWED_TASK_STATUSES.has(st)) {
+              return respond({ error: `Disallowed status value: ${st}` }, cors, 400)
+            }
+          }
+          selectedStatuses = Array.from(new Set(parts))
+          statusPredicate =
+            selectedStatuses.length === 1
+              ? `&status=eq.${encodeURIComponent(selectedStatuses[0])}`
+              : `&status=in.(${selectedStatuses.map(encodeURIComponent).join(",")})`
+        }
+
+        // 3. Direction determination & order parameter
+        const rawOrder = url.searchParams.get("order")
+        let direction = null
+        if (rawOrder !== null && rawOrder !== undefined && rawOrder.trim() !== "") {
+          const ord = rawOrder.trim().toLowerCase()
+          if (ord !== "asc" && ord !== "desc") {
+            return respond({ error: "Invalid order parameter: must be 'asc' or 'desc'" }, cors, 400)
+          }
+          direction = ord
+        } else {
+          // Default: Needs review (pending_practitioner_review) is oldest-submitted first (FIFO: asc);
+          // all other tabs are descending.
+          if (selectedStatuses.length === 1 && selectedStatuses[0] === "pending_practitioner_review") {
+            direction = "asc"
+          } else {
+            direction = "desc"
+          }
+        }
+
+        // 4. Parse & clamp limit parameter (Amendment 5)
+        // Decision: Reject non-integers, floats, negatives and zero with 400.
+        // Clamp integers > 200 to max allowed (200) to allow client ease while preventing bulk exports.
+        const rawLimit = url.searchParams.get("limit")
+        let limit = 50
+        if (rawLimit !== null && rawLimit !== undefined && rawLimit.trim() !== "") {
+          const trimmedLimit = rawLimit.trim()
+          if (!/^-?\d+$/.test(trimmedLimit)) {
+            return respond({ error: "Invalid limit: must be an integer" }, cors, 400)
+          }
+          const parsedLimit = parseInt(trimmedLimit, 10)
+          if (parsedLimit <= 0) {
+            return respond({ error: "Invalid limit: must be greater than 0" }, cors, 400)
+          }
+          limit = Math.min(parsedLimit, 200)
+        }
+
+        // 5. Parse & validate cursor parameter (Aya's Decided Clauses)
+        const rawCursor = url.searchParams.get("cursor")
+        let cursorObj = null
+        let cursorPredicate = ""
+        const cursorSecret = clientLinkSecret(env) || env.SUPABASE_SERVICE_ROLE_KEY || "alice-review-queue-cursor-secret"
+
+        if (rawCursor !== null && rawCursor !== undefined && rawCursor.trim() !== "") {
+          cursorObj = await verifyReviewQueueCursor(rawCursor.trim(), cursorSecret)
+          if (!cursorObj) {
+            return respond({ error: "Invalid cursor: signature verification or decoding failed" }, cors, 400)
+          }
+          if (
+            !cursorObj.id ||
+            !UUID_REGEX.test(cursorObj.id) ||
+            typeof cursorObj.is_null !== "boolean" ||
+            (cursorObj.dir !== "asc" && cursorObj.dir !== "desc")
+          ) {
+            return respond({ error: "Invalid cursor: keyset payload validation failed" }, cors, 400)
+          }
+          // Clause 2: Carry direction in cursor and refuse on mismatch (400)
+          if (cursorObj.dir !== direction) {
+            return respond({ error: "Cursor direction mismatch" }, cors, 400)
+          }
+          // Keyset positioning across NULL boundary (Clause 1)
+          if (cursorObj.is_null) {
+            const cmp = direction === "asc" ? "gt" : "lt"
+            cursorPredicate = `&submitted_at=is.null&id=${cmp}.${encodeURIComponent(cursorObj.id)}`
+          } else {
+            const cmp = direction === "asc" ? "gt" : "lt"
+            cursorPredicate = `&or=(submitted_at.${cmp}.${encodeURIComponent(cursorObj.submitted_at)},and(submitted_at.eq.${encodeURIComponent(cursorObj.submitted_at)},id.${cmp}.${encodeURIComponent(cursorObj.id)}),submitted_at.is.null)`
+          }
+        }
+
+        const countOnly = url.searchParams.get("count_only") === "1"
+
+        // 6. Resolve caller's clients from clinician_clients (Tenant Scoping)
+        // Performed only after all input parameters have been validated.
+        const mappingRes = await fetch(
+          `${SUPABASE_URL}/clinician_clients?clinician_id=eq.${encodeURIComponent(authUser.id)}&select=client_id`,
+          { headers: HEADERS }
+        )
+        if (!mappingRes.ok) throw new Error(await mappingRes.text())
+        const mappingData = await mappingRes.json()
+        const callerClientIds = (Array.isArray(mappingData) ? mappingData : [])
+          .map((m) => m.client_id)
+          .filter(Boolean)
+
+
+        // If caller has no assigned clients, short-circuit to empty results
+        if (callerClientIds.length === 0) {
+          const emptyCounts = {
+            pending_practitioner_review: 0,
+            draft: 0,
+            reviewed: 0,
+            approved: 0,
+            revision_requested: 0,
+            archived: 0,
+          }
+          if (countOnly) {
+            return respond({ counts: emptyCounts, pending_total: 0 }, cors)
+          }
+          return respond({ rows: [], counts: emptyCounts, pending_total: 0, next_cursor: null }, cors)
+        }
+
+        const callerTenantPredicate = `client_id=in.(${callerClientIds.map(encodeURIComponent).join(",")})`
+
+        // 7. Outbound queries:
+        // - counts: tenant predicate YES, client_id YES; status / cursor / limit NEVER (Aya)
+        // - pending_total: tenant predicate YES, client_id NEVER; status=eq.pending_practitioner_review; cursor / limit NEVER (Aya)
+        // - rows: single query embedding sessions, client_reflections, clients (No N+1!)
+        const countsUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}${clientIdPredicate}&select=status`
+        const pendingTotalUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}&status=eq.pending_practitioner_review&select=status`
+        const rowsUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}${clientIdPredicate}${statusPredicate}${cursorPredicate}&order=submitted_at.${direction}.nullslast,id.${direction}&limit=${limit + 1}&select=id,client_id,task_type,status,submitted_at,created_at,updated_at,session_id,clients(full_name),sessions(name),client_reflections(id)`
+
+        const [countsRes, pendingTotalRes, rowsRes] = await Promise.all([
+          fetch(countsUrl, { headers: HEADERS }),
+          fetch(pendingTotalUrl, { headers: HEADERS }),
+          countOnly ? Promise.resolve(null) : fetch(rowsUrl, { headers: HEADERS }),
+        ])
+
+        if (!countsRes.ok) throw new Error(await countsRes.text())
+        if (!pendingTotalRes.ok) throw new Error(await pendingTotalRes.text())
+        if (rowsRes && !rowsRes.ok) throw new Error(await rowsRes.text())
+
+        const countsData = await countsRes.json()
+        const pendingTotalData = await pendingTotalRes.json()
+
+        const counts = {
+          pending_practitioner_review: 0,
+          draft: 0,
+          reviewed: 0,
+          approved: 0,
+          revision_requested: 0,
+          archived: 0,
+        }
+        if (Array.isArray(countsData)) {
+          for (const item of countsData) {
+            if (item.status && Object.prototype.hasOwnProperty.call(counts, item.status)) {
+              counts[item.status]++
+            }
+          }
+        }
+
+        const pending_total = Array.isArray(pendingTotalData) ? pendingTotalData.length : 0
+
+        if (countOnly) {
+          return respond({ counts, pending_total }, cors)
+        }
+
+        const rawRows = await rowsRes.json()
+        const rowsList = Array.isArray(rawRows) ? rawRows : []
+
+        // In-memory deterministic ordering: NULLs last, then submitted_at by direction, then id by direction
+        rowsList.sort((a, b) => {
+          const aNull = a.submitted_at === null || a.submitted_at === undefined
+          const bNull = b.submitted_at === null || b.submitted_at === undefined
+          if (aNull && !bNull) return 1
+          if (!aNull && bNull) return -1
+          if (!aNull && !bNull) {
+            const aTime = new Date(a.submitted_at).getTime()
+            const bTime = new Date(b.submitted_at).getTime()
+            if (aTime !== bTime) {
+              return direction === "asc" ? aTime - bTime : bTime - aTime
+            }
+          }
+          return direction === "asc"
+            ? String(a.id).localeCompare(String(b.id))
+            : String(b.id).localeCompare(String(a.id))
+        })
+
+        // Defensive in-memory cursor filtering against mocks/stubs that do not evaluate PostgREST queries
+        let filteredRows = rowsList
+        if (cursorObj) {
+          filteredRows = filteredRows.filter((r) => {
+            const rNull = r.submitted_at === null || r.submitted_at === undefined
+            if (cursorObj.is_null) {
+              if (!rNull) return false
+              return direction === "asc" ? r.id > cursorObj.id : r.id < cursorObj.id
+            } else {
+              if (rNull) return true
+              const rTime = new Date(r.submitted_at).getTime()
+              const cTime = new Date(cursorObj.submitted_at).getTime()
+              if (direction === "asc") {
+                if (rTime > cTime) return true
+                if (rTime === cTime) return r.id > cursorObj.id
+                return false
+              } else {
+                if (rTime < cTime) return true
+                if (rTime === cTime) return r.id < cursorObj.id
+                return false
+              }
+            }
+          })
+        }
+
+        const hasMore = filteredRows.length > limit
+        const pageRows = filteredRows.slice(0, limit)
+
+        const rows = pageRows.map((r) => {
+          const client_name =
+            r.client_name ??
+            (r.clients ? (Array.isArray(r.clients) ? r.clients[0]?.full_name : r.clients.full_name) : null) ??
+            null
+          const session_name =
+            r.session_name ??
+            (r.sessions ? (Array.isArray(r.sessions) ? r.sessions[0]?.name : r.sessions.name) : null) ??
+            null
+          const reflection_count =
+            typeof r.reflection_count === "number"
+              ? r.reflection_count
+              : Array.isArray(r.client_reflections)
+                ? r.client_reflections.length
+                : 0
+
+          return {
+            id: r.id,
+            client_id: r.client_id,
+            client_name,
+            task_type: r.task_type,
+            status: r.status,
+            submitted_at: r.submitted_at ?? null,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            reflection_count,
+            session_id: r.session_id ?? null,
+            session_name,
+          }
+        })
+
+        let next_cursor = null
+        if (hasMore && rows.length > 0) {
+          const lastRow = rows[rows.length - 1]
+          const isNull = lastRow.submitted_at === null || lastRow.submitted_at === undefined
+          next_cursor = await signReviewQueueCursor(
+            {
+              id: lastRow.id,
+              submitted_at: isNull ? null : lastRow.submitted_at,
+              is_null: isNull,
+              dir: direction,
+            },
+            cursorSecret
+          )
+        }
+
+        return respond({ rows, counts, pending_total, next_cursor }, cors)
+      }
 
       /* ------------------------------------------------------------------
          POST /tasks/submissions
