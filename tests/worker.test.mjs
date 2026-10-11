@@ -63,6 +63,7 @@ const env = {
   ALLOWED_ORIGINS: "http://localhost:3000",
   PUBLIC_APP_URL: "http://localhost:3000",
   CLIENT_LINK_SECRET: "test-client-link-secret-0123456789",
+  REVIEW_QUEUE_CURSOR_SECRET: "test-review-queue-cursor-secret-0123456789",
 }
 
 const NOTES = "Client reports low mood and avoids social contact."
@@ -95,6 +96,39 @@ async function signLink(sessionId, exp, secret = env.CLIENT_LINK_SECRET) {
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
 
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+/**
+ * Signs a review queue cursor exactly as the Worker does, allowing the harness
+ * to produce valid, expired, non-ISO, or altered keyset cursors.
+ */
+async function signReviewCursor(payload, secret = env.REVIEW_QUEUE_CURSOR_SECRET) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  const jsonStr = JSON.stringify(payload)
+  const view = new TextEncoder().encode(jsonStr)
+  let binary = ""
+  for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i])
+  const encodedPayload = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`cursor|${encodedPayload}`)
+  )
+
+  const sigView = new Uint8Array(signature)
+  let sigBinary = ""
+  for (let i = 0; i < sigView.length; i++) sigBinary += String.fromCharCode(sigView[i])
+  const encodedSig = btoa(sigBinary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+
+  return `${encodedPayload}.${encodedSig}`
 }
 
 const inAnHour = () => Math.floor(Date.now() / 1000) + 3600
@@ -1766,6 +1800,103 @@ async function main() {
   assert.equal(r.body.rows[0].submitted_at, null, "historical row with NULL submitted_at must sort last")
   assert.equal(r.body.next_cursor, null, "end of list must yield null next_cursor")
   pass("queue: keyset crosses NULL boundary, NULLs sort last, direction mismatch refused")
+
+  /* 50. Queue: missing or short REVIEW_QUEUE_CURSOR_SECRET fails closed (503 CURSOR_SECRET_UNCONFIGURED) */
+  installFetch([{ content: VALID }])
+  const envNoCursorSecret = { ...env }
+  delete envNoCursorSecret.REVIEW_QUEUE_CURSOR_SECRET
+  r = await call("GET", "/tasks/submissions", null, envNoCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.ok(
+    r.body.error && r.body.error.includes("REVIEW_QUEUE_CURSOR_SECRET"),
+    "error message must name REVIEW_QUEUE_CURSOR_SECRET"
+  )
+  assert.equal(supabaseCalls().length, 0, "missing cursor secret must issue 0 database queries")
+
+  // Short cursor secret (< 16 chars) must also fail closed
+  installFetch([{ content: VALID }])
+  const envShortCursorSecret = { ...env, REVIEW_QUEUE_CURSOR_SECRET: "short-secret" }
+  r = await call("GET", "/tasks/submissions", null, envShortCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.equal(supabaseCalls().length, 0, "short cursor secret must issue 0 database queries")
+
+  // Whitespace-only secret trims to empty and fails closed
+  installFetch([{ content: VALID }])
+  const envBlankCursorSecret = { ...env, REVIEW_QUEUE_CURSOR_SECRET: "          " }
+  r = await call("GET", "/tasks/submissions", null, envBlankCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.equal(supabaseCalls().length, 0, "blank cursor secret must issue 0 database queries")
+  pass("queue: missing or short cursor secret fails closed with 503 CURSOR_SECRET_UNCONFIGURED without querying database")
+
+  /* 51. Queue: validly signed cursor with absent or non-ISO submitted_at (when is_null=false) refused with 400 */
+  // 51a. submitted_at absent from payload when is_null: false
+  installFetch([{ content: VALID }])
+  const cursorMissingSubmittedAt = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorMissingSubmittedAt}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "absent submitted_at must issue 0 queries")
+
+  // 51b. submitted_at null when is_null: false
+  installFetch([{ content: VALID }])
+  const cursorNullSubmittedAt = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: null,
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorNullSubmittedAt}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "null submitted_at with is_null=false must issue 0 queries")
+
+  // 51c. submitted_at non-ISO string ("not-a-date")
+  installFetch([{ content: VALID }])
+  const cursorGarbageDate = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "not-an-iso-date",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorGarbageDate}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "non-ISO submitted_at must issue 0 queries")
+
+  // 51d. submitted_at date-only (not a strict datetime)
+  installFetch([{ content: VALID }])
+  const cursorDateOnly = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "2026-10-01",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorDateOnly}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "date-only submitted_at must issue 0 queries")
+
+  // 51e. submitted_at injection probe
+  installFetch([{ content: VALID }])
+  const cursorInjection = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "2026-10-01T10:00:00Z),status.eq.draft",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorInjection}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "injected submitted_at must issue 0 queries")
+
+  pass("queue: validly signed cursor with absent or non-ISO submitted_at refused with 400")
 }
 
 // Derived from the number of pass() calls in this file so adding a check never stales the count.

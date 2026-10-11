@@ -191,6 +191,21 @@ function clientLinkTtlDays(value) {
    ✅ REVIEW QUEUE CURSOR SIGNING (HMAC-SHA256)
    =============================== */
 /**
+ * Reads and trims REVIEW_QUEUE_CURSOR_SECRET from env (minimum 16 chars).
+ * Fails closed (returns null) if missing or too short.
+ * Never falls back to a literal or another purpose's secret (e.g. CLIENT_LINK_SECRET or SUPABASE_SERVICE_ROLE_KEY).
+ * When unset or too short, GET /tasks/submissions fails closed with HTTP 503 and code 'CURSOR_SECRET_UNCONFIGURED'.
+ */
+function reviewQueueCursorSecret(env) {
+  const raw = String(env?.REVIEW_QUEUE_CURSOR_SECRET || "").trim()
+
+  return raw.length >= 16 ? raw : null
+}
+
+const ISO_DATETIME_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/
+
+/**
  * Signs keyset pagination cursors for `GET /tasks/submissions`.
  * Carries:
  *   - `id`: submission UUID (tie-breaker)
@@ -219,7 +234,7 @@ async function signReviewQueueCursor(payload, secret) {
 }
 
 async function verifyReviewQueueCursor(cursorStr, secret) {
-  if (typeof cursorStr !== "string") return null
+  if (typeof cursorStr !== "string" || !secret) return null
   const parts = cursorStr.split(".")
   if (parts.length !== 2) return null
   const [encodedPayload, encodedSig] = parts
@@ -1433,11 +1448,17 @@ if (method === "GET" && cleanPath === "/auth/me") {
          GET /tasks/submissions
          Collection endpoint for the practitioner review queue.
 
+         Environment & Security Requirements:
+           - REVIEW_QUEUE_CURSOR_SECRET: Dedicated signing secret (minimum 16 characters).
+             Trimming applied; missing or too short fails closed immediately with HTTP 503
+             and code 'CURSOR_SECRET_UNCONFIGURED'. The endpoint is unavailable until configured.
+             Never falls back to a known literal or cross-purpose secrets (defence in depth).
+
          Query params:
            - status: allowlisted TaskStatus values (CSV or in.(...))
            - client_id: UUID; intersected with caller's clients (never substituted)
            - limit: integer in [1, 200], default 50. Non-integers/<=0 refused; >200 clamped
-           - cursor: HMAC-signed keyset carrying null-flag and direction
+           - cursor: HMAC-signed keyset carrying null-flag, ISO submitted_at, and direction
            - order: 'asc' | 'desc'. Default: 'asc' for pending_practitioner_review (FIFO), 'desc' otherwise
            - count_only: '1' -> returns { counts, pending_total } (no rows/cursor)
 
@@ -1453,6 +1474,22 @@ if (method === "GET" && cleanPath === "/auth/me") {
            - NULL submitted_at rows sort LAST deterministically
       ------------------------------------------------------------------ */
       if (method === "GET" && cleanPath === "/tasks/submissions") {
+        // 0. Dedicated cursor secret guard (F-a: defence in depth, fail closed with 503)
+        const cursorSecret = reviewQueueCursorSecret(env)
+        if (!cursorSecret) {
+          console.error(
+            "REVIEW_QUEUE_CURSOR_SECRET missing or too short — review queue is disabled"
+          )
+          return respond(
+            {
+              error: "REVIEW_QUEUE_CURSOR_SECRET missing or too short — review queue is disabled",
+              code: "CURSOR_SECRET_UNCONFIGURED",
+            },
+            cors,
+            503
+          )
+        }
+
         // 1. Parse & validate client_id parameter (Amendment 4)
         const rawClientId = url.searchParams.get("client_id")
         let clientIdPredicate = ""
@@ -1535,11 +1572,10 @@ if (method === "GET" && cleanPath === "/auth/me") {
           limit = Math.min(parsedLimit, 200)
         }
 
-        // 5. Parse & validate cursor parameter (Aya's Decided Clauses)
+        // 5. Parse & validate cursor parameter (Aya's Decided Clauses & F-b validation)
         const rawCursor = url.searchParams.get("cursor")
         let cursorObj = null
         let cursorPredicate = ""
-        const cursorSecret = clientLinkSecret(env) || env.SUPABASE_SERVICE_ROLE_KEY || "alice-review-queue-cursor-secret"
 
         if (rawCursor !== null && rawCursor !== undefined && rawCursor.trim() !== "") {
           cursorObj = await verifyReviewQueueCursor(rawCursor.trim(), cursorSecret)
@@ -1550,7 +1586,11 @@ if (method === "GET" && cleanPath === "/auth/me") {
             !cursorObj.id ||
             !UUID_REGEX.test(cursorObj.id) ||
             typeof cursorObj.is_null !== "boolean" ||
-            (cursorObj.dir !== "asc" && cursorObj.dir !== "desc")
+            (cursorObj.dir !== "asc" && cursorObj.dir !== "desc") ||
+            (!cursorObj.is_null &&
+              (typeof cursorObj.submitted_at !== "string" ||
+                !ISO_DATETIME_REGEX.test(cursorObj.submitted_at) ||
+                Number.isNaN(Date.parse(cursorObj.submitted_at))))
           ) {
             return respond({ error: "Invalid cursor: keyset payload validation failed" }, cors, 400)
           }
@@ -1559,6 +1599,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
             return respond({ error: "Cursor direction mismatch" }, cors, 400)
           }
           // Keyset positioning across NULL boundary (Clause 1)
+          // NOTE (Lockstep Ordering Site 1 of 2): This query-level keyset filter and the PostgREST
+          // ordering (&order=submitted_at.${direction}.nullslast,id.${direction}) must stay in strict
+          // lockstep with the in-memory sorting and filtering below (Site 2, around rowsList.sort).
           if (cursorObj.is_null) {
             const cmp = direction === "asc" ? "gt" : "lt"
             cursorPredicate = `&submitted_at=is.null&id=${cmp}.${encodeURIComponent(cursorObj.id)}`
@@ -1647,6 +1690,9 @@ if (method === "GET" && cleanPath === "/auth/me") {
         const rawRows = await rowsRes.json()
         const rowsList = Array.isArray(rawRows) ? rawRows : []
 
+        // NOTE (Lockstep Ordering Site 2 of 2): In-memory deterministic ordering (NULLs last, then submitted_at
+        // by direction, then id by direction) and defensive keyset filtering below must stay in strict lockstep
+        // with the Supabase PostgREST query ordering and cursorPredicate above (Site 1, around lines 1570-1650).
         // In-memory deterministic ordering: NULLs last, then submitted_at by direction, then id by direction
         rowsList.sort((a, b) => {
           const aNull = a.submitted_at === null || a.submitted_at === undefined
