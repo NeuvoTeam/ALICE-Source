@@ -6,6 +6,7 @@ import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
 import { CheckCircle2, Circle, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { DynamicTaskForm, type TaskVariant } from "@/components/tasks/DynamicTaskForm";
 import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
+import type { BackgroundType } from "@/components/canvas/canvasTypes";
 
 import type { PracticePackage } from "@/lib/practice-package";
 
@@ -177,6 +178,12 @@ export default function PracticePage() {
         ? practiceTask.prompt
         : null;
 
+    const suggested = practiceTask.suggested_background;
+    const bg: BackgroundType | undefined =
+      suggested === "lined" || suggested === "dotted" || suggested === "blank"
+        ? suggested
+        : undefined;
+
     return (
       <div className="min-h-screen bg-zinc-50/60 py-12 px-4 sm:px-6 flex justify-center">
         <div className="w-full max-w-4xl space-y-6">
@@ -205,7 +212,10 @@ export default function PracticePage() {
                     {reflectionPrompt}
                   </p>
                 )}
-                <ReflectionCanvas />
+                <ReflectionCanvas
+                  defaultBackground={bg}
+                  showKeyboardHints={false}
+                />
               </div>
             ) : (
               <DynamicTaskForm

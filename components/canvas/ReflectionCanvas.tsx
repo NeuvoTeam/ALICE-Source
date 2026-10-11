@@ -44,6 +44,7 @@ import {
   Eraser,
   Loader2,
   Pen,
+  PenLine,
   Redo2,
   Trash2,
   Undo2,
@@ -93,6 +94,10 @@ export interface ReflectionCanvasHandle {
 interface ReflectionCanvasProps {
   /** Initial vector data to restore (e.g. from a saved draft). */
   initialData?: CanvasVectorData;
+  /** Seed background to use when initialData has none. Read once at mount. */
+  defaultBackground?: BackgroundType;
+  /** Whether to show keyboard shortcut hints in the status bar (defaults to true). */
+  showKeyboardHints?: boolean;
   /** Called on every committed stroke — for auto-save of vector data. */
   onStrokeCommit?: (data: CanvasVectorData) => void;
   /** CSS class forwarded to the root container. */
@@ -107,7 +112,7 @@ interface ReflectionCanvasProps {
 // Pen colour
 // ---------------------------------------------------------------------------
 
-const PEN_COLOR = "#1a1d28"; // near-black ink — adapts via compositing in dark mode
+const PEN_COLOR = "#1a1d28"; // near-black ink; the paper adapts to the theme, the ink does not, so the exported artefact matches what the client drew.
 
 // ---------------------------------------------------------------------------
 // Toolbar button primitive
@@ -129,12 +134,13 @@ function ToolbarBtn({ label, active, danger, disabled, onClick, children }: Tool
       title={label}
       aria-label={label}
       aria-pressed={active}
+      aria-disabled={disabled ? true : undefined}
       disabled={disabled}
       onClick={onClick}
       className={cn(
         "relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
-        "disabled:pointer-events-none disabled:opacity-35",
+        "disabled:pointer-events-none disabled:opacity-45",
         active
           ? "bg-slate-800 text-white shadow-inner"
           : danger
@@ -234,7 +240,18 @@ function getDarkModeServerSnapshot() {
 const ReflectionCanvas = React.forwardRef<
   ReflectionCanvasHandle,
   ReflectionCanvasProps
->(function ReflectionCanvas({ initialData, onStrokeCommit, className, clientId, submissionId }, ref) {
+>(function ReflectionCanvas(
+  {
+    initialData,
+    defaultBackground,
+    showKeyboardHints = true,
+    onStrokeCommit,
+    className,
+    clientId,
+    submissionId,
+  },
+  ref
+) {
   // ── Canvas refs ──────────────────────────────────────────────────────────
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -243,7 +260,7 @@ const ReflectionCanvas = React.forwardRef<
   const [tool,       setTool]       = useState<DrawTool>("pen");
   const [strokePxIdx, setStrokePxIdx] = useState(1);          // index into STROKE_WIDTHS
   const [background, setBackground] = useState<BackgroundType>(
-    initialData?.background ?? "blank"
+    initialData?.background ?? defaultBackground ?? "blank"
   );
 
   // Committed history + redo stack — kept in refs to avoid re-render churn.
@@ -395,9 +412,9 @@ const ReflectionCanvas = React.forwardRef<
       // Draw the starting dot
       const canvas = canvasRef.current!;
       const ctx    = canvas.getContext("2d")!;
-      renderStroke(ctx, stroke);
+      renderStroke(ctx, stroke, isDark);
     },
-    [tool, toCanvasCoords, effectiveWidth]
+    [tool, toCanvasCoords, effectiveWidth, isDark]
   );
 
   const handlePointerMove = useCallback(
@@ -414,9 +431,9 @@ const ReflectionCanvas = React.forwardRef<
       // Incremental render: just draw the latest segment
       const canvas = canvasRef.current!;
       const ctx    = canvas.getContext("2d")!;
-      renderStroke(ctx, { ...stroke, points: stroke.points.slice(-3) });
+      renderStroke(ctx, { ...stroke, points: stroke.points.slice(-3) }, isDark);
     },
-    [toCanvasCoords]
+    [toCanvasCoords, isDark]
   );
 
   const handlePointerUp = useCallback(
@@ -508,7 +525,8 @@ const ReflectionCanvas = React.forwardRef<
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target !== document.body && e.target !== document.documentElement) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, [contenteditable='true']")) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
         if (e.shiftKey) handleRedo();
         else handleUndo();
@@ -536,7 +554,7 @@ const ReflectionCanvas = React.forwardRef<
     },
 
     async exportAsImageBlob(): Promise<Blob> {
-      return exportAsImageBlob(canvasRef.current!);
+      return exportAsImageBlob(canvasRef.current!, isDark);
     },
 
     async uploadReflection(
@@ -553,7 +571,7 @@ const ReflectionCanvas = React.forwardRef<
 
       let blob: Blob;
       try {
-        blob = await exportAsImageBlob(canvasRef.current!);
+        blob = await exportAsImageBlob(canvasRef.current!, isDark);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Compression failed";
         setUploadError(msg);
@@ -593,14 +611,14 @@ const ReflectionCanvas = React.forwardRef<
     hasContent(): boolean {
       return strokesRef.current.length > 0;
     },
-  }), [background, clientId, submissionId]);
+  }), [background, clientId, isDark, submissionId]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-xl border border-slate-200",
-        "bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900",
+        "relative flex flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm",
+        "bg-white dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40",
         className
       )}
     >
@@ -608,86 +626,101 @@ const ReflectionCanvas = React.forwardRef<
       <div
         role="toolbar"
         aria-label="Drawing tools"
+        aria-orientation="horizontal"
         className={cn(
           // Floating pill positioned at the top centre
           "absolute left-1/2 top-3 z-20 -translate-x-1/2",
-          "flex items-center gap-0.5 rounded-xl px-2 py-1.5",
+          "flex items-center gap-1 rounded-xl px-2.5 py-1.5",
           "bg-white/90 shadow-lg shadow-slate-200/60 backdrop-blur-md",
           "border border-slate-100 dark:border-slate-700",
           "dark:bg-slate-800/90 dark:shadow-slate-900/60"
         )}
       >
-        {/* Tool: Pen */}
-        <ToolbarBtn
-          label="Pen"
-          active={tool === "pen"}
-          onClick={() => setTool("pen")}
-        >
-          <Pen className="h-4 w-4" />
-        </ToolbarBtn>
+        {/* Tools: Pen / Eraser */}
+        <div role="group" aria-label="Tools" className="flex items-center gap-0.5">
+          <ToolbarBtn
+            label="Pen"
+            active={tool === "pen"}
+            onClick={() => setTool("pen")}
+          >
+            <Pen className="h-[18px] w-[18px]" />
+          </ToolbarBtn>
 
-        {/* Tool: Eraser */}
-        <ToolbarBtn
-          label="Eraser"
-          active={tool === "eraser"}
-          onClick={() => setTool("eraser")}
-        >
-          <Eraser className="h-4 w-4" />
-        </ToolbarBtn>
+          <ToolbarBtn
+            label="Eraser"
+            active={tool === "eraser"}
+            onClick={() => setTool("eraser")}
+          >
+            <Eraser className="h-[18px] w-[18px]" />
+          </ToolbarBtn>
+        </div>
 
         <ToolbarSep />
 
         {/* Stroke width selector */}
-        {STROKE_WIDTHS.map((sw, i) => (
-          <ToolbarBtn
-            key={sw.label}
-            label={`Stroke: ${sw.label}`}
-            active={tool !== "eraser" && strokePxIdx === i}
-            onClick={() => { setStrokePxIdx(i); setTool("pen"); }}
-          >
-            <span
-              className={cn(
-                "block rounded-full bg-current transition-all",
-                // Visually vary the dot size per width option
-                i === 0 ? "h-1.5 w-1.5" : i === 1 ? "h-2.5 w-2.5" : "h-4 w-4"
-              )}
-            />
-          </ToolbarBtn>
-        ))}
+        <div role="group" aria-label="Width" className="flex items-center gap-0.5">
+          <span className="hidden sm:inline-block px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
+            Width
+          </span>
+          {STROKE_WIDTHS.map((sw, i) => (
+            <ToolbarBtn
+              key={sw.label}
+              label={sw.label}
+              active={tool !== "eraser" && strokePxIdx === i}
+              onClick={() => { setStrokePxIdx(i); setTool("pen"); }}
+            >
+              <span
+                className={cn(
+                  "block rounded-full bg-current transition-all",
+                  i === 0 ? "h-2 w-2" : i === 1 ? "h-3 w-3" : "h-4.5 w-4.5"
+                )}
+              />
+            </ToolbarBtn>
+          ))}
+        </div>
 
         <ToolbarSep />
 
-        {/* Background toggles */}
-        {BACKGROUND_OPTIONS.map((bg) => (
-          <ToolbarBtn
-            key={bg.id}
-            label={`Background: ${bg.label}`}
-            active={background === bg.id}
-            onClick={() => setBackground(bg.id)}
-          >
-            <span className="font-mono text-xs leading-none">{bg.icon}</span>
-          </ToolbarBtn>
-        ))}
+        {/* Paper selector */}
+        <div role="group" aria-label="Paper" className="flex items-center gap-0.5">
+          <span className="hidden sm:inline-block px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
+            Paper
+          </span>
+          {BACKGROUND_OPTIONS.map((bg) => {
+            const Icon = bg.icon;
+            return (
+              <ToolbarBtn
+                key={bg.id}
+                label={bg.label}
+                active={background === bg.id}
+                onClick={() => setBackground(bg.id)}
+              >
+                <Icon className="h-[18px] w-[18px]" />
+              </ToolbarBtn>
+            );
+          })}
+        </div>
 
         <ToolbarSep />
 
-        {/* Undo */}
-        <ToolbarBtn
-          label={`Undo (${historyLen})`}
-          disabled={historyLen === 0}
-          onClick={handleUndo}
-        >
-          <Undo2 className="h-4 w-4" />
-        </ToolbarBtn>
+        {/* History: Undo / Redo */}
+        <div role="group" aria-label="History" className="flex items-center gap-0.5">
+          <ToolbarBtn
+            label="Undo"
+            disabled={historyLen === 0}
+            onClick={handleUndo}
+          >
+            <Undo2 className="h-[18px] w-[18px]" />
+          </ToolbarBtn>
 
-        {/* Redo */}
-        <ToolbarBtn
-          label={`Redo (${redoLen})`}
-          disabled={redoLen === 0}
-          onClick={handleRedo}
-        >
-          <Redo2 className="h-4 w-4" />
-        </ToolbarBtn>
+          <ToolbarBtn
+            label="Redo"
+            disabled={redoLen === 0}
+            onClick={handleRedo}
+          >
+            <Redo2 className="h-[18px] w-[18px]" />
+          </ToolbarBtn>
+        </div>
 
         <ToolbarSep />
 
@@ -698,7 +731,7 @@ const ReflectionCanvas = React.forwardRef<
           disabled={historyLen === 0}
           onClick={handleClear}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-[18px] w-[18px]" />
         </ToolbarBtn>
 
         {/* Upload status */}
@@ -716,7 +749,13 @@ const ReflectionCanvas = React.forwardRef<
       >
         <canvas
           ref={canvasRef}
-          aria-label="Reflection canvas — use a stylus or finger to draw"
+          aria-label={`Reflection canvas — ${
+            background === "lined"
+              ? "ruled paper"
+              : background === "dotted"
+              ? "dotted paper"
+              : "blank paper"
+          }. Draw with a stylus, finger, or mouse.`}
           style={{
             // Palm rejection: browser must not intercept pointer events
             touchAction: "none",
@@ -728,6 +767,20 @@ const ReflectionCanvas = React.forwardRef<
             height: "100%",
           }}
         />
+
+        {historyLen === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <PenLine className="mx-auto mb-2 h-6 w-6 text-slate-300 dark:text-slate-500" />
+              <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
+                Start anywhere
+              </p>
+              <p className="mt-0.5 text-xs text-slate-300 dark:text-slate-600">
+                Draw with a stylus, finger, or mouse
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Bottom status bar ─────────────────────────────────────────────── */}
@@ -739,12 +792,14 @@ const ReflectionCanvas = React.forwardRef<
       >
         <p className="text-[11px] text-slate-400 dark:text-slate-500">
           {historyLen === 0
-            ? "Draw with a stylus, finger, or mouse"
+            ? "Blank sheet · nothing drawn yet"
             : `${historyLen} stroke${historyLen !== 1 ? "s" : ""}`}
         </p>
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-          ⌘Z undo · ⌘⇧Z redo
-        </p>
+        {showKeyboardHints ? (
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            ⌘Z undo · ⌘⇧Z redo
+          </p>
+        ) : null}
       </div>
     </div>
   );

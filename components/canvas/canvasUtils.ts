@@ -19,34 +19,46 @@ import {
 } from "./canvasTypes";
 
 // ---------------------------------------------------------------------------
-// Background rendering
+// Paper & guide tokens
 // ---------------------------------------------------------------------------
 
-const LINE_SPACING = 28;         // px between ruled lines
-const DOT_SPACING  = 24;         // px between dot-grid dots
-const DOT_RADIUS   = 1.2;        // px dot radius
+export const PAPER_LIGHT = "#FBFAF7";
+export const PAPER_DARK  = "#EDE9E1";
+export const GUIDE_LIGHT = "rgba(31, 36, 48, 0.12)";
+export const GUIDE_DARK  = "rgba(31, 36, 48, 0.16)";
+
+export const LINE_SPACING = 28;         // px between ruled lines
+export const DOT_SPACING  = 24;         // px between dot-grid dots
+export const DOT_RADIUS   = 1.4;        // px dot radius (tuned for dimmed paper visibility)
 
 /**
- * Fill the background of an off-screen canvas with the given background type.
- * Called once on mount and whenever `background` changes.
+ * Fill the background with paper colour for the active theme.
+ * The paper is dimmed in dark mode, never inverted.
  */
-export function drawBackground(
+export function drawPaper(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  isDark: boolean
+): void {
+  ctx.fillStyle = isDark ? PAPER_DARK : PAPER_LIGHT;
+  ctx.fillRect(0, 0, width, height);
+}
+
+/**
+ * Draw ruled lines or dot grid guide onto the canvas.
+ * Guide colour is derived from dark ink for both light and dimmed paper.
+ */
+export function drawGuides(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   background: BackgroundType,
   isDark: boolean
 ): void {
-  const bgColour  = isDark ? "#1a1d21" : "#ffffff";
-  const inkColour = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-
-  ctx.fillStyle = bgColour;
-  ctx.fillRect(0, 0, width, height);
-
-  if (background === "blank") return;
-
-  ctx.strokeStyle = inkColour;
-  ctx.fillStyle   = inkColour;
+  const guideColour = isDark ? GUIDE_DARK : GUIDE_LIGHT;
+  ctx.strokeStyle = guideColour;
+  ctx.fillStyle   = guideColour;
 
   if (background === "lined") {
     ctx.lineWidth = 0.8;
@@ -70,6 +82,22 @@ export function drawBackground(
   }
 }
 
+/**
+ * Fill the background of an off-screen canvas with the given background type.
+ * Called once on mount and whenever `background` changes.
+ */
+export function drawBackground(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  background: BackgroundType,
+  isDark: boolean
+): void {
+  drawPaper(ctx, width, height, isDark);
+  if (background === "blank") return;
+  drawGuides(ctx, width, height, background, isDark);
+}
+
 // ---------------------------------------------------------------------------
 // Stroke rendering
 // ---------------------------------------------------------------------------
@@ -77,18 +105,35 @@ export function drawBackground(
 /**
  * Render a single stroke onto a canvas context using quadratic Bézier
  * interpolation for smooth curves. Pressure is mapped to line width.
+ * Eraser paints paper (source-over) rather than cutting alpha (destination-out).
  */
 export function renderStroke(
   ctx: CanvasRenderingContext2D,
-  stroke: Stroke
+  stroke: Stroke,
+  isDark: boolean = false
 ): void {
-  if (stroke.points.length < 2) return;
+  if (stroke.points.length < 2) {
+    if (stroke.points.length === 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = stroke.tool === "eraser"
+        ? (isDark ? PAPER_DARK : PAPER_LIGHT)
+        : stroke.color;
+      const pt = stroke.points[0];
+      const r = (stroke.width * (0.5 + (pt.pressure ?? 0.5) * 0.7)) / 2;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    return;
+  }
 
   ctx.save();
 
   if (stroke.tool === "eraser") {
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = isDark ? PAPER_DARK : PAPER_LIGHT;
   } else {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = stroke.color;
@@ -138,7 +183,7 @@ export function redrawAll(
   ctx.clearRect(0, 0, width, height);
   drawBackground(ctx, width, height, background, isDark);
   for (const stroke of strokes) {
-    renderStroke(ctx, stroke);
+    renderStroke(ctx, stroke, isDark);
   }
 }
 
@@ -148,14 +193,15 @@ export function redrawAll(
 
 /**
  * Render the canvas to an offscreen canvas capped at EXPORT_MAX_WIDTH_PX,
- * then compress to a PNG blob. If the PNG exceeds EXPORT_MAX_SIZE_BYTES,
- * falls back to JPEG at successively lower quality levels.
+ * composite with paper colour first to eliminate alpha, then compress to a PNG blob.
+ * If the PNG exceeds EXPORT_MAX_SIZE_BYTES, falls back to JPEG at successively lower quality levels.
  *
  * @returns A compressed Blob ready for upload.
  * @throws  If the blob cannot be made below the size limit even at minimum quality.
  */
 export async function exportAsImageBlob(
-  sourceCanvas: HTMLCanvasElement
+  sourceCanvas: HTMLCanvasElement,
+  isDark: boolean = false
 ): Promise<Blob> {
   const scale = Math.min(1, EXPORT_MAX_WIDTH_PX / sourceCanvas.width);
   const exportW = Math.round(sourceCanvas.width  * scale);
@@ -166,6 +212,8 @@ export async function exportAsImageBlob(
   offscreen.height = exportH;
 
   const ctx = offscreen.getContext("2d")!;
+  ctx.fillStyle = isDark ? PAPER_DARK : PAPER_LIGHT;
+  ctx.fillRect(0, 0, exportW, exportH);
   ctx.drawImage(sourceCanvas, 0, 0, exportW, exportH);
 
   // Try PNG first

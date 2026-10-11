@@ -24,6 +24,9 @@ export const STROKE_WIDTHS: StrokeWidth[] = [
 
 export const STYLUS_STROKE_SCALE = 2.2; // multiplier applied when pointerType === 'pen'
 
+import type { LucideIcon } from "lucide-react";
+import { Square, AlignLeft, Grip } from "lucide-react";
+
 // ---------------------------------------------------------------------------
 // Background types
 // ---------------------------------------------------------------------------
@@ -33,13 +36,13 @@ export type BackgroundType = "blank" | "lined" | "dotted";
 export interface BackgroundOption {
   id: BackgroundType;
   label: string;
-  icon: string;
+  icon: LucideIcon;
 }
 
 export const BACKGROUND_OPTIONS: BackgroundOption[] = [
-  { id: "blank", label: "Blank", icon: "□" },
-  { id: "lined", label: "Lined", icon: "≡" },
-  { id: "dotted", label: "Dotted", icon: "⋯" },
+  { id: "blank", label: "Blank", icon: Square },
+  { id: "lined", label: "Lined", icon: AlignLeft },
+  { id: "dotted", label: "Dotted", icon: Grip },
 ];
 
 // ---------------------------------------------------------------------------
