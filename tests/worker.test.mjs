@@ -157,10 +157,31 @@ function installFetch(steps, { supabaseRows } = {}) {
       const override = supabaseRows ? supabaseRows(href, init) : undefined
 
       if (override !== undefined) {
+        if (override instanceof Response) {
+          return override
+        }
         return new Response(JSON.stringify(override), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
+      }
+
+      if (href.includes("practice_task_submissions")) {
+        const method = init.method || "GET"
+        if (method === "GET") {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        }
+        if (method === "POST" || method === "PATCH") {
+          return new Response(
+            JSON.stringify([
+              record.body ? { id: "sub-auto", ...record.body } : { id: "sub-auto" },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        }
       }
 
       // Supabase REST with `Prefer: return=representation` answers with an array.
@@ -1188,11 +1209,13 @@ async function main() {
   const directSig = await signLink(directSessId, directExp)
 
   installFetch([{ content: VALID }], {
-    supabaseRows: (href) => {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
       if (href.includes("/sessions")) {
         return [{ id: directSessId, client_id: "client-direct-123", name: "Session Direct" }]
       }
       if (href.includes("practice_task_submissions")) {
+        if (method === "GET") return []
         return [{ id: "sub-direct-new", session_id: directSessId, client_id: "client-direct-123", status: "pending_practitioner_review" }]
       }
       if (href.includes("status_audit_log")) {
@@ -1280,6 +1303,184 @@ async function main() {
     assert.equal(r.body.status, "draft")
   }
   pass("client-submission: task_type allowlist refuses garbage (400) and accepts each allowed value")
+
+  /* 41. Client submission: resolve-first by session_id, idempotent retries return 200 with same id, pending review does not overwrite, and race backstop catches 23505 */
+  const rslvSessId = "session-rslv-01"
+  const rslvExp = inAnHour()
+  const rslvSig = await signLink(rslvSessId, rslvExp)
+
+  let sessionSubmissions = []
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
+      if (href.includes("/sessions")) {
+        return [{ id: rslvSessId, client_id: "client-rslv-1", name: "Session Resolve" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (method === "GET") {
+          assert.ok(href.includes(`session_id=eq.${rslvSessId}`), "lookup MUST be scoped by session_id")
+          return sessionSubmissions.slice()
+        }
+        if (method === "POST") {
+          const b = init?.body ? JSON.parse(init.body) : {}
+          const newRow = {
+            id: "sub-created-first",
+            session_id: rslvSessId,
+            client_id: "client-rslv-1",
+            status: b.status || "draft",
+            task_type: b.task_type,
+            form_data: b.form_data,
+          }
+          sessionSubmissions.push(newRow)
+          return [newRow]
+        }
+        if (method === "PATCH") {
+          const b = init?.body ? JSON.parse(init.body) : {}
+          if (sessionSubmissions.length > 0) {
+            sessionSubmissions[0] = {
+              ...sessionSubmissions[0],
+              ...b,
+            }
+            return [sessionSubmissions[0]]
+          }
+          return []
+        }
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-rslv-01" }]
+      }
+      return undefined
+    },
+  })
+
+  // 41a. POST for a session with no row creates one (200 with new row id)
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 1 },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "draft")
+  const firstInsertCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "POST"
+  )
+  assert.ok(firstInsertCall, "must create row when no row exists")
+
+  // 41b. A second POST for the same session with no id returns 200 with the SAME row id (not duplicate, not 409)
+  const callsBeforeSecondPost = supabaseCalls().length
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 2 },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first", "second POST must return SAME row id")
+  assert.equal(r.body.status, "draft")
+  const newPostCalls = supabaseCalls()
+    .slice(callsBeforeSecondPost)
+    .filter((c) => c.url.includes("practice_task_submissions") && c.method === "POST")
+  assert.equal(newPostCalls.length, 0, "second POST must not execute another INSERT")
+
+  // 41c. Commit transition: transitions draft to pending_practitioner_review
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 3 },
+      status: "pending_practitioner_review",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "pending_practitioner_review")
+
+  // 41d. POST when the row is already pending_practitioner_review does not overwrite and returns that row (200, not 409)
+  const callsBeforePendingRetry = supabaseCalls().length
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 4, malicious_overwrite: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200, "retry must not return 409")
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "pending_practitioner_review")
+  const writesDuringPendingRetry = supabaseCalls()
+    .slice(callsBeforePendingRetry)
+    .filter((c) => (c.method === "POST" && c.url.includes("practice_task_submissions")) || c.method === "PATCH")
+  assert.equal(writesDuringPendingRetry.length, 0, "must not overwrite pending submission")
+
+  // 41e. Race backstop: if INSERT hits unique violation (23505), selects by session_id and returns 200 with existing row
+  const raceSessId = "session-race-01"
+  const raceExp = inAnHour()
+  const raceSig = await signLink(raceSessId, raceExp)
+
+  let raceInsertAttempted = false
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
+      if (href.includes("/sessions")) {
+        return [{ id: raceSessId, client_id: "client-race-1", name: "Session Race" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (method === "GET") {
+          if (!raceInsertAttempted) return []
+          return [{ id: "sub-race-winner", session_id: raceSessId, client_id: "client-race-1", status: "draft" }]
+        }
+        if (method === "POST") {
+          raceInsertAttempted = true
+          return new Response(
+            JSON.stringify({
+              code: "23505",
+              message: 'duplicate key value violates unique constraint "practice_task_submissions_session_unique"',
+              details: `Key (session_id)=(${raceSessId}) already exists.`,
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } }
+          )
+        }
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${raceSessId}?exp=${raceExp}&sig=${raceSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Concurrent submit" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200, "race backstop must return 200, not error")
+  assert.equal(r.body.id, "sub-race-winner")
+  assert.equal(r.body.status, "draft")
+
+  pass("client-submission: resolve-first creates row, retry returns same id (200), pending does not overwrite, and 23505 race backstop returns 200")
 }
 
 // Derived from the number of pass() calls in this file so adding a check never stales the count.

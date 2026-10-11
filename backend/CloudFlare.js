@@ -1524,12 +1524,22 @@ if (method === "GET" && cleanPath === "/auth/me") {
          Signed bearer link write surface - token-free, guarded by HMAC.
          Upserts a practice-task submission in `draft` or `pending_practitioner_review`.
 
-         Security constraints:
+         Invariant (Aya's ruling): One submission per session across all states.
+         The client surface holds no id (token-free, no localStorage/sessionStorage);
+         the session in the path is the resume handle.
+
+         Security & resolution constraints:
          - Signed link HMAC verification via verifyClientLink(sessionId, url.searchParams, env).
          - client_id is resolved strictly from the session row (with case_formulations fallback), never from body.
          - practitioner_id is sent as an EXPLICIT null JSON value (never omitted, never fabricated).
-         - IDOR protection: every UPDATE is scoped by session_id=eq.<path>&id=eq.<id>&status=eq.draft.
-         - Status allowlist: exactly 'draft' and 'pending_practitioner_review'. Only draft rows can be updated (409 gate).
+         - Resolve first by session_id: client link sends no id. Route resolves existing row by session_id:
+           * none: INSERT new row with explicit null practitioner_id and session_id from path.
+           * draft: UPDATE in place (autosave/resume path), keeping id=eq.<id>&session_id=eq.<path>&status=eq.draft scoping.
+           * pending_practitioner_review: do not overwrite; return existing row (UI renders sent receipt).
+           * revision_requested / approved / archived: do not overwrite; return existing row (UI renders locked).
+         - Retries never receive 409: returns 200 with { id, status } receipt so UI branches on status alone.
+         - Race backstop: if INSERT hits unique violation (23505), scoped SELECT by session_id returns existing row with 200.
+         - Backward compatibility: if body.id is provided, existing id + session_id + draft scoping is preserved (409 on non-draft update).
          - submitted_at is written transactionally in the same statement when transitioning to pending_practitioner_review.
          - Payload size capped at 64 KB on request body (Content-Length check + streaming byte-cap before JSON.parse, plus form_data cap); rate limited (60 req/min per IP:session).
          - Receipt returns only { id, status } - no cross-row reads.
@@ -1729,28 +1739,100 @@ if (method === "GET" && cleanPath === "/auth/me") {
           }
           row = Array.isArray(patchData) ? patchData[0] : patchData
         } else {
-          // 10. INSERT: Explicit null practitioner_id, session_id from path, client_id from session
-          previousStatus = null
-          const insertPayload = {
-            client_id: sessionClientId,
-            session_id: sessionId,
-            practitioner_id: null,
-            task_type: body.task_type,
-            form_data: body.form_data,
-            status: targetStatus,
-            created_at: now,
-            updated_at: now,
-            ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
-          }
+          // 10. Client-link surface (no id): Resolve first by session_id (never client_id)
+          const existingRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!existingRes.ok) throw new Error(await existingRes.text())
+          const existingRows = await existingRes.json()
+          const existingRow = existingRows && existingRows.length ? existingRows[0] : null
 
-          const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
-            method: "POST",
-            headers: HEADERS,
-            body: JSON.stringify(insertPayload),
-          })
-          if (!insertRes.ok) throw new Error(await insertRes.text())
-          const insertData = await insertRes.json()
-          row = Array.isArray(insertData) ? insertData[0] : insertData
+          if (!existingRow) {
+            // (a) none → INSERT as today (explicit null practitioner_id, session_id from path, client_id from session)
+            previousStatus = null
+            const insertPayload = {
+              client_id: sessionClientId,
+              session_id: sessionId,
+              practitioner_id: null,
+              task_type: body.task_type,
+              form_data: body.form_data,
+              status: targetStatus,
+              created_at: now,
+              updated_at: now,
+              ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+            }
+
+            const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify(insertPayload),
+            })
+            if (!insertRes.ok) {
+              const errText = await insertRes.text()
+              if (insertRes.status === 409 || errText.includes("23505")) {
+                // Race backstop: if INSERT hits unique violation (23505),
+                // scoped SELECT by session_id and return that row with 200 instead of erroring
+                const raceRes = await fetch(
+                  `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+                  { headers: HEADERS }
+                )
+                if (raceRes.ok) {
+                  const raceData = await raceRes.json()
+                  if (raceData && raceData.length > 0) {
+                    row = raceData[0]
+                    return respond({ id: row.id, status: row.status }, cors)
+                  }
+                }
+              }
+              throw new Error(errText)
+            }
+            const insertData = await insertRes.json()
+            row = Array.isArray(insertData) ? insertData[0] : insertData
+          } else if (existingRow.status === "draft") {
+            // (b) draft → UPDATE in place (autosave/resume path), keeping existing scoping
+            previousStatus = "draft"
+            const patchPayload = {
+              task_type: body.task_type,
+              form_data: body.form_data,
+              practitioner_id: null,
+              status: targetStatus,
+              updated_at: now,
+              ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+            }
+
+            const patchRes = await fetch(
+              `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(existingRow.id)}&session_id=eq.${encodeURIComponent(sessionId)}&status=eq.draft`,
+              {
+                method: "PATCH",
+                headers: HEADERS,
+                body: JSON.stringify(patchPayload),
+              }
+            )
+            if (!patchRes.ok) throw new Error(await patchRes.text())
+            const patchData = await patchRes.json()
+            if (!patchData || (Array.isArray(patchData) && patchData.length === 0)) {
+              // If concurrent transition moved row out of draft, fetch latest row and return
+              const raceRes = await fetch(
+                `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+                { headers: HEADERS }
+              )
+              if (raceRes.ok) {
+                const raceData = await raceRes.json()
+                if (raceData && raceData.length > 0) {
+                  return respond({ id: raceData[0].id, status: raceData[0].status }, cors)
+                }
+              }
+              return respond({ id: existingRow.id, status: existingRow.status }, cors)
+            }
+            row = Array.isArray(patchData) ? patchData[0] : patchData
+          } else if (existingRow.status === "pending_practitioner_review") {
+            // (c) pending_practitioner_review → do not overwrite; return row so UI renders sent receipt
+            return respond({ id: existingRow.id, status: existingRow.status }, cors)
+          } else {
+            // (d) revision_requested / approved / archived → return row; UI renders it locked
+            return respond({ id: existingRow.id, status: existingRow.status }, cors)
+          }
         }
 
         // 11. Best-effort audit log entry on commit (changed_by_user_id is null)
