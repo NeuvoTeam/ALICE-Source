@@ -384,6 +384,15 @@ broken, which means the session-less rows sit directly under the client header a
 trailing, unlabelled group. Design for that mixture now; it is the steady state, not a
 transient.
 
+**One submission per session — three dimensions, one clinical unit** (settled 2026-10-11
+with Item 1 §4.3). A session carries **one** submission in every state, so a
+session-grouped queue shows exactly one row
+per session: one session → one row → one review → one audit chain in `status_audit_log`. The
+weaker "one open draft per session" alternative was withdrawn because it would allow a second
+pending row after the first commits, forcing the clinician to approve one clinical unit twice.
+Consequence for this queue: there is no aggregation problem to design for at the session
+level — but see §6.4 for the one case the unique index cannot see.
+
 ### 6.4 Schema (shared with the Item 1 spec — one decision, not two)
 
 ```sql
@@ -397,8 +406,33 @@ create index if not exists practice_task_submissions_session_id_idx
   on public.practice_task_submissions (session_id);
 ```
 
-Plus the two indexes in §6.2 and the nullable `practitioner_id` question raised in §4.4 of
-the Item 1 spec. No backfill for either column.
+Plus the two indexes in §6.2, the uniqueness constraint below, and the nullable
+`practitioner_id` question raised in §4.5 of the Item 1 spec. No backfill for either column.
+
+```sql
+-- ONE SUBMISSION PER SESSION (Item 1 §4.3). Plain, not partial: under this invariant
+-- every state is exclusive, so there is no predicate to write. NULL session_id stays
+-- unconstrained (Postgres treats NULLs as distinct), which is what keeps pre-migration
+-- and clinician-authored rows legitimate.
+create unique index if not exists practice_task_submissions_session_unique
+  on public.practice_task_submissions (session_id);
+```
+
+**The one case this constraint cannot see — flag it, do not paper over it.** The index
+constrains rows that *carry* a `session_id`. A clinician-authored submission takes the other
+route (`POST /tasks/submissions`, which does not write `session_id` — `CloudFlare.js:1387-1395`),
+so it lands with `session_id = NULL` and is invisible to the unique index. If a clinician
+"records on behalf of" a client for a session that *also* has a link submission, that session
+ends up with two rows and the constraint will not object.
+
+Today that is latent, not live: the clinician path never sets `session_id`, so no session can
+currently hold two `session_id`-bearing rows. It becomes real the moment the clinician path
+starts writing `session_id` — which it must, if clinician-recorded submissions are ever to join
+this queue's session grouping. **Recommendation for that change:** when the clinician path
+begins writing `session_id`, it inherits this same unique index, and the record-on-behalf flow
+must resolve the session's existing row rather than inserting — i.e. reuse Item 1 §4.3's
+resolution contract, not a second insert path. Raise it as a scoped task at that point; it is
+not a blocker for the migration being written now.
 
 ---
 

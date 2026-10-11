@@ -358,6 +358,16 @@ alter table public.practice_task_submissions
 create index if not exists practice_task_submissions_session_id_idx
   on public.practice_task_submissions (session_id);
 
+-- INVARIANT: one submission per session (settled 2026-10-11 — see §4.3).
+-- Deliberately a PLAIN unique index, not a partial one: under this invariant every
+-- state is exclusive, so there is no predicate to write. Postgres treats NULLs as
+-- distinct in a unique index, which is a feature here — historical rows and
+-- clinician-authored drafts carry session_id = NULL and stay unconstrained, while
+-- link-scoped rows (which always carry session_id) are constrained to one.
+-- Confirm NULL-distinctness is the intent rather than reaching for `nulls not distinct`.
+create unique index if not exists practice_task_submissions_session_unique
+  on public.practice_task_submissions (session_id);
+
 -- Scope is clinician_clients → client_id IN (…), so the useful index is client-scoped.
 -- An index on (practitioner_id, …) would be dead weight once §4.2 sets it NULL.
 create index if not exists practice_task_submissions_client_status_updated_idx
@@ -403,12 +413,84 @@ actor that does not exist):**
   write any other value, and must refuse to touch a row that is not `draft`.
 - Route must be declared **above** the catch-all `if (method === "POST")` AI handler in
   `backend/CloudFlare.js` (`.hermes.md` §2 route precedence).
-- One link, one session, one open draft. A second POST with an existing `id` updates;
-  without one it inserts. The link grants no read of any other session's rows.
-  Every UPDATE must carry a `session_id=eq.<path>` filter as well as the id, or the
-  token-free route is an IDOR.
+- **One submission per session — see §4.3.** The earlier wording here said "one link, one
+  session, one open draft", which is the *weaker* invariant (a) and is **withdrawn**: it
+  would permit a second row once the first commits, leaving a session with two pending
+  submissions. The settled invariant is one submission per session, in every state.
+- The link grants no read of any other session's rows. Every UPDATE must carry a
+  `session_id=eq.<path>` filter as well as the id, or the token-free route is an IDOR.
+  (The committed route already does this — `CloudFlare.js:1634`.)
 
-### 4.3 Type widening (mandatory, and it is not a one-line change)
+### 4.3 The session invariant, and what it buys (settled 2026-10-11)
+
+**Decision: one submission per session, in every state. Not one open draft.**
+
+Why, from what the product actually models:
+
+1. **A session carries exactly one clinician-chosen activity.** `GET /client-homework/:id`
+   returns `practiceTask: projectClientPracticeTask(row.practice_package)` — singular, from
+   one `practice_package` object with one `task_type`. No projection renders two. So the
+   rationale that favours the weaker invariant ("the client could start another task in that
+   session") describes a flow that cannot even be displayed.
+2. **A link is one piece of homework for one session, and a short-lived one** — default TTL
+   14 days, max 30 (`CloudFlare.js:67-68`) — not an open-ended workspace.
+3. **The clinical unit and the artefact stay 1:1.** The review gateway reviews one
+   submission; `status_audit_log` is keyed on `submission_id`; approval locks immutability on
+   it. Two rows for one session means one clinical unit needing two approvals and two audit
+   chains. The queue's session grouping is only clean under this invariant — one session,
+   one row, one review.
+4. **A revision is a state transition on one row, never a new row.** `revision_requested` →
+   the client edits → resubmit. The status vocabulary already supports it
+   (`types/tasks.ts:31-37`). A second row would orphan the first row's audit history and show
+   two submissions where the clinical truth is one task revised.
+5. **Another reflection is another attachment, not another submission.** This is the most
+   plausible-looking counter-case, so it is settled explicitly: `client_reflections` is keyed
+   on `submission_id` and already allows many reflections per submission, and the review
+   gateway renders `reflections.length` images (`review/page.tsx:763`). A client wanting to
+   add a second drawing adds a reflection, never a submission.
+
+**What the invariant buys — the resume path, for free.** This is the real prize, and it is
+why the weaker invariant would have cost more than it looks. The client surface cannot store
+an id: there is no token, and `ReflectionCanvas.tsx:25` forbids `localStorage`/`sessionStorage`
+as an architectural guardrail. So the `id` returned by the route survives only in memory, and
+after a reload the client cannot reference its own draft. Under a uniqueness constraint scoped
+to the session, it no longer needs to: the session **is** the handle. This delivers the
+server-side save-and-return that §3.10 requires as a hard Phase 2 prerequisite, with no
+client-side storage at all.
+
+**Required route behaviour under this invariant:**
+
+- **The client always POSTs without `id`.** It has no durable way to hold one. The route
+  resolves the session's row rather than requiring the caller to name it.
+- On a unique violation (`23505`) on `session_id`: scoped `SELECT` by `session_id` and return
+  that row with **200** — not an error. The scoped SELECT must never widen to `client_id`,
+  which spans sessions (the same rule `/client-homework` documents at `CloudFlare.js:926-928`).
+- Behaviour by the existing row's status:
+  | Existing status | Route does | UI renders |
+  | --- | --- | --- |
+  | `draft` | update it in place | resumed editing — this is the autosave path |
+  | `pending_practitioner_review` | do **not** overwrite; return the row | the "sent" receipt (S8) |
+  | `revision_requested` | return the row | locked + clinician feedback (S10) |
+  | `approved` / `archived` | return the row | locked (S10) |
+- **Never return 409 to a retry.** The committed route returns 409 for a non-draft update
+  (`CloudFlare.js:1621`, `:1644`). To a client who just tapped Submit on a flaky connection,
+  409 is indistinguishable from a failure and invites a second attempt. The receipt is
+  already `{ id, status }`, so the UI can branch on `status` alone and render the receipt for
+  anything committed.
+- `body.id` support may stay for compatibility, but must remain scoped by
+  `id=eq.<id>&session_id=eq.<path>&status=eq.draft` exactly as it is now.
+
+**Resume-on-load requires a read, not just an idempotent write.** The POST path only helps
+once the client submits something. To greet them correctly on arrival — "welcome back, we
+saved your draft" — the load call must report the session's submission state. Recommendation:
+`GET /client-homework/:id` gains a narrow `submission: { status, submitted_at } | null`
+alongside `practiceTask`. Never the id (the client does not need it and omitting it removes
+id-passing entirely) and never `form_data` in the list-shaped projection. Resuming the
+client's *own* saved answers additionally needs that submission's `form_data` / `canvas_data`,
+scoped by `session_id` — a content disclosure to the token-free surface, so **Rook's call**,
+not mine. The scoping rule is non-negotiable either way: by `session_id`, never by `client_id`.
+
+### 4.4 Type widening (mandatory, and it is not a one-line change)
 
 `practitioner_id` becoming nullable ripples into four type declarations:
 
@@ -430,9 +512,9 @@ only what §4.2 makes nullable.
 Audit every read site, not just the declaration. `NormalisedSubmission.practitionerId` is
 currently rendered nowhere (the only `practitionerId` render, `review/page.tsx:887`, is a
 **note's** actor, which is always a clinician), so that one is safe to widen. The audit
-row is not — see §4.4.
+row is not — see §4.5.
 
-### 4.4 The audit-actor dilemma (this one has no clean branch)
+### 4.5 The audit-actor dilemma (this one has no clean branch)
 
 Two verified facts and one fact I could not verify:
 
