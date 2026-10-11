@@ -9,14 +9,14 @@ import type {
   BackgroundType,
   CanvasVectorData,
   Stroke,
-} from "./canvasTypes";
+} from "./canvasTypes.ts";
 
 import {
   EXPORT_MAX_WIDTH_PX,
   EXPORT_MAX_SIZE_BYTES,
   EXPORT_MIME,
   JPEG_QUALITY_STEPS,
-} from "./canvasTypes";
+} from "./canvasTypes.ts";
 
 // ---------------------------------------------------------------------------
 // Paper & guide tokens
@@ -24,6 +24,7 @@ import {
 
 export const PAPER_LIGHT = "#FBFAF7";
 export const PAPER_DARK  = "#EDE9E1";
+export const PEN_COLOR   = "#1a1d28";
 export const GUIDE_LIGHT = "rgba(31, 36, 48, 0.12)";
 export const GUIDE_DARK  = "rgba(31, 36, 48, 0.16)";
 

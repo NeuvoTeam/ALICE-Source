@@ -65,6 +65,7 @@ import {
 } from "./canvasTypes";
 
 import {
+  PEN_COLOR,
   exportAsImageBlob,
   newStrokeId,
   redrawAll,
@@ -109,10 +110,7 @@ interface ReflectionCanvasProps {
 }
 
 // ---------------------------------------------------------------------------
-// Pen colour
-// ---------------------------------------------------------------------------
-
-const PEN_COLOR = "#1a1d28"; // near-black ink; the paper adapts to the theme, the ink does not, so the exported artefact matches what the client drew.
+// PEN_COLOR imported from ./canvasUtils
 
 // ---------------------------------------------------------------------------
 // Toolbar button primitive
