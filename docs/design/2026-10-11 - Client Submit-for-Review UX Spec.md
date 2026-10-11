@@ -1,5 +1,10 @@
 # ALICE — Client Submit-for-Review UX Spec (Item 1)
 
+> **Anchor convention.** Code references here are cited by **symbol**, not by line number —
+> a line number rots with any adjacent edit, so it reads as a fact with no expiry. Resolve a
+> symbol with `grep -n '<symbol>' <file>`. If a line number is ever genuinely load-bearing it
+> must be stamped `as of <sha>`, never left bare.
+
 Author: Aya (UI/UX architect)
 Date: 2026-10-11
 Status: SPEC — not implemented. Phase 2 is Rook-gated (schema + signed write route).
@@ -12,14 +17,14 @@ Scope: `app/practice/[sessionId]/page.tsx`, `components/client-view.tsx`,
 
 | Claim | Evidence |
 | --- | --- |
-| The approval gate exists | `components/tasks/DynamicTaskForm.tsx:257-312` (`ApprovalGate`), first-person copy at `:281-282` |
-| It only renders when there is something to submit to | `:735-760` — the last step renders `Submit for review` only in the `isLastStep` (persist) branch |
-| The signed link cannot submit | `app/practice/[sessionId]/page.tsx:214` passes `persist={false}`; `:735-739` then renders "Answers on this page are not saved or sent." |
-| A clinician-looking surface shows the client-voice gate | `components/client-view.tsx:99-110` passes no `persist` → default `true` → gate + first-person attestation render |
-| That surface is a **clinician preview mode**, not a client portal | `app/dashboard/page.tsx:13` `type ViewMode = "clinician" \| "client"`; `:17` default `"clinician"`; `:78` `<ClientView client={storeClient} />` is the `"client"` branch of a clinician's own authenticated dashboard, behind `AuthGuard` (`:84`) |
-| Server-side submission needs a clinician token | `backend/CloudFlare.js:1389` — `practitioner_id: authUser.id`; `:1345` `checkClientAccess(body.client_id)` |
-| The commit transition is draft → pending | `backend/CloudFlare.js:1407` and `:1450` `status: "pending_practitioner_review"` |
-| Submissions cannot be tied to the session that issued the link | `backend/CloudFlare.js:1387-1395` insert body carries `client_id, practitioner_id, task_type, form_data, status, created_at, updated_at` — no `session_id`; the table has none (see the comment at `:926-928`) |
+| The approval gate exists | `components/tasks/DynamicTaskForm.tsx` (`ApprovalGate`) — first-person copy in its checkbox label |
+| It only renders when there is something to submit to | `DynamicTaskForm`, last-step branch — the last step renders `Submit for review` only in the `isLastStep` (persist) branch |
+| The signed link cannot submit | `app/practice/[sessionId]/page.tsx` passes `persist={false}`; that branch then renders "Answers on this page are not saved or sent." |
+| A clinician-looking surface shows the client-voice gate | `components/client-view.tsx` passes no `persist` → default `true` → gate + first-person attestation render |
+| That surface is a **clinician preview mode**, not a client portal | `app/dashboard/page.tsx` `type ViewMode = "clinician" \| "client"`; the default is `"clinician"`; and `<ClientView client={storeClient} />` is the `"client"` branch of a clinician's own authenticated dashboard, behind `AuthGuard` |
+| Server-side submission needs a clinician token | `backend/CloudFlare.js` — `practitioner_id: authUser.id`; and `checkClientAccess(body.client_id)` |
+| The commit transition is draft → pending | `backend/CloudFlare.js` and the transition write `status: "pending_practitioner_review"` |
+| Submissions cannot be tied to the session that issued the link | `backend/CloudFlare.js` insert body carries `client_id, practitioner_id, task_type, form_data, status, created_at, updated_at` — no `session_id`; the table has none (see the comment in the `/client-homework` handler) |
 
 ### The reframe (important — it changes the fix)
 
@@ -74,7 +79,7 @@ Tailwind (existing tokens only):
 </div>
 ```
 
-### 3.2 Surface (A) — the gate copy (`ApprovalGate`, `DynamicTaskForm.tsx:257-312`)
+### 3.2 Surface (A) — the gate copy (`ApprovalGate`, `DynamicTaskForm.tsx`)
 
 Add a `submitContext?: "client" | "practitioner"` prop (default `"client"`).
 `ClientView` passes `submitContext="practitioner"`.
@@ -88,7 +93,7 @@ Add a `submitContext?: "client" | "practitioner"` prop (default `"client"`).
 
 Non-negotiable: the practitioner branch must not render first-person client
 attestation wording. The audit entry already records the true submitter
-(`changed_by_user_id = authUser.id`, `backend/CloudFlare.js:1468`), so the UI must
+(`changed_by_user_id = authUser.id`, `backend/CloudFlare.js`), so the UI must
 match what the log will say.
 
 ### 3.3 Surface (B) — the client link state model
@@ -98,8 +103,8 @@ says what ships now; Phase-2 column is what the same state becomes.
 
 | # | State | Trigger | Phase 1 rendering | Phase 2 rendering |
 | --- | --- | --- | --- | --- |
-| S0 | Loading | mount | existing spinner (`:141-148`) — keep | unchanged |
-| S1 | Link invalid/expired | 403 from `/client-homework` | existing error card (`:150-165`) — keep | unchanged |
+| S0 | Loading | mount | existing spinner — keep | unchanged |
+| S1 | Link invalid/expired | 403 from `/client-homework` | existing error card — keep | unchanged |
 | S2 | Nothing assigned | no `practiceTask` **and** empty `homework` | **new empty state** (3.4) | unchanged |
 | S3 | Checklist only | no `practiceTask`, `homework.length > 0` | **see 3.5 — the tick boxes are a false affordance and must change** | unchanged |
 | S4 | Activity ready | `practiceTask` present | editable form + **LockBadge** (3.6) + "not saved" status (3.7) | editable + "Saved" pill + Save-and-return |
@@ -121,7 +126,7 @@ Rules that hold in every state:
 
 ### 3.4 S2 — empty state (nothing assigned)
 
-Today: `:270-273` renders a dashed box "No practice tasks currently assigned for this session."
+Today: the fallback renders a dashed box "No practice tasks currently assigned for this session."
 It is close, but it sits under a page headed "Client Practice Tasks" and offers no
 next step. Replace with:
 
@@ -154,9 +159,9 @@ Tailwind:
 
 ### 3.5 S3 — the checklist tick boxes are a false affordance (bug, not polish)
 
-`app/practice/[sessionId]/page.tsx:281-305` renders a `w-full` `<button>` per homework
+`app/practice/[sessionId]/page.tsx` renders a `w-full` `<button>` per homework
 item that toggles `completed[index]` in local state. Nothing persists (no token, and
-`ReflectionCanvas.tsx:25` records "No localStorage / sessionStorage" as a guardrail).
+`ReflectionCanvas.tsx` records "No localStorage / sessionStorage" as a guardrail).
 The button has hover, active-scale and a check-circle — a full interactive promise —
 and everything is lost on reload.
 
@@ -174,7 +179,7 @@ Render it as a static checklist with `aria-disabled` raised to a plain list:
 </ul>
 ```
 
-Delete the progress bar (`:253-268`) in Phase 1. A percentage that cannot move is a
+Delete the progress bar in Phase 1. A percentage that cannot move is a
 lie. It returns in Phase 2, driven by real submission status.
 
 ### 3.6 Editable vs locked — the distinction must be legible at a glance
@@ -216,7 +221,7 @@ inputs must carry `disabled` or `readOnly`.
 
 Phase 1 has no persistence, so the status region must say exactly that and nothing
 more. Place it in the header row, right-aligned, where `SaveStatusBadge` sits in the
-persisting form (`DynamicTaskForm.tsx:633`).
+persisting form (`DynamicTaskForm.tsx`).
 
 ```tsx
 <div role="status" aria-live="polite"
@@ -238,13 +243,13 @@ useEffect(() => {
 }, [dirty]);
 ```
 
-And replace the current honest-but-bare line at `DynamicTaskForm.tsx:737-739`
+And replace the current honest-but-bare line at `DynamicTaskForm.tsx`
 ("Answers on this page are not saved or sent.") with the same tokens as the status
 pill so the two do not contradict each other in tone.
 
 ### 3.8 Phase 2 — the "your work is safe" moment (the first one this surface ever has)
 
-The success screen. The existing `committed` screen (`DynamicTaskForm.tsx:586-606`) is
+The success screen. The existing `committed` screen (`DynamicTaskForm.tsx`) is
 close; it needs a receipt, not just a tick.
 
 ```
@@ -326,7 +331,7 @@ save-and-return, a closed tab is a lost task, and the client-facing failure mode
 "my homework vanished" — which damages the therapeutic alliance, not just the UX.
 
 Phase 1 cannot do it: the surface is token-free *and* the canvas component
-(`ReflectionCanvas.tsx:25`) forbids browser storage as an architectural guardrail.
+(`ReflectionCanvas.tsx`) forbids browser storage as an architectural guardrail.
 Do not invent a localStorage draft to work around it — that guardrail exists because
 this is a clinical surface on shared devices, and a local draft is unencrypted PHI on
 a device we do not control.
@@ -389,7 +394,7 @@ historical rows: leave it NULL and render the wait as unknown rather than invent
 POST /client-submissions/:sessionId?exp=<int>&sig=<hex>
 
 NOT behind requireUser. Verified with the SAME verifyClientLink(sessionId, url.searchParams, env)
-that guards GET /client-homework/:id (backend/CloudFlare.js:889).
+that guards GET /client-homework/:id (backend/CloudFlare.js).
 ```
 
 **Derivation rules — corrected against Rook's audit (this section previously demanded an
@@ -400,11 +405,11 @@ actor that does not exist):**
 - `practitioner_id` is **NULL** on this path. The earlier instruction to take it "from
   the session row" was unimplementable: `sessions` has no `practitioner_id` column, and
   the Worker never reads one from that table (`SESSION_FULL_SELECT`,
-  `CloudFlare.js:2131-2132`, enumerates every column it knows, and none is an owner).
+  `CloudFlare.js`, enumerates every column it knows, and none is an owner).
   Do not substitute `authUser.id` — there is no `authUser` on a token-free route, and
   inventing one would write a fabricator into a clinical audit trail.
   **Consequence:** authorisation is unaffected, because `checkClientAccess`
-  (`CloudFlare.js:298-304`) is scoped by `clinician_clients(clinician_id, client_id)` and
+  (`CloudFlare.js`) is scoped by `clinician_clients(clinician_id, client_id)` and
   never reads `practitioner_id`. Verified, not assumed.
 - `session_id` is the path segment — which is the whole point of the column.
 - `submitted_at` is written **in the same statement** as the `draft →
@@ -419,7 +424,7 @@ actor that does not exist):**
   submissions. The settled invariant is one submission per session, in every state.
 - The link grants no read of any other session's rows. Every UPDATE must carry a
   `session_id=eq.<path>` filter as well as the id, or the token-free route is an IDOR.
-  (The committed route already does this — `CloudFlare.js:1634`.)
+  (The committed route already does this — `CloudFlare.js`.)
 
 ### 4.3 The session invariant, and what it buys (settled 2026-10-11)
 
@@ -433,7 +438,7 @@ Why, from what the product actually models:
    rationale that favours the weaker invariant ("the client could start another task in that
    session") describes a flow that cannot even be displayed.
 2. **A link is one piece of homework for one session, and a short-lived one** — default TTL
-   14 days, max 30 (`CloudFlare.js:67-68`) — not an open-ended workspace.
+   14 days, max 30 (`CloudFlare.js`) — not an open-ended workspace.
 3. **The clinical unit and the artefact stay 1:1.** The review gateway reviews one
    submission; `status_audit_log` is keyed on `submission_id`; approval locks immutability on
    it. Two rows for one session means one clinical unit needing two approvals and two audit
@@ -441,17 +446,17 @@ Why, from what the product actually models:
    one row, one review.
 4. **A revision is a state transition on one row, never a new row.** `revision_requested` →
    the client edits → resubmit. The status vocabulary already supports it
-   (`types/tasks.ts:31-37`). A second row would orphan the first row's audit history and show
+   (`types/tasks.ts`). A second row would orphan the first row's audit history and show
    two submissions where the clinical truth is one task revised.
 5. **Another reflection is another attachment, not another submission.** This is the most
    plausible-looking counter-case, so it is settled explicitly: `client_reflections` is keyed
    on `submission_id` and already allows many reflections per submission, and the review
-   gateway renders `reflections.length` images (`review/page.tsx:763`). A client wanting to
+   gateway renders `reflections.length` images (`review/page.tsx`). A client wanting to
    add a second drawing adds a reflection, never a submission.
 
 **What the invariant buys — the resume path, for free.** This is the real prize, and it is
 why the weaker invariant would have cost more than it looks. The client surface cannot store
-an id: there is no token, and `ReflectionCanvas.tsx:25` forbids `localStorage`/`sessionStorage`
+an id: there is no token, and `ReflectionCanvas.tsx` forbids `localStorage`/`sessionStorage`
 as an architectural guardrail. So the `id` returned by the route survives only in memory, and
 after a reload the client cannot reference its own draft. Under a uniqueness constraint scoped
 to the session, it no longer needs to: the session **is** the handle. This delivers the
@@ -464,7 +469,7 @@ client-side storage at all.
   resolves the session's row rather than requiring the caller to name it.
 - On a unique violation (`23505`) on `session_id`: scoped `SELECT` by `session_id` and return
   that row with **200** — not an error. The scoped SELECT must never widen to `client_id`,
-  which spans sessions (the same rule `/client-homework` documents at `CloudFlare.js:926-928`).
+  which spans sessions (the same rule `/client-homework` documents at `CloudFlare.js`).
 - Behaviour by the existing row's status:
   | Existing status | Route does | UI renders |
   | --- | --- | --- |
@@ -473,7 +478,7 @@ client-side storage at all.
   | `revision_requested` | return the row | locked + clinician feedback (S10) |
   | `approved` / `archived` | return the row | locked (S10) |
 - **Never return 409 to a retry.** The committed route returns 409 for a non-draft update
-  (`CloudFlare.js:1621`, `:1644`). To a client who just tapped Submit on a flaky connection,
+  (`CloudFlare.js`, both 409 gates). To a client who just tapped Submit on a flaky connection,
   409 is indistinguishable from a failure and invites a second attempt. The receipt is
   already `{ id, status }`, so the UI can branch on `status` alone and render the receipt for
   anything committed.
@@ -496,21 +501,21 @@ not mine. The scoping rule is non-negotiable either way: by `session_id`, never 
 
 | Type | File:line | Change |
 | --- | --- | --- |
-| `PracticeTaskSubmissionRow.practitioner_id` | `types/tasks.ts:141` | `UUID` → `UUID \| null` |
-| `NormalisedSubmission.practitionerId` | `types/tasks.ts:203` | `UUID` → `UUID \| null` |
-| `NormalisedAuditLogEntry.changedByUserId` | `types/tasks.ts:238` | see the dilemma below |
-| `StatusAuditLogRow.changed_by_user_id` | `types/tasks.ts:177` | see the dilemma below |
+| `PracticeTaskSubmissionRow.practitioner_id` | `types/tasks.ts` | `UUID` → `UUID \| null` |
+| `NormalisedSubmission.practitionerId` | `types/tasks.ts` | `UUID` → `UUID \| null` |
+| `NormalisedAuditLogEntry.changedByUserId` | `types/tasks.ts` | see the dilemma below |
+| `StatusAuditLogRow.changed_by_user_id` | `types/tasks.ts` | see the dilemma below |
 
 **Do not widen these two, and this is the trap in a mechanical sweep:** they read as the
 same field but are always clinician-authored, so they stay non-null —
-`SubmissionPractitionerNoteRow.practitioner_id` (`types/tasks.ts:155`) and
-`NormalisedPractitionerNote.practitionerId` (`:227`). Widening the latter would immediately
-break the one live render site, `review/page.tsx:887`
+`SubmissionPractitionerNoteRow.practitioner_id` (`types/tasks.ts`) and
+`NormalisedPractitionerNote.practitionerId`. Widening the latter would immediately
+break the one live render site, `review/page.tsx`
 (`fmtShortId(n.practitionerId)`), because `fmtShortId` takes a non-nullable string. Widen
 only what §4.2 makes nullable.
 
 Audit every read site, not just the declaration. `NormalisedSubmission.practitionerId` is
-currently rendered nowhere (the only `practitionerId` render, `review/page.tsx:887`, is a
+currently rendered nowhere (the only `practitionerId` render, `review/page.tsx`, is a
 **note's** actor, which is always a clinician), so that one is safe to widen. The audit
 row is not — see §4.5.
 
@@ -518,12 +523,12 @@ row is not — see §4.5.
 
 Two verified facts and one fact I could not verify:
 
-1. **Verified** — the audit write is best-effort: `CloudFlare.js:1471-1473` catches and
-   logs `"status_audit_log insert failed (non-fatal)"`; `documentation.md:599` and `:634`
+1. **Verified** — the audit write is best-effort: `CloudFlare.js` catches and
+   logs `"status_audit_log insert failed (non-fatal)"`; `documentation.md` (its API and schema tables)
    both document it as "best-effort, non-fatal".
 2. **Verified** — the gateway's render of that column is **unguarded**:
-   `fmtShortId(id: string) { return id.slice(0, 8) + "…" }` (`review/page.tsx:174-176`),
-   called at `:366` for every audit entry and at `:267` for the approval entry. A `null`
+   `fmtShortId(id: string) { return id.slice(0, 8) + "…" }` (`review/page.tsx`),
+   called in `AuditLogPanel` for every audit entry and in `AuditStrip` for the approval entry. A `null`
    reaching either site throws a `TypeError` and takes the whole review page down.
 3. **Not verified** — whether `changed_by_user_id` is `NOT NULL`. Rook read the live
    schema at HEAD `924d57a`; I could not. There is no DDL for this table in the repo (the
@@ -538,7 +543,7 @@ Either branch is broken for exactly the client submissions the queue exists to s
 | If `changed_by_user_id` is… | Then the client-link commit's audit insert… | Result |
 | --- | --- | --- |
 | `NOT NULL` | fails on a null actor | swallowed by the `try/catch` → **no `draft → pending` audit row at all** → the gateway's timeline silently omits the most important event, and any audit-derived sort key is null |
-| nullable | succeeds with a null actor | `fmtShortId(null)` at `review/page.tsx:366` → **the review gateway crashes** |
+| nullable | succeeds with a null actor | `fmtShortId(null)` at `review/page.tsx` → **the review gateway crashes** |
 
 Rook's recommendation resolves the *sort key* problem completely and I accept it: add
 `submitted_at`, keep the audit table as the audit trail. But it does not by itself resolve
@@ -556,7 +561,7 @@ what the timeline shows for the client's own transition, so pick one:
 **Non-negotiable either way:** `fmtShortId` must be guarded before any client-link
 submission can exist. That is a two-line change and it is independent of the choice above.
 
-**Open question for Rook, with a named falsifier:** `documentation.md:631` lists
+**Open question for Rook, with a named falsifier:** `documentation.md` lists
 `practice_task_submissions.practitioner_id` but no constraints. If that column is
 `NOT NULL`, then setting it to `NULL` per §4.2 makes the insert fail and Phase 2 has no
 storage at all. Verify the constraint before the route is written. If it *is* `NOT NULL`,

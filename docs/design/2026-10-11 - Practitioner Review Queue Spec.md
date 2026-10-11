@@ -1,5 +1,10 @@
 # ALICE — Practitioner Review Queue UX Spec (Item 3)
 
+> **Anchor convention.** Code references here are cited by **symbol**, not by line number —
+> a line number rots with any adjacent edit, so it reads as a fact with no expiry. Resolve a
+> symbol with `grep -n '<symbol>' <file>`. If a line number is ever genuinely load-bearing it
+> must be stamped `as of <sha>`, never left bare.
+
 Author: Aya (UI/UX architect)
 Date: 2026-10-11
 Status: SPEC — not implemented. Blocked on a list route (Rook-gated).
@@ -13,21 +18,21 @@ Scope: new route `app/practitioner/submissions/page.tsx`, plus the route that fe
 | Claim | Evidence |
 | --- | --- |
 | The review gateway exists and is complete | `app/practitioner/tasks/[id]/review/page.tsx` (1 425 lines) |
-| It needs a submission id handed to it | `:1245` `const params = useParams<{ id: string }>()` |
+| It needs a submission id handed to it | `useParams` in the page — `const params = useParams<{ id: string }>()` |
 | **Nothing links to it** | `grep -rn "review" app components --include=*.tsx` returns only the page's own header comment — there is no `<Link>`, no `router.push`, no list |
 | There is no list or index route | `find app/practitioner -type f -name "*.tsx"` → exactly one file |
 | There is no list endpoint | `GET` handlers in `backend/CloudFlare.js`: `/auth/me`, `/clients`, `/client-link/*`, `/client-homework/*`, `/sessions/*`, `/sessions`, `/latest-session`, `/client/history`, `/client/*`, `/ai/*`, and `/tasks/submissions/:id/bundle`. **No collection route for submissions.** |
-| Status vocabulary already exists | `types/tasks.ts:31-37` `TaskStatus`; presentation in `page.tsx:182-207` `STATUS_CONFIG` |
-| The true "submitted at" already exists | `backend/CloudFlare.js:1461-1471` writes `status_audit_log { previous_status: "draft", new_status: "pending_practitioner_review", changed_by_user_id, changed_at }` |
-| Client names are reachable | `backend/CloudFlare.js:469-499` `GET /clients` → `clinician_clients` mapping → `clients(id, full_name)` |
-| A submission cannot be attributed to a session | no `session_id` column (`:926-928` comment confirms) |
+| Status vocabulary already exists | `types/tasks.ts` `TaskStatus`; presentation in `page.tsx` `STATUS_CONFIG` |
+| The true "submitted at" already exists | `backend/CloudFlare.js` writes `status_audit_log { previous_status: "draft", new_status: "pending_practitioner_review", changed_by_user_id, changed_at }` |
+| Client names are reachable | `backend/CloudFlare.js` `GET /clients` → `clinician_clients` mapping → `clients(id, full_name)` |
+| A submission cannot be attributed to a session | no `session_id` column (the `/client-homework` comment confirms) |
 
 ### Two latent defects to fix while in here
 
-**a. `TASK_LABELS` is incomplete** (`app/practitioner/tasks/[id]/review/page.tsx:105-109`).
+**a. `TASK_LABELS` is incomplete** (`app/practitioner/tasks/[id]/review/page.tsx`).
 It maps `activity_log`, `thought_record`, `behavioural_experiment` — and **not**
 `two_choice_worksheet` or `reflection_prompt`, both of which the signed-link page can
-render today (`app/practice/[sessionId]/page.tsx:21-25`). Any label lookup must move to
+render today (`app/practice/[sessionId]/page.tsx`). Any label lookup must move to
 one shared module so the queue and the gateway cannot drift. Proposed source of truth:
 
 ```ts
@@ -198,7 +203,7 @@ Field-by-field rationale:
 | Slot | Source | Why |
 | --- | --- | --- |
 | **Activity title** | `task_type` → shared `taskLabel()` | what the work *is*; the only thing that differentiates two rows for the same client |
-| **Status pill** | reuse `STATUS_CONFIG` verbatim (`review/page.tsx:182-207`) | one visual language; do not invent a second pill. Extract it to `components/status-pill.tsx` so the queue and gateway share it |
+| **Status pill** | reuse `STATUS_CONFIG` verbatim (`review/page.tsx`) | one visual language; do not invent a second pill. Extract it to `components/status-pill.tsx` so the queue and gateway share it |
 | **Waiting time** | `now - submittedAt` | the clinically meaningful number in a review queue. `3 days` in `text-xs`, and escalate the pill treatment past thresholds — see below |
 | **Submitted at** | `practice_task_submissions.submitted_at` — a first-class column written transactionally by the commit route | Rook's bundled decision. **Not** `created_at` (that is when the *draft* was created, often days earlier and often by the clinician), and **not** `updated_at` (moves whenever the clinician edits notes). **Not** `status_audit_log` either — see below |
 | **Session slot** | `session_id` (Phase 2) | renders only when present; `NULL` = *session unknown (pre-migration)* and must render as **nothing at all** — never a placeholder, and never a guessed session. The reserved level-2 hook (§2, points 3-4) |
@@ -218,11 +223,11 @@ Waiting-time escalation (colour is never the only signal — the word changes to
   focus stop, no nested interactive elements.
 - The row hover raises the border and a chevron appears at the trailing edge
   (`ChevronRight`, `opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100`).
-- Keep the gateway's existing left-aligned audit strip (`review/page.tsx:225-...`) at the
+- Keep the gateway's existing left-aligned audit strip (`AuditStrip` in `review/page.tsx`) at the
   top, and add a **back link**: `← Submissions` → `/practitioner/submissions?tab=<tab>`
   so the clinician returns to the filter they came from, not to a reset queue.
 - **Make the gateway's "Submitted" label agree with the queue.** `AuditStrip`
-  (`review/page.tsx:239-242`) already renders an item labelled "Submitted", and it reads
+  (`review/page.tsx`) already renders an item labelled "Submitted", and it reads
   `submission.createdAt` — the *draft-creation* time, i.e. it is already wrong today. Once
   `submitted_at` exists that label must use it, or the queue and the gateway will show two
   different submission times for the same record. Sweep the gateway for every
@@ -318,8 +323,8 @@ Requirements the audit must confirm:
   written transactionally by the commit route for **both** author paths (clinician
   commit and client-link commit). Do not derive it from `status_audit_log`. Rook's
   reasoning, which I accept: the audit write is explicitly best-effort —
-  `CloudFlare.js:1471-1473` swallows a failed insert as `"non-fatal"`, corroborated by
-  `documentation.md:599` and `:634` — and a **work-list sort key must not depend on a
+  `CloudFlare.js` swallows a failed insert as `"non-fatal"`, corroborated by
+  `documentation.md` (its API and schema tables) — and a **work-list sort key must not depend on a
   best-effort write with a nullable actor**. Deriving it there makes `submitted_at` null
   for exactly the client submissions the queue exists to show, silently inverting the
   FIFO sort. Do not substitute `updated_at` either: it moves whenever the clinician
@@ -333,15 +338,15 @@ Requirements the audit must confirm:
 - **`client_name`** must be resolved server-side. The alternative (fetch `/clients`, then
   join in the browser) leaks the full client roster into the page payload.
 - **Tenant scoping is mandatory at the query level, for rows *and* counts.** Reuse the
-  `GET /clients` pattern (`CloudFlare.js:469-499`):
+  `GET /clients` pattern (`CloudFlare.js`):
   `clinician_clients?clinician_id=eq.<caller>&select=client_id` → then
   `practice_task_submissions?client_id=in.(...)`. **Never fetch-then-filter in the
   handler.** The Worker writes with the service-role key and there is no RLS backstop
-  (`supabase/migrations/20260914_worksheet_submissions.sql:2-3` states this explicitly,
+  (`supabase/migrations/20260914_worksheet_submissions.sql` states this explicitly,
   and the same note governs this table), so a forgotten filter returns **every
   clinician's submissions**, and — worse, because it is visible on every screen — a
   cross-tenant `counts` object and badge count. `checkClientAccess`
-  (`CloudFlare.js:298-304`) is the same principle applied per row; a collection endpoint
+  (`CloudFlare.js`) is the same principle applied per row; a collection endpoint
   must apply it once, in the query.
 - **`practitioner_id` is not a scoping key and must not be used as one.** It is `NULL`
   for client-originated submissions (Item 1 spec §4.2), so filtering on it would silently
@@ -350,7 +355,7 @@ Requirements the audit must confirm:
 - **PHI discipline.** The list payload carries activity type, status and timestamps —
   **no `form_data`**. The clinician fetches content only via
   `GET /tasks/submissions/:id/bundle` when they open a row. The existing
-  `/client-homework/:id` handler documents exactly this reasoning (`:936-937`); hold the
+  `/client-homework/:id` handler documents exactly this reasoning; hold the
   list to the same rule.
 - **Route placement**: declare it above the catch-all `if (method === "POST")` block
   per `.hermes.md` §2 — this is a `GET`, but the same discipline applies to any sibling
@@ -420,7 +425,7 @@ create unique index if not exists practice_task_submissions_session_unique
 
 **The one case this constraint cannot see — flag it, do not paper over it.** The index
 constrains rows that *carry* a `session_id`. A clinician-authored submission takes the other
-route (`POST /tasks/submissions`, which does not write `session_id` — `CloudFlare.js:1387-1395`),
+route (`POST /tasks/submissions`, which does not write `session_id` — `CloudFlare.js`),
 so it lands with `session_id = NULL` and is invisible to the unique index. If a clinician
 "records on behalf of" a client for a session that *also* has a link submission, that session
 ends up with two rows and the constraint will not object.
@@ -459,8 +464,8 @@ not a blocker for the migration being written now.
    on the `counts` object separately — a rows-only assertion passes while the badge still
    leaks the other tenant's workload.
 9. **The review gateway must not crash on a client-link submission's audit row.**
-   `fmtShortId` (`review/page.tsx:174-176`) does `id.slice(0, 8)` with no guard, and it is
-   called at `:366` for every audit entry. Render the gateway for a submission whose audit
+   `fmtShortId` (`review/page.tsx`) does `id.slice(0, 8)` with no guard, and it is
+   called in `AuditLogPanel` for every audit entry. Render the gateway for a submission whose audit
    row has a null actor and assert the page renders (labelling the actor as the client)
    rather than throwing. This test fails today by construction, which is the point.
 

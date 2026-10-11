@@ -1,5 +1,10 @@
 # ALICE — Reflection Canvas (Pad) UX Spec (Item 2)
 
+> **Anchor convention.** Code references here are cited by **symbol**, not by line number —
+> a line number rots with any adjacent edit, so it reads as a fact with no expiry. Resolve a
+> symbol with `grep -n '<symbol>' <file>`. If a line number is ever genuinely load-bearing it
+> must be stamped `as of <sha>`, never left bare.
+
 Author: Aya (UI/UX architect)
 Date: 2026-10-11
 Status: SPEC — not implemented.
@@ -13,7 +18,7 @@ Scope: `components/canvas/ReflectionCanvas.tsx`, `components/canvas/canvasUtils.
 Kuro's brief says `drawBackground()` "returns early when the background is `"blank"`,
 so the canvas is never filled. It's transparent over a dark container."
 
-**That is not what the code does.** `canvasUtils.ts:40-46`:
+**That is not what the code does.** `canvasUtils.ts`:
 
 ```ts
 const bgColour  = isDark ? "#1a1d21" : "#ffffff";
@@ -30,7 +35,7 @@ that as "the fix" would leave the operator's actual complaint on screen.
 ### What is actually happening — three distinct defects
 
 **Defect A — the ink is invisible in dark mode (severity: blocking).**
-`ReflectionCanvas.tsx:110` sets `PEN_COLOR = "#1a1d28"` with the comment "adapts via
+`ReflectionCanvas.tsx` sets `PEN_COLOR = "#1a1d28"` with the comment "adapts via
 compositing in dark mode". There is no compositing anywhere in the file. Measured
 contrast ratios:
 
@@ -49,14 +54,14 @@ of "the pad defaults dark", and it is the only defect here that loses a client's
 ```
 
 The dark pad fill (`#1a1d21`) and the card behind it (`dark:bg-slate-900`,
-`ReflectionCanvas.tsx:603`) are the same value to the eye, so the sheet merges into the
+`ReflectionCanvas.tsx`) are the same value to the eye, so the sheet merges into the
 chrome and reads as one dark slab. There is no paper edge, no shadow separation, no
 affordance that this is a surface you can write on.
 
 **Defect C — erasing is invisible, which is why the only feedback is the word "Draw".**
-`canvasUtils.ts:89-91` renders the eraser with
+`canvasUtils.ts` renders the eraser with
 `globalCompositeOperation = "destination-out"` — it punches **alpha**, it does not paint
-paper. The pixels behind the canvas are the parent `div` (`:711-716`, no background) and
+paper. The pixels behind the canvas are the parent `div` (the drawing container, no background) and
 then the card. In both themes the backdrop is the same colour as the fill, so:
 
 | theme | pad | after erase | visible? |
@@ -65,14 +70,14 @@ then the card. In both themes the backdrop is the same colour as the fill, so:
 | dark | `#1a1d21` | transparent → shows `#0f172a` | 1.056:1 — effectively no |
 
 So erasing produces no visible change, the stroke count falls to 0, and the status-bar
-hint at `:740-744` flips back to *"Draw with a stylus, finger, or mouse"*. That is
+hint in the status bar flips back to *"Draw with a stylus, finger, or mouse"*. That is
 **exactly** the operator's observation — "the eraser's only visible result is the word
 Draw". Note the string is the **status bar hint**, not canvas content.
 
-It also corrupts the artefact: `exportAsImageBlob` (`canvasUtils.ts:157-184`) copies the
+It also corrupts the artefact: `exportAsImageBlob` (`canvasUtils.ts`) copies the
 source canvas onto an offscreen canvas with **no background fill**, so erased regions
 stay transparent in the PNG. The clinician views it with `<img src={r.imageUrl}>`
-(`app/practitioner/tasks/[id]/review/page.tsx:773`) on a card — transparent holes render
+(`app/practitioner/tasks/[id]/review/page.tsx`) on a card — transparent holes render
 as whatever is behind them, and a JPEG fallback flattens them to black.
 
 **Defect D — the clinician's chosen background never reaches the canvas (severity: low,
@@ -80,15 +85,15 @@ and cheaper than reported).**
 Kuro's brief says "nothing consumes `suggested_background`". Half right: the canvas
 never consumes it, but the **wire already carries it end to end**:
 
-- `lib/ai/schemas.ts:30` defines it on `ReflectionPromptSchema`.
-- `backend/CloudFlare.js:2420` — `reflection_prompt: ["prompt", "suggested_background", "notes"]`
+- `lib/ai/schemas.ts` defines it on `ReflectionPromptSchema`.
+- `backend/CloudFlare.js` — `reflection_prompt: ["prompt", "suggested_background", "notes"]`
   is in `CLIENT_PRACTICE_TASK_FIELDS`, so `projectClientPracticeTask` already projects it
   and `GET /client-homework/:id` already returns it.
-- `app/practice/[sessionId]/page.tsx:16-19` types `PracticeTask` with an index signature,
+- `app/practice/[sessionId]/page.tsx` types `PracticeTask` with an index signature,
   so `practiceTask.suggested_background` is available on the page **today**.
 
-Missing piece: the page mounts `<ReflectionCanvas />` bare (`:208`) and
-`ReflectionCanvas.tsx:245-247` defaults `background` to `"blank"`. **No schema, worker
+Missing piece: the page mounts `<ReflectionCanvas />` bare and
+`ReflectionCanvas.tsx` defaults `background` to `"blank"`. **No schema, worker
 or projection change is needed** — a prop pass and a canvas prop. Do not let this be
 scoped as a backend ticket.
 
@@ -138,7 +143,7 @@ Record it as Phase 2; do not let it leak into this fix.
 | --- | --- | --- |
 | `PEN_COLOR` | `#1A1D28` (unchanged) | 16.09:1 on `#FBFAF7`; 14.21:1 on `#EDE9E1` |
 
-Change the comment at `ReflectionCanvas.tsx:110` — it currently claims compositing that
+Change the comment at `ReflectionCanvas.tsx` — it currently claims compositing that
 does not exist. Replace with: *"near-black ink; the paper adapts to the theme, the ink
 does not, so the exported artefact matches what the client drew."*
 
@@ -177,7 +182,7 @@ Splitting `drawPaper` out is not cosmetic — §4 and §5 both need to call it o
 
 **The sheet stays paper in both themes. Dark mode dims the sheet, never inverts it.**
 
-Apply to the container (`:600-605`) so the sheet reads as an object on a surface:
+Apply to the container so the sheet reads as an object on a surface:
 
 ```tsx
 // light
@@ -208,7 +213,7 @@ if (stroke.tool === "eraser") {
 ```
 
 `renderStroke` needs the paper colour, so thread it through (`renderStroke(ctx, stroke, isDark)`)
-or resolve paper in `canvasUtils` from `isDark`. Keep `effectiveWidth` (`:361-370`)
+or resolve paper in `canvasUtils` from `isDark`. Keep `effectiveWidth`
 multiplying the eraser by 4 — an eraser being fat is right.
 
 Consequence to state in the commit: pre-existing stored strokes with
@@ -240,7 +245,7 @@ Raised after the first spec was issued, so it is deliberately **out of the runni
 The current run owes the six tests in §9; this adds a seventh if it is taken up.
 
 **The defect.** Paper, guide lines and ink all live on **one** canvas:
-`drawBackground` (`canvasUtils.ts:43-69`) fills the paper *and* strokes the rules/dots onto
+`drawBackground` (`canvasUtils.ts`) fills the paper *and* strokes the rules/dots onto
 it, then `redrawAll` draws strokes on top. So the eraser cannot distinguish "ink" from
 "printed rule" — `destination-out` cuts alpha through both, and my §4.1 fix paints flat
 paper over both. Either way, erasing across a ruled or dotted sheet leaves a paper-coloured
@@ -258,8 +263,8 @@ canvas). Then:
   real eraser (a rubber removes graphite, not the printed rule);
 - **§4.1's `isDark` threading through `renderStroke` becomes unnecessary.** The function
   keeps its current signature, and with it the three call sites that would otherwise have
-  to change together: `handlePointerDown` (`ReflectionCanvas.tsx:398`), `handlePointerMove`
-  (`:417`) and `redrawAll` (`canvasUtils.ts:141`). Threading a new parameter through those
+  to change together: `handlePointerDown` (`ReflectionCanvas.tsx`), `handlePointerMove`
+  (`handlePointerMove`) and `redrawAll` (`canvasUtils.ts`). Threading a new parameter through those
   three is the most likely way this change breaks — a missed call site means the initial
   pointer dot paints the wrong colour — so removing the need to touch them is a real risk
   reduction, not just elegance;
@@ -281,12 +286,12 @@ digitised record. A known and stated limitation is acceptable; an unstated one i
 
 ## 5. The empty canvas
 
-Today the empty state is *only* the status-bar string at `:740-744`, which reads as a
+Today the empty state is *only* the status-bar string, which reads as a
 flush-left caption and, on the signed link, appears one line under the clinician's
 prompt. Replace the caption and add a real, non-exporting overlay.
 
 **5.1 Overlay (never canvas pixels).** Anything drawn into the canvas is exported to the
-clinician. This is a DOM layer inside the drawing container (`:711-716`):
+clinician. This is a DOM layer inside the drawing container:
 
 ```tsx
 {historyLen === 0 && (
@@ -322,28 +327,28 @@ On the signed link the keyboard hint is wrong (iPad has no ⌘Z) — pass
 device is worse than no hint.
 
 **5.3 Do not put the reflection prompt inside the canvas area.** The signed-link page
-already renders it above (`app/practice/[sessionId]/page.tsx:203-207`). Duplicating it
+already renders it above (`app/practice/[sessionId]/page.tsx`). Duplicating it
 in the overlay would compete with the client's own first stroke.
 
 ---
 
 ## 6. Toolbar — the findability problem (this is a real bug, not taste)
 
-The operator's icon list is **diagnostic**. Reading `:620-707` against it:
+The operator's icon list is **diagnostic**. Reading the toolbar against it:
 
 | Operator saw | Actual control | Line |
 | --- | --- | --- |
-| "pen" | `Pen` icon — ✅ the one control that reads correctly | `:626` |
-| "a diamond" | `Eraser` (`lucide-react` `Eraser` at 16 px) — **the operator could not identify the eraser at all** | `:635` |
-| "two swatches" | stroke-width dots #1 and #2 (`h-1.5 w-1.5`, `h-2.5 w-2.5`) | `:649-653` |
-| "a dotted circle" | stroke-width dot #3 (`h-4 w-4`) | `:652` |
-| "a black square" | the **text glyph** `"□"` for Blank | `canvasTypes.ts:40` |
-| "hamburger" | the **text glyph** `"≡"` for Lined | `canvasTypes.ts:41` |
-| "ellipsis" | the **text glyph** `"⋯"` for Dotted | `canvasTypes.ts:42` |
-| undo / redo / trash | `Undo2`, `Redo2`, `Trash2` — ✅ read correctly | `:680-701` |
+| "pen" | `Pen` icon — ✅ the one control that reads correctly | `Pen` button |
+| "a diamond" | `Eraser` (`lucide-react` `Eraser` at 16 px) — **the operator could not identify the eraser at all** | `Eraser` button |
+| "two swatches" | stroke-width dots #1 and #2 (`h-1.5 w-1.5`, `h-2.5 w-2.5`) | the three width buttons |
+| "a dotted circle" | stroke-width dot #3 (`h-4 w-4`) | the widest width button |
+| "a black square" | the **text glyph** `"□"` for Blank | `canvasTypes.ts` |
+| "hamburger" | the **text glyph** `"≡"` for Lined | `canvasTypes.ts` |
+| "ellipsis" | the **text glyph** `"⋯"` for Dotted | `canvasTypes.ts` |
+| undo / redo / trash | `Undo2`, `Redo2`, `Trash2` — ✅ read correctly | `Undo2` / `Redo2` / `Trash2` buttons |
 
 Everything the operator could not name is either a bare text glyph (`□ ≡ ⋯`, rendered in
-`font-mono` at `text-xs`, `:668`) or a plain dot. `≡` genuinely looks like a hamburger
+`font-mono` at `text-xs`) or a plain dot. `≡` genuinely looks like a hamburger
 menu and `⋯` genuinely looks like an overflow menu — the operator was not misreading,
 the icons are wrong. And the eraser — the control the operator explicitly asked about —
 is unidentifiable.
@@ -383,19 +388,18 @@ is unidentifiable.
    and keep `aria-label` on every button regardless. Group wrappers get
    `role="group" aria-label="Width"` etc.
 
-4. **Tooltips via `title` already exist** (`:129-131`) — keep them, and make sure the
+4. **Tooltips via `title` already exist** — keep them, and make sure the
    label text is the plain tool name ("Eraser", not "Tool: eraser").
 
-5. **Disabled-history affordance.** Undo/Redo currently render `disabled:opacity-35`
-   (`:137`). At 35% on a translucent toolbed they read as missing, not disabled. Raise
+5. **Disabled-history affordance.** Undo/Redo currently render `disabled:opacity-35`. At 35% on a translucent toolbed they read as missing, not disabled. Raise
    to `disabled:opacity-45` and add `aria-disabled`.
 
-6. **`aria-pressed` is already set** for active tools (`:131`) — good, keep it, and make
+6. **`aria-pressed` is already set** for active tools — good, keep it, and make
    sure the *paper* toggles report `aria-pressed` too (they do, same primitive).
 
 ### 6.2 Keyboard
 
-`:509-519` binds ⌘Z / ⌘⇧Z only when `e.target` is `document.body` or
+The keyboard handler binds ⌘Z / ⌘⇧Z only when `e.target` is `document.body` or
 `document.documentElement`. That check excludes the common case where focus sits on a
 toolbar button — so undo silently does nothing right after clicking Undo. Broaden to
 "not inside a text input / textarea / contenteditable":
@@ -418,11 +422,11 @@ if (t?.closest("input, textarea, [contenteditable='true']")) return;
    );
    ```
 
-   Note the existing deliberate contract at `:249-254`: `initialData` is read once at
+   Note the existing deliberate contract in the state initialisers: `initialData` is read once at
    mount. `defaultBackground` follows the same rule — it is a seed, not a controlled
    prop. Do not add a sync effect.
 
-2. `app/practice/[sessionId]/page.tsx:208` — pass it:
+2. `app/practice/[sessionId]/page.tsx` — pass it:
 
    ```tsx
    const suggested = practiceTask.suggested_background;
@@ -441,9 +445,9 @@ if (t?.closest("input, textarea, [contenteditable='true']")) return;
 
 ## 8. Accessibility
 
-- Canvas has `aria-label` already (`:719`). Extend it to name the paper:
+- Canvas has `aria-label` already. Extend it to name the paper:
   `"Reflection canvas — ruled paper. Draw with a stylus, finger, or mouse."`
-- The toolbar is `role="toolbar"` (`:609`) — add `aria-orientation="horizontal"` and
+- The toolbar is `role="toolbar"` — add `aria-orientation="horizontal"` and
   implement roving tabindex (arrow keys move between controls) or accept Tab-per-control;
   with eleven controls Tab is tolerable, roving is better.
 - Paper colour must never be the only signal: the active paper toggle carries
@@ -468,7 +472,7 @@ if (t?.closest("input, textarea, [contenteditable='true']")) return;
 ## 10. Out of scope
 
 - Night-paper (inverted) mode — Phase 2, per-canvas, hex persisted in `canvas_data`.
-- Palm rejection heuristics (`:376-379`), pen pressure, stroke smoothing.
+- Palm rejection heuristics, pen pressure, stroke smoothing.
 - Redesigning the stroke-width model; three widths stay.
 - Deleting the `Line`/guide spacing constants.
 
