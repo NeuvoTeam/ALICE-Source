@@ -1,0 +1,265 @@
+==============================================================================
+ALICE card t_b32676c6 — rank 8l: archive the last orphan
+hooks/use-clinical-workspace.ts -> archive/2026-10-10-unreferenced-ui-kit/hooks/
+generated 2026-10-10 21:33:09 +1100 on branch alan
+==============================================================================
+
+## 1. the commit
+aa40377 chore(archive): archive the last orphan — the zero-importer workspace hook (lint 8l)
+300ec86 chore(lint): remove the four dead rule downgrades — restore real severity (lint 8k)
+587776b chore(archive): archive the three orphaned kit files and record the orphaned embla dependency (lint 8j)
+
+commit aa403777ce56eca28955236646994b5d827bc832
+Author: AChoy <choy.apy@gmail.com>
+Date:   Sat Oct 10 21:30:52 2026 +1100
+
+    chore(archive): archive the last orphan — the zero-importer workspace hook (lint 8l)
+    
+    Card t_b32676c6. Operator-approved ("Yes — archive hooks/use-clinical-workspace.ts").
+    
+    The file (register row B15) is moved, never deleted, to
+    archive/2026-10-10-unreferenced-ui-kit/hooks/use-clinical-workspace.ts with `git mv`, so git records
+    it as a 100% rename: the index blob 63f91d0b is unchanged, the archived copy is 8 129 bytes /
+    SHA-256 773ea3fb…, and the live path is gone.
+    
+    It is unreferenced and always was — `git log -S` over the path and the symbol on every branch lists
+    only b79c368, the commit that added it, and the live workspace model is stores/useClientNavStore.ts.
+    The per-pattern sweep (basename case-insensitive, static @/hooks and relative imports, require(),
+    dynamic import() / next/dynamic, the four barrels, tests/, scripts/, workers/, tsconfig.json,
+    components.json, eslint.config.mjs, next.config.mjs, postcss.config.mjs, package.json, the Tailwind
+    @source globs, every Markdown file) returns only prose: AGENTS.md:35 (not edited — immutable path in
+    this workspace's contract, flagged for the operator), documentation.md, the stale eslint.config.mjs
+    comment corrected here, and the file itself.
+    
+    Lint bookkeeping, in the same commit: `npm run lint` goes 117 → 116 matched files, 0 errors / 4 → 3
+    warnings, exit 0. The removed finding is exactly hooks/use-clinical-workspace.ts:40
+    (react-hooks/set-state-in-effect); the three survivors are unchanged at the same lines
+    (DynamicTaskForm.tsx:404, :529; vignette-generator.tsx:177) — nothing relocated — and the linted-file
+    list differs by exactly one removal and zero additions. The exception's comment in eslint.config.mjs
+    is corrected from "4 sites across 3 files" to "3 sites across 2 files"; the downgrade itself stays,
+    because three sites remain.
+    
+    Inert, re-proved: the emitted production stylesheet is byte-identical (both chunks sha256-equal —
+    037.tcc7jhmtv.css 3 628 bytes, 0vlgq2asp-14v.css 139 022 bytes; 1 289 selectors, 0 removed, 0 added),
+    and the cross-check of 3 472 class candidates in the 5 352 string literals of the 116 live files
+    finds 0 whose rule existed before and is missing after. Route list byte-identical (13 routes, md5
+    bab5456e…), npx tsc --noEmit exit 0, npm test 62/62 (35 worker + 12 PDF + 15 hydration, the fifteen
+    hydration checks named), npm run build exit 0, npm run docs:check exit 0.
+    
+    documentation.md carries the move in §2 (hooks/ row), §8.3, §13.3 (both rows), §10.2, §11.1 and a
+    new rank-8l record in the §13.4 lint-gate row; the archive README carries the fourth table row, the
+    restore command and the measured evidence.
+    
+    Recorded, not actioned: archiving the hook leaves lib/clinical-hierarchy.ts reachable only from
+    lib/vignette-restore.ts, which itself has no importer — an unreachable pair, both still live paths.
+
+M	archive/2026-10-10-unreferenced-ui-kit/README.md
+R100	hooks/use-clinical-workspace.ts	archive/2026-10-10-unreferenced-ui-kit/hooks/use-clinical-workspace.ts
+M	documentation.md
+M	eslint.config.mjs
+
+full hash: aa403777ce56eca28955236646994b5d827bc832   parent: 300ec86f9908166c4c286dd5547eae442a9d3fc2
+origin/alan behind: 25 ahead; nothing pushed
+
+## 2. git status --porcelain (only untracked evidence dirs remain)
+?? debug_reports/GATES_8l_20261010.txt
+?? debug_reports/agy_8h_run.txt
+?? debug_reports/agy_8k_run.txt
+?? debug_reports/agy_8l_run.txt
+?? debug_reports/build_8g_final_20261010.txt
+?? debug_reports/build_8j_committed_20261010.txt
+?? debug_reports/build_8k_20261010.txt
+?? debug_reports/build_8k_final_20261010.txt
+?? debug_reports/build_8k_postcommit_20261010.txt
+?? debug_reports/build_8l_after_20261010.txt
+?? debug_reports/build_8l_before_20261010.txt
+?? debug_reports/build_8l_postcommit_20261010.txt
+?? debug_reports/commit_8j_output.txt
+?? debug_reports/commit_8k_amend_output.txt
+?? debug_reports/commit_8k_output.txt
+?? debug_reports/commit_8l_output.txt
+?? debug_reports/cssdiff_8l_20261010.txt
+?? debug_reports/docscheck_8l_precommit_20261010.txt
+?? debug_reports/draft_8k_docs_20261010.md
+?? debug_reports/gates_8k_20261010.txt
+?? debug_reports/lint_8k_after.json
+?? debug_reports/lint_8k_before.json
+?? debug_reports/lint_8k_final.json
+?? debug_reports/lint_8k_postcommit.json
+?? debug_reports/lint_8k_probe.json
+?? debug_reports/lint_8l_after.err
+?? debug_reports/lint_8l_after.json
+?? debug_reports/lint_8l_before.err
+?? debug_reports/lint_8l_before.json
+?? debug_reports/lint_8l_before_after_summary_20261010.txt
+?? debug_reports/lint_8l_before_summary_20261010.txt
+?? debug_reports/postcommit_8j_20261010.txt
+?? debug_reports/postcommit_8k_20261010.txt
+?? debug_reports/postcommit_8l_20261010.txt
+?? debug_reports/pre_8l_checks_20261010.txt
+?? debug_reports/printcfg_8k_probe.json
+?? debug_reports/printcfg_8k_real.json
+?? debug_reports/printcfg_8k_real_after.json
+?? debug_reports/proof_8l_b34_20261010.txt
+?? debug_reports/proof_8l_references_20261010.txt
+?? debug_reports/routes_8k_after_20261010.txt
+?? debug_reports/routes_8k_diff_20261010.txt
+?? debug_reports/routes_8k_final_20261010.txt
+?? debug_reports/routes_8k_postcommit_20261010.txt
+?? debug_reports/test_8k_20261010.txt
+?? debug_reports/test_8l_20261010.txt
+?? debug_reports/tsc_8l_20261010.txt
+?? scratch/
+--- tracked (non-untracked) entries: ---
+(none — no unstaged or staged change)
+
+## 3. byte-identity / rename proof
+$ git diff-tree --no-commit-id --name-status -r -M HEAD   (the rename, as git records it)
+M	archive/2026-10-10-unreferenced-ui-kit/README.md
+R100	hooks/use-clinical-workspace.ts	archive/2026-10-10-unreferenced-ui-kit/hooks/use-clinical-workspace.ts
+M	documentation.md
+M	eslint.config.mjs
+$ git ls-files -s <archived path>
+100644 63f91d0b8e3578ea02f92edb8303688bcd07d812 0	archive/2026-10-10-unreferenced-ui-kit/hooks/use-clinical-workspace.ts
+$ git rev-parse 300ec86:hooks/use-clinical-workspace.ts   (blob at the last commit that held it live)
+63f91d0b8e3578ea02f92edb8303688bcd07d812
+$ git rev-parse 3ade9ba:hooks/use-clinical-workspace.ts   (blob at the commit that last modified it)
+63f91d0b8e3578ea02f92edb8303688bcd07d812
+$ sha256sum <archived file> ; git cat-file blob 300ec86:... | sha256sum ; byte counts
+773ea3fbc31dcc19c9a313b6b3f2a775e918ec8341a9840677cdb791eecc7ca2 *archive/2026-10-10-unreferenced-ui-kit/hooks/use-clinical-workspace.ts
+773ea3fbc31dcc19c9a313b6b3f2a775e918ec8341a9840677cdb791eecc7ca2 *-
+archived bytes: 8129
+blob bytes:     8129
+$ live path gone:
+total 16
+drwxr-xr-x 1 kuroi 197615    0 Oct 10 21:13 .
+drwxr-xr-x 1 kuroi 197615    0 Oct 10 21:32 ..
+-rw-r--r-- 1 kuroi 197615 4327 Oct 10 17:23 use-toast.ts
+
+## 4. the reference proof (summary; raw in proof_8l_references_20261010.txt + proof_8l_b34_20261010.txt)
+A. basename + symbol case-insensitive, every tracked text extension: hits only in
+   AGENTS.md:35, documentation.md prose, eslint.config.mjs's (then-stale) comment and the file itself.
+B. static @/hooks import        : no match
+   relative ./ ../ import       : no match
+   require(...)                 : no match
+   dynamic import()             : no match
+   next/dynamic consumers       : components/main-content.tsx:12 only — it names no hook
+   barrels (4 found)            : components/canvas/index.ts, components/tasks/index.ts,
+                                  types/index.ts, workers/mcp-gateway/src/index.ts — none reaches hooks/
+C. config: tsconfig.json, components.json, next.config.mjs, postcss.config.mjs, package.json,
+   package-lock.json, ai-config/mcp.json, .cursor/config.json, wrangler.jsonc : no match
+   eslint.config.mjs            : its comment (corrected in this commit)
+D. Tailwind @source globs       : ../app ../components ../lib ../hooks ../stores (the hook was inside ../hooks)
+E. Markdown                     : AGENTS.md:35, documentation.md (all updated except AGENTS.md — see §8)
+F. git history, all branches    : git log -S over the path and the symbol lists ONLY b79c368 (the add)
+                                  -> the file never had an importer in any commit on any branch
+
+## 5. lint before/after
+$ npx eslint . -f json  (before: debug_reports/lint_8l_before.json)
+=== debug_reports/lint_8l_before.json ===
+matched files: 117  errors: 0  warnings: 4  problems: 4
+by rule:
+   4  react-hooks/set-state-in-effect
+findings:
+   warn components/tasks/DynamicTaskForm.tsx:404:7  [react-hooks/set-state-in-effect]
+   warn components/tasks/DynamicTaskForm.tsx:529:5  [react-hooks/set-state-in-effect]
+   warn components/vignette-generator.tsx:177:7  [react-hooks/set-state-in-effect]
+   warn hooks/use-clinical-workspace.ts:40:5  [react-hooks/set-state-in-effect]
+
+=== debug_reports/lint_8l_after.json ===
+matched files: 116  errors: 0  warnings: 3  problems: 3
+$ npx eslint . -f json  (after: debug_reports/lint_8l_after.json)
+by rule:
+   3  react-hooks/set-state-in-effect
+findings:
+   warn components/tasks/DynamicTaskForm.tsx:404:7  [react-hooks/set-state-in-effect]
+   warn components/tasks/DynamicTaskForm.tsx:529:5  [react-hooks/set-state-in-effect]
+   warn components/vignette-generator.tsx:177:7  [react-hooks/set-state-in-effect]
+
+linted-file list diff (117 -> 116):
+91d90
+< D:/Work/Neuvo/ALICE/Source/hooks/use-clinical-workspace.ts
+
+## 6. stylesheet + route cross-check
+=== selector counts (individual, commas split) ===
+before: 1289
+after : 1289
+removed: 0   added: 0
+
+=== removed selectors (present before, missing after) ===
+
+=== added selectors ===
+
+=== live-source cross-check ===
+live source files scanned : 116
+string literals scanned   : 5352
+distinct class candidates : 3472
+candidates with a rule BEFORE: 724
+candidates whose rule existed BEFORE and is MISSING AFTER: 0
+
+css chunk sha256, before vs post-commit build:
+9b02264557c08f3fda4db103350e2e8909f26163072b15033dcbaac360abe887 *scratch/css_8l/before/037.tcc7jhmtv.css
+32032bb3f94e34a7060eab20ab6c5fbb549827510a7b710b4510edf1d8e9099d *scratch/css_8l/before/0vlgq2asp-14v.css
+9b02264557c08f3fda4db103350e2e8909f26163072b15033dcbaac360abe887 *scratch/css_8l/postcommit/037.tcc7jhmtv.css
+32032bb3f94e34a7060eab20ab6c5fbb549827510a7b710b4510edf1d8e9099d *scratch/css_8l/postcommit/0vlgq2asp-14v.css
+css chunk bytes: 142650 (before) vs 142650 (after)
+
+route list md5 (rows extraction, identical in every prior card):
+43c6d3f002ca504660b908f8420b7231 *scratch/css_8l/routes_before.txt
+43c6d3f002ca504660b908f8420b7231 *scratch/css_8l/routes_postcommit.txt
+route rows:
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze/session
+├ ƒ /cases/[caseId]/sessions/[sessionId]
+├ ○ /client-login
+├ ○ /dashboard
+├ ○ /forgot-password
+├ ƒ /homework/[sessionId]
+├ ○ /login
+├ ƒ /practice/[sessionId]
+├ ƒ /practitioner/tasks/[id]/review
+├ ○ /signup
+└ ○ /test-auth
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+## 7. raw gates on the committed tree
+$ grep -E 'exit=' debug_reports/postcommit_8l_20261010.txt
+exit=0
+exit=0
+exit=0
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+exit=0
+$ npm run build (post-commit): exit recorded below, route list above
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+$ npm test : the fifteen hydration checks are named in debug_reports/postcommit_8l_20261010.txt
+
+## 8. found but NOT actioned
+a. AGENTS.md:35 still names hooks/use-clinical-workspace.ts in its state row. NOT edited:
+   AGENTS.md is an immutable path in this workspace's contract (.hermes.md section 4). Operator-side fix.
+b. Archiving the hook leaves lib/clinical-hierarchy.ts reachable only from lib/vignette-restore.ts,
+   which itself has no importer — an unreachable pair. Both are still live paths; neither was moved
+   (the operator approved one file). Recorded in documentation.md section 13.3.
+c. documentation.md section 13.3's 'Unused components' row is stale: it calls
+   components/clinical-folder-tree.tsx 'the only unreferenced component left', but that file does not
+   exist in the tree (it was deleted in 2a4b740) — pre-existing wording, out of this card's scope,
+   recorded here rather than rewritten.
+d. The agy run was cut off by the tool's 420 s bound after it had written its three files and before
+   it reported; its edits were re-derived from the brief and the tree, one defect (an over-escaped
+   apostrophe in section 8.3) was corrected, the mixed line endings it left in eslint.config.mjs and
+   the README were renormalised to CRLF, and the README edits it did not reach were completed.
+
+## 9. attribution
+agy (Antigravity CLI, Gemini 3.1 Pro (High) — no Claude engine) authored: the eslint.config.mjs
+comment, the six documentation.md prose edits (sections 2, 8.3, 10.2, 11.1 and the two section 13.3
+rows) and the archive README's fourth table row and note. Everything else — the brief, the byte-
+identical move, the baselines, the rank-8l record in section 13.4, the README evidence block, every
+gate and the commit — is the reviewing agent's.

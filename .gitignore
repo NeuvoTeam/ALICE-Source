@@ -29,3 +29,6 @@ tsconfig.tsbuildinfo
 
 # Local junctions/sync
 .obsidian_sync/
+
+# Local measurement harnesses and throwaway bundles (never tracked)
+scratch/

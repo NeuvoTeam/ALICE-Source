@@ -1,0 +1,172 @@
+# ALICE lint rank 8k (card t_0c86d33b) — raw gate output
+# remove the four dead rule downgrades (react-hooks/refs, react-hooks/purity,
+# react/no-unescaped-entities, @typescript-eslint/no-explicit-any) and restore real severity
+# branch alan, pre-edit HEAD = 587776b (lint 8j), final commit 300ec86 (see section 8 for the two amends)
+
+## 1. baseline — tree 587776b, BEFORE the config edit
+$ npx eslint . -f json -o debug_reports/lint_8k_before.json
+eslint exit = 0
+files linted : 117
+problems     : 4 = errors 0 + warnings 4
+--- per rule ---
+  4 react-hooks/set-state-in-effect
+       components/tasks/DynamicTaskForm.tsx:404
+       components/tasks/DynamicTaskForm.tsx:529
+       components/vignette-generator.tsx:177
+       hooks/use-clinical-workspace.ts:40
+   (the four rules this card removes report ZERO findings on this tree)
+
+$ npm run lint
+✖ 4 problems (0 errors, 4 warnings)
+npm run lint exit = 0
+
+## 2. restored severity, BY MEASUREMENT (acceptance criterion 2)
+$ npx eslint --config scratch/probe-8k.config.mjs --print-config components/vignette-generator.tsx > debug_reports/printcfg_8k_probe.json
+$ npx eslint --print-config components/vignette-generator.tsx > debug_reports/printcfg_8k_real.json          # pre-edit config (exception present)
+$ npx eslint --print-config components/vignette-generator.tsx > debug_reports/printcfg_8k_real_after.json    # committed config (exception gone)
+
+rule                                 | committed config | pre-edit config | probe (exceptions stripped)
+-------------------------------------+------------------+-----------------+----------------------------
+react-hooks/refs                     | 2 (error)        | 1 (warn)        | 2 (error)
+react-hooks/purity                   | 2 (error)        | 1 (warn)        | 2 (error)
+react/no-unescaped-entities          | 2 (error)        | 1 (warn)        | 2 (error)
+@typescript-eslint/no-explicit-any   | 2 (error)        | 1 (warn)        | 2 (error)
+react-hooks/set-state-in-effect      | 1 (warn)         | 1 (warn)        | 2 (error)   <- KEPT, still live (4 sites)
+import/no-anonymous-default-export   | 1 (warn)         | 1 (warn)        | 1 (warn)    <- n/a for this .tsx (scoped globs)
+@typescript-eslint/ban-ts-comment    | 2 (error)        | 2 (error)       | 2 (error)   <- n/a for this .tsx (scoped glob)
+
+-> all four go 1 -> 2: every removal restores a STRICTER severity. None is cosmetic.
+   The committed config proves it directly (column 1), not by inference from the probe.
+
+## 3. the scoped overrides are LIVE, not dead (measured on their own globs)
+$ npx eslint --config scratch/probe-8k.config.mjs --print-config backend/CloudFlare.js
+   import/no-anonymous-default-export : probe [1]        | real [1,{"allowObject":true}]
+   @typescript-eslint/ban-ts-comment  : probe [2]        | real [0]
+$ npx eslint --config scratch/probe-8k.config.mjs --print-config workers/mcp-gateway/src/index.ts
+   import/no-anonymous-default-export : probe [1]        | real [1,{"allowObject":true}]
+   @typescript-eslint/ban-ts-comment  : probe [2]        | real [2]
+
+$ npx eslint --config scratch/probe-8k.config.mjs -f json -o debug_reports/lint_8k_probe.json
+   exit = 1
+   files linted : 117
+   problems     : 7 = errors 5 + warnings 2
+     4 react-hooks/set-state-in-effect   (as ERRORs only because the probe also strips that exception)
+     2 import/no-anonymous-default-export  backend/CloudFlare.js:190, workers/mcp-gateway/src/index.ts:12  (warn)
+     1 @typescript-eslint/ban-ts-comment   backend/CloudFlare.js:1                                          (error)
+   NOTE: ZERO findings come from the four rules this card deletes — the positive proof they are dead.
+   Both scoped overrides therefore STAY: each still suppresses real live findings.
+
+## 4. exceptions audit — nothing left is dead
+| exception | state | measured sites/findings |
+| --- | --- | --- |
+| react-hooks/set-state-in-effect -> warn | LIVE | 4 sites / 3 files (B11, B12, B13, B15) |
+| import/no-anonymous-default-export [warn, allowObject] for backend/**/*.js + workers/**/*.ts | LIVE | suppresses 2 warnings |
+| @typescript-eslint/ban-ts-comment off under backend/ | LIVE | suppresses 1 error |
+| globalIgnores .next/** | LIVE | 688 lintable files under it |
+| globalIgnores node_modules/** | LIVE | 31730 |
+| globalIgnores backend/.wrangler/** | LIVE | 3 |
+| globalIgnores backend/deployed/** | LIVE | 1 |
+| globalIgnores debug_reports/** | LIVE | 2 |
+| globalIgnores .obsidian_sync/** | LIVE | 0 files on disk (kept: it is the documentation.md sync target) |
+| globalIgnores scratch/** | LIVE | 57 |
+| globalIgnores next-env.d.ts | LIVE | 1 |
+| globalIgnores archive/** | LIVE | 3 |
+exception block: 5 rule-level downgrades -> 1. Config total: 7 documented exceptions -> 3.
+
+## 5. gates on the committed tree (da00e38)
+$ npx eslint . -f json -o debug_reports/lint_8k_postcommit.json
+   exit=0   files linted: 117   problems: 4 = errors 0 + warnings 4   (all four set-state-in-effect)
+$ npm run lint               -> ✖ 4 problems (0 errors, 4 warnings)          exit=0     (UNCHANGED: 0/4 before, 0/4 after)
+$ npx tsc --noEmit           -> exit=0
+$ npm test                   -> 35/35 checks passed / 12/12 checks passed / 15/15 checks passed   (62/62)
+   hydration checks named (tests/hydration-guard.test.mjs):
+     1 guard: wait on the stub, keep when latched, hydrate when the payload lands
+     2 race: the GET /client/:id stub never latches
+     3 race: the payload rehydrates the notes, the analysis and Phase 3
+     4 later write cannot reset the phase or stomp edits
+     5 empty session: hydration completes on Phase 1
+     6 blur-save after Next keeps Phase 2 and the typed notes
+     7 Adjust -> Back -> blur-save stays on Phase 1 with the edits
+     8 placeholder advisory survives a later write
+     9 no advisory for a real formulation
+    10 failed GET /sessions/:id leaves an empty Phase 1
+    11 remount hydrates immediately
+    12 re-selecting the same session leaves the clinician where they were
+    13 losing the session clears local state and re-arms the latch
+    14 the cleared latch hydrates a returning session
+    15 counter-example: the pre-c902331 effect stuck on an empty Phase 1
+$ npm run build              -> exit=0
+$ sed -n '/^Route (app)/,/^└/p' build log > debug_reports/routes_8k_postcommit_20261010.txt
+   md5sum bab5456e751481302dfcd14942ada88c   (13 routes, identical to rank 8j)
+   diff vs debug_reports/routes_8j_after_20261010.txt -> exit 0 (byte-identical)
+$ npm run docs:check         -> "docs:check — ok (no behaviour-affecting path changed)."   exit=0
+
+## 6. git
+$ git show --stat --name-status da00e38
+   da00e38 chore(lint): remove the four dead rule downgrades — restore real severity (lint 8k)
+   parent 587776b, 2 files changed, 25 insertions(+), 27 deletions(-)
+     M eslint.config.mjs
+     M documentation.md
+$ git status -sb            -> ## alan...origin/alan [ahead 24]      (NOTHING PUSHED)
+$ git cat-file blob HEAD:eslint.config.mjs | eol check -> 85 lines, all LF, 0 CRLF, 4701 bytes
+$ next-env.d.ts: the build rewrote it, so it was restored byte-exactly from the HEAD blob
+   git cat-file blob HEAD:next-env.d.ts > next-env.d.ts
+   sha256 7ad303e40d4fddf44f156129e397511953a71481c5cfd86b1862649aaaf240cc (both sides)
+   git diff --exit-code -- next-env.d.ts -> 0 (no content change); `git status` still lists it
+   as stat-dirty after the build touched it, and it is NOT in the commit.
+
+## 7. delegation
+agy run log: debug_reports/agy_8k_run.txt  (exit 0)
+   engine: Antigravity CLI, `Gemini 3.1 Pro (High)` (gemini-3.1-pro-high) — NO Claude engine
+   authored: the eslint.config.mjs edit (the four deletions + the 11-line removal record)
+             and the draft documentation text (debug_reports/draft_8k_docs_20261010.md)
+   brief:   C:\Users\kuroi\AppData\Local\hermes\profiles\kuro\cache\scratch\brief_8k_rank8k.md
+   reviewing agent: wrote the brief, built the probe config and measured all four restored
+   severities before the edit, reviewed the hunk line by line, corrected two draft defects
+   (a garbled replacement sentence for the §11.1 bullet, a boilerplate reason column in the
+   exceptions table), applied the documentation.md text, ran every gate and made the commit.
+
+## 8. two amends to the single commit, recorded for honesty
+   da00e38 (first commit) -> 09cd9f1 -> 300ec86 (HEAD, parent 587776b). All three carry the same
+   two files and the SAME eslint.config.mjs blob (7d4c6096864edb2aacdd51ebec677aaf30ca350e), so
+   every gate in this file describes the same source tree.
+   - amend #1 (da00e38 -> 09cd9f1): wording only. A clumsy parenthetical in the section 13.4
+     rank-8k record was reworded to name the pre-edit config and the committed-config
+     measurement directly.
+   - amend #2 (09cd9f1 -> 300ec86): DEFECT FIX. The rank-8k record had been written with literal
+     backslash-escaped quotes (`\"Approved\"` — 8 occurrences, 4 pairs) instead of plain quotes,
+     which would have rendered literally in Obsidian. All eight were replaced with `"` and the
+     count re-verified at 0 (`scratch/fix-escq.mjs`; 12 remaining backslashes in the file are the
+     pre-existing markdown `\|` table-cell escapes, all in sections 5/6).
+   - `git diff --name-status 09cd9f1 300ec86` -> M documentation.md (nothing else).
+
+## 9. final gate run on HEAD 300ec86 (after amend #2)
+$ npx eslint . -f json   -> exit 0, 117 files, 4 problems = 0 errors / 4 warnings (`lint_8k_final.json`)
+$ npm run lint           -> ✖ 4 problems (0 errors, 4 warnings)   exit 0
+$ npx tsc --noEmit       -> exit 0
+$ npm test               -> 35/35 / 12/12 / 15/15 = 62/62
+$ npm run build          -> exit 0 (`build_8k_final_20261010.txt`)
+$ routes                 -> md5 bab5456e751481302dfcd14942ada88c, 13 routes, byte-identical to
+                            rank 8j (`routes_8k_final_20261010.txt`, diff exit 0)
+$ npm run docs:check     -> ok, exit 0
+$ next-env.d.ts          -> restored from the HEAD blob, sha256 7ad303e4… on both sides, not in the commit
+$ git status -sb         -> ## alan...origin/alan [ahead 24]      (nothing pushed)
+=== amend delta (da00e38 -> 09cd9f1) ===
+M	documentation.md
+eslint.config.mjs blob: da00e38=7d4c6096864edb2aacdd51ebec677aaf30ca350e HEAD=7d4c6096864edb2aacdd51ebec677aaf30ca350e
+=== gates re-run on the amended commit 09cd9f1 ===
+eslint exit=0
+files linted : 117
+problems     : 4 = errors 0 + warnings 4
+--- per rule ---
+  4 react-hooks/set-state-in-effect
+       components/tasks/DynamicTaskForm.tsx:404
+       components/tasks/DynamicTaskForm.tsx:529
+       components/vignette-generator.tsx:177
+       hooks/use-clinical-workspace.ts:40
+tsc exit=0
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+test exit=0
+ M next-env.d.ts

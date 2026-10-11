@@ -1,0 +1,63 @@
+# ALICE rank 8j (card t_09ae9f3d) — gates RE-RUN ON THE COMMITTED TREE (commit 587776b)
+2026-10-10T20:43:16+11:00
+
+## git log --oneline --name-status -1
+587776b chore(archive): archive the three orphaned kit files and record the orphaned embla dependency (lint 8j)
+A	archive/2026-10-10-unreferenced-ui-kit/README.md
+R100	components/ui/skeleton.tsx	archive/2026-10-10-unreferenced-ui-kit/components/ui/skeleton.tsx
+R100	components/ui/tooltip.tsx	archive/2026-10-10-unreferenced-ui-kit/components/ui/tooltip.tsx
+R100	hooks/use-mobile.ts	archive/2026-10-10-unreferenced-ui-kit/hooks/use-mobile.ts
+A	debug_reports/agy_8j_readme_run.txt
+A	debug_reports/agy_8j_run.txt
+A	debug_reports/build_8j_after_20261010.txt
+A	debug_reports/build_8j_before_20261010.txt
+A	debug_reports/build_8j_before_probe_20261010.txt
+A	debug_reports/css_8j_delta_20261010.txt
+A	debug_reports/gates_8j_20261010.txt
+A	debug_reports/lint_8j_after_20261010.json
+A	debug_reports/lint_8j_before_20261010.json
+A	debug_reports/routes_8j_after_20261010.txt
+A	debug_reports/routes_8j_diff_20261010.txt
+A	debug_reports/test_8j_20261010.txt
+M	documentation.md
+M	eslint.config.mjs
+M	tsconfig.json
+
+## git status --porcelain
+?? debug_reports/agy_8h_run.txt
+?? debug_reports/build_8g_final_20261010.txt
+?? debug_reports/commit_8j_output.txt
+?? debug_reports/postcommit_8j_20261010.txt
+?? scratch/
+
+## npx tsc --noEmit
+exit=0
+
+## npm run lint (eslint . -f json)
+eslint exit=0
+files linted: 117
+errors: 0
+warnings: 4
+files with findings: 3
+  components/tasks/DynamicTaskForm.tsx  err 0 warn 2  [react-hooks/set-state-in-effect, react-hooks/set-state-in-effect]
+  components/vignette-generator.tsx  err 0 warn 1  [react-hooks/set-state-in-effect]
+  hooks/use-clinical-workspace.ts  err 0 warn 1  [react-hooks/set-state-in-effect]
+present? components/ui/skeleton.tsx -> false
+present? components/ui/tooltip.tsx -> false
+
+## npm test
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+
+## npm run build
+build exit=0
+bab5456e751481302dfcd14942ada88c *scratch/routes_8j_committed.txt
+routes identical to the pre-commit build
+CSS: 3628 .next/static/chunks/037.tcc7jhmtv.css
+139022 .next/static/chunks/0vlgq2asp-14v.css
+CSS total bytes: 142650
+
+## npm run docs:check
+docs:check — ok (no behaviour-affecting path changed).
+        1 file(s) copied.
