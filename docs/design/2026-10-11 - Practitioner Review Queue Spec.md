@@ -141,10 +141,18 @@ Tab = `role="tablist"` with `aria-selected`; count badges announce via `aria-lab
   of "newest first". A review queue is a fairness queue — the client who has waited
   longest is the one at risk of their next session arriving before their homework was
   read. Newest-first systematically starves the oldest.
-- All other tabs: newest first by `submitted_at`, tie-broken by `client.full_name`.
-- Secondary sort control (right-aligned, `Select`): `Waiting longest` · `Newest` ·
-  `Client A–Z`. Default is tab-dependent; the choice persists in the URL query so a
-  refresh keeps it.
+- All other tabs: newest first by `submitted_at`, tie-broken by `id`.
+- Secondary sort control (right-aligned, `Select`): `Waiting longest` · `Newest`.
+  Default is tab-dependent; the choice persists in the URL query so a refresh keeps it.
+- **`Client A–Z` was in this list and is deliberately withdrawn.** It asked for a keyset
+  over a resolved, non-unique join field (`client_name`), which is the worst case for
+  cursor pagination — and it was redundant: the default view already groups by client
+  under a client-name heading (§3.3), so a row-level client sort duplicated the grouping
+  and bought a new query-surface requirement for nothing. Group ordering is client-name
+  ascending, which the grouping provides inherently.
+- The tie-break is **`id`**, not `client.full_name`. The tie-break must be a real column:
+  stable, unique, and available in the row without a join — a resolved name is none of
+  those, and a keyset cannot order by it reliably.
 
 ### 3.3 Group header (client)
 
@@ -262,11 +270,22 @@ clinician gets feedback that they are on top of things, and it is cheap.
 
 ## 4. Browser tab / badge
 
-`Submissions` in the sidebar nav carries a count badge when pending > 0
+**This is new construction, not a change to existing chrome.** There is no sidebar or
+shell badge today — `components/ui/badge.tsx` is only the primitive and nothing in
+`components/` renders a pending count. The badge belongs to the **page run**, not to a
+shell refactor, and the count it needs already exists as `pending_total` (§6.1).
+
+The queue's nav entry carries a count badge when pending > 0
 (`bg-primary text-primary-foreground rounded-full px-1.5 text-xs`). Cap at `9+`. The
 badge is the *only* thing that makes the queue discoverable without a notification
 channel, so it must be present from day one — the operator's instinct ("no way to pull
 submissions up") is largely a **zero-surface-area** problem, and a badge is the fix.
+
+**Its source is `pending_total`, and it must be fetched where the badge renders.** Because
+the badge lives outside the queue page, wiring it to the list endpoint alone would leave
+it blank on every other page — inverting its purpose, since the moment it matters is when
+the clinician is *not* looking at the queue. Fetch it on mount via `count_only=1` (§6.1),
+which returns the counts without a row payload.
 
 ---
 
@@ -292,13 +311,20 @@ submissions up") is largely a **zero-surface-area** problem, and a badge is the 
 
 ```
 GET /tasks/submissions?status=<csv|in.(...)|omitted>&client_id=<uuid|omitted>
-                     &limit=<int, default 50, max 200>&cursor=<opaque>
-Authorization: clinician (requireUser). Scoping is mandatory and query-level: resolve the
-caller's clients from `clinician_clients` first, then filter `client_id=in.(...)`. Never
-fetch-then-filter — with the service-role key there is no RLS backstop, so a missing
-filter returns every clinician's rows *and* a cross-tenant count. See the scoping bullet
-under §6.1.
+                     &order=<asc|desc>&limit=<int, default 50, max 200>
+                     &cursor=<opaque>&count_only=<1|omitted>
 ```
+
+**Auth:** clinician session only — never token-free, never in `isPublicRoute`. Scoping is
+mandatory and query-level: resolve the caller's clients from `clinician_clients` first,
+then filter `client_id=in.(...)`. Never fetch-then-filter — with the service-role key
+there is no RLS backstop, so a missing filter returns every clinician's rows *and* a
+cross-tenant count. See the scoping bullets below.
+
+`count_only=1` returns `{ counts, pending_total }` with **no** `rows` and **no**
+`next_cursor`, and applies the **identical tenant resolution and predicate** as the list
+path: a count is data, and a cross-tenant count is a leak. It omits the row query, never
+the authorisation.
 
 Response:
 
@@ -313,6 +339,7 @@ Response:
     "session_id": null, "session_name": null
   }],
   "counts": { "pending_practitioner_review": 3, "draft": 4, "reviewed": 5, "approved": 3, "revision_requested": 1, "archived": 0 },
+  "pending_total": 3,
   "next_cursor": null
 }
 ```
@@ -333,8 +360,45 @@ Requirements the audit must confirm:
   The row must render an unknown wait ("submitted date unknown") rather than a
   fabricated one, and the FIFO sort must place nulls **last**, deterministically, not
   wherever the database happens to put them.
-- **`counts`** powers the tab badges and the nav badge. Computing them client-side from a
-  paginated list is wrong — a badge that says 3 because only 3 rows were fetched is a bug.
+- **`counts` and `pending_total` are different scopes, and the difference is load-bearing.**
+
+  | Field | Scope | Drives |
+  | --- | --- | --- |
+  | `counts` | tenant **and** the active `client_id` | the **tab badges** |
+  | `pending_total` | tenant **only** — never `client_id` | the **nav badge** (§4) |
+
+  `counts` must match the tenant+client filter, because a tab labelled "Needs review 3"
+  that renders an empty list when clicked is a broken promise. `pending_total` must *not*
+  be client-scoped, because its job is "work waiting somewhere in your caseload" — scoping
+  it would make the badge vanish exactly when the clinician has filtered to someone else,
+  which is when it matters most.
+
+  **Both carry the tenant predicate. Neither carries the status, cursor or limit filters.**
+  This split is what stops a later reader from "unifying" the two queries: applying the
+  tab's status filter to `counts` makes *every* badge wrong, and that mistake is inviting
+  precisely because "counts must run through the same filter as rows" sounds like a safety
+  rule. Computing counts client-side from a paginated list is wrong for the same family of
+  reasons — a badge that says 3 because only 3 rows were fetched is a bug.
+- **`order`** accepts `asc` or `desc` and selects the direction §3.2 specifies per tab;
+  **`limit`** is clamped to `[1, 200]`. Both are the endpoint's own decisions, not the
+  caller's — an out-of-range value is normalised or rejected, never passed through.
+- **The cursor is a position, not an authorisation input.** The tenant predicate is
+  resolved and applied on **every** request, including cursor requests, so the cursor
+  never carries authority. It decodes as a strict keyset and is used **only** to position
+  the window: it may never build, replace, or widen a filter. That sentence is the rule
+  worth holding, because the failure mode is not a missing check — it is a naive decoder
+  that lets any cursor field reach the query, which turns tampering into filter injection.
+  HMAC-signing the cursor is defence in depth *on top of* that, never a substitute for it.
+- **The cursor must carry its direction, and a mismatch is a 400.** One tab sorts ascending
+  and the rest descending (§3.2), and the tab is a URL param the caller can change while
+  holding the same cursor. Silent mispositioning would show a clinician the wrong work
+  after a mid-scroll tab change — invisible, and worse than an error.
+- **The cursor must cross the `submitted_at IS NULL` block.** Historical rows sort last
+  (above), and any comparison with NULL is unknown, so a plain `(submitted_at, id)` keyset
+  will either skip that block or loop on it. The ordering is
+  `(submitted_at is null), submitted_at, id` with the null-flag carried **inside the
+  signed cursor**. Settling this encoding after cursors are in flight invalidates them
+  mid-scroll.
 - **`client_name`** must be resolved server-side. The alternative (fetch `/clients`, then
   join in the browser) leaks the full client roster into the page payload.
 - **Tenant scoping is mandatory at the query level, for rows *and* counts.** Reuse the
@@ -468,6 +532,22 @@ not a blocker for the migration being written now.
    called in `AuditLogPanel` for every audit entry. Render the gateway for a submission whose audit
    row has a null actor and assert the page renders (labelling the actor as the client)
    rather than throwing. This test fails today by construction, which is the point.
+10. **The `counts` / `pending_total` split (§6.1).** With a `client_id` filter held: assert
+   `counts` reflects that client's set **and** `pending_total` does not — and assert both
+   carry the tenant predicate, so a second tenant's submissions contribute to neither. A
+   rows-only or counts-only assertion passes while the other silently leaks.
+11. **`count_only=1` applies the identical tenant predicate.** Same seed as test 8, on the
+   count-only path: a cross-tenant count is a leak even though no row is returned. Also
+   assert the response carries **no** `rows` and **no** `next_cursor` — the mode omits the
+   row query, never the authorisation.
+12. **A cursor whose direction disagrees with `order` returns 400.** Fetch a page, then
+   replay its cursor against the opposite `order`: expect 400, not a silently mispositioned
+   page. Silent mispositioning is the failure this guards, and it renders plausible rows —
+   so a shape-only assertion would pass.
+13. **The cursor crosses the `submitted_at IS NULL` block.** With historical (NULL) rows
+   seeded alongside timestamped ones, page to exhaustion and assert every row appears
+   **exactly once** and the NULL block lands last. The failure modes are a skipped row and
+   an infinite loop, and neither raises an error.
 
 ## 8. Out of scope
 
