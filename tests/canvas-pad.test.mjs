@@ -392,6 +392,8 @@ async function main() {
     new URL("../components/canvas/ReflectionCanvas.tsx", import.meta.url),
     "utf8"
   )
+  // THIS regex is the real guard for the background-wiring property, and the
+  // local resolveBackground helper above it is illustrative only and cannot catch a change in the component.
   assert.match(
     componentSource,
     /defaultBackground\?: BackgroundType/,
@@ -420,12 +422,9 @@ async function main() {
         typeof opt.icon === "function",
       `option ${opt.id} icon must be a Lucide React component, not a text glyph`
     )
-    assert.ok(
-      !["□", "≡", "⋯", "□", "☰"].includes(opt.icon),
-      `option ${opt.id} icon must not be a legacy text glyph`
-    )
   }
 
+  // THIS source scan is the real guard for the glyph property.
   const typesSource = readFileSync(
     new URL("../components/canvas/canvasTypes.ts", import.meta.url),
     "utf8"
