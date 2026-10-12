@@ -140,6 +140,7 @@ export function SessionNode({
         <div className="min-w-0 flex-1">
           <EditableName
             value={session.name}
+            showPencilOnCoarse={false}
             isEditing={isEditing}
             onEditChange={setIsEditing}
             onSave={async (newName) => {

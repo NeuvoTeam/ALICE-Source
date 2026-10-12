@@ -3,15 +3,30 @@
 import { useState, useEffect } from 'react'
 import { Check, X, Pencil } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 type Props = {
   value: string
   onSave: (value: string) => Promise<void>
   isEditing?: boolean
   onEditChange?: (editing: boolean) => void
+  /**
+   * Whether the inline rename pencil stays tappable on coarse pointers.
+   * The session row turns this off: on a 390 px drawer the pencil's 44 px box
+   * sat across the row's geometric centre and squeezed the session name to
+   * 31 px. Sessions keep rename reachable via the kebab's "Rename session".
+   * Case rows have no menu, so they keep the pencil.
+   */
+  showPencilOnCoarse?: boolean
 }
 
-export default function EditableName({ value, onSave, isEditing: externalIsEditing, onEditChange }: Props) {
+export default function EditableName({
+  value,
+  onSave,
+  isEditing: externalIsEditing,
+  onEditChange,
+  showPencilOnCoarse = true,
+}: Props) {
   const { toast } = useToast()
   const [internalIsEditing, setInternalIsEditing] = useState(false)
   const isEditing = externalIsEditing !== undefined ? externalIsEditing : internalIsEditing
@@ -76,7 +91,12 @@ export default function EditableName({ value, onSave, isEditing: externalIsEditi
               e.stopPropagation()
               setEditing(true)
             }}
-            className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center shrink-0"
+            className={cn(
+              "rounded p-1 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto shrink-0",
+              showPencilOnCoarse
+                ? "pointer-coarse:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center"
+                : "pointer-coarse:hidden"
+            )}
           >
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
