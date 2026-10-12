@@ -59,6 +59,7 @@ export function SessionNode({
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"copy" | "open" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // ✅ COPY — mint a fresh signed link, then copy it
   const handleCopy = async (e: React.MouseEvent) => {
@@ -118,8 +119,15 @@ export function SessionNode({
       role="button"
       tabIndex={0}
       onClick={() => void selectSession(caseId, session.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === " ") e.preventDefault();
+          void selectSession(caseId, session.id);
+        }
+      }}
       className={cn(
-        "group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer select-none",
+        "group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer select-none pointer-coarse:min-h-11",
         "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         isSelected
           ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-2xs border border-border/40"
@@ -134,16 +142,25 @@ export function SessionNode({
             value={session.name}
             isEditing={isEditing}
             onEditChange={setIsEditing}
-            onSave={(newName) =>
-              renameSession(caseId, session.id, newName)
-            }
+            onSave={async (newName) => {
+              useClientNavStore.setState({ error: null });
+              await renameSession(caseId, session.id, newName);
+              const { error } = useClientNavStore.getState();
+              if (error) throw new Error(error);
+            }}
           />
         </div>
       </div>
 
       {/* RIGHT ACTIONS - COMPACT & NO TOOLTIP OCCLUSION */}
       <div
-        className="hidden items-center gap-0.5 group-hover:flex group-focus-within:flex shrink-0 ml-1"
+        className={cn(
+          "flex items-center gap-0.5 shrink-0 ml-1 opacity-0 pointer-events-none transition-opacity",
+          "group-hover:opacity-100 group-hover:pointer-events-auto",
+          "group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+          "pointer-coarse:opacity-100 pointer-coarse:pointer-events-auto",
+          menuOpen && "opacity-100 pointer-events-auto"
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* QUICK COPY LINK */}
@@ -153,7 +170,7 @@ export function SessionNode({
           disabled={busy !== null}
           aria-label="Copy client link"
           className={cn(
-            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-50",
+            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-50 pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center",
             copied
               ? "text-primary font-bold bg-primary/10"
               : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -167,28 +184,29 @@ export function SessionNode({
         </button>
 
         {/* MORE OPTIONS DROPDOWN */}
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               aria-label="More session actions"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center"
             >
               <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44 text-xs">
-            <DropdownMenuItem onClick={handleOpen} disabled={busy !== null}>
+            <DropdownMenuItem onClick={handleOpen} disabled={busy !== null} className="pointer-coarse:min-h-11">
               <ExternalLink className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
               <span>Open in new tab</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsEditing(true)}>
+            <DropdownMenuItem onClick={() => setIsEditing(true)} className="pointer-coarse:min-h-11">
               <Pencil className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
               <span>Rename session</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
+              className="pointer-coarse:min-h-11"
               onClick={() => {
                 if (confirm("Delete this session?")) {
                   deleteSession(caseId, session.id);

@@ -29,12 +29,19 @@ export function CaseNode({ caseData }: { caseData: Case }) {
     <div className="space-y-1">
 
       {/* Case Row */}
-      <div className="group flex items-center justify-between rounded-md hover:bg-sidebar-accent/50 transition-colors px-1 py-0.5">
+      <div className="group flex items-center justify-between rounded-md hover:bg-sidebar-accent/50 transition-colors px-1 py-0.5 pointer-coarse:min-h-11">
         <div
           role="button"
           tabIndex={0}
           onClick={() => setOpen((o) => !o)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 px-1 py-1 text-xs font-medium cursor-pointer text-foreground select-none"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === " ") e.preventDefault();
+              setOpen((o) => !o);
+            }
+          }}
+          className="flex min-w-0 flex-1 items-center gap-1.5 px-1 py-1 text-xs font-medium cursor-pointer text-foreground select-none pointer-coarse:min-h-11"
         >
           <ChevronRight
             className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
@@ -55,7 +62,12 @@ export function CaseNode({ caseData }: { caseData: Case }) {
           >
             <EditableName
               value={caseData.name}
-              onSave={(newName) => renameCase(caseData.id, newName)}
+              onSave={async (newName) => {
+                useClientNavStore.setState({ error: null });
+                await renameCase(caseData.id, newName);
+                const { error } = useClientNavStore.getState();
+                if (error) throw new Error(error);
+              }}
             />
           </div>
 
@@ -66,7 +78,7 @@ export function CaseNode({ caseData }: { caseData: Case }) {
 
         {/* Actions */}
         <div
-          className="hidden items-center gap-0.5 group-hover:flex group-focus-within:flex shrink-0 pr-1"
+          className="flex items-center gap-0.5 shrink-0 ml-1 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -76,7 +88,7 @@ export function CaseNode({ caseData }: { caseData: Case }) {
               void createSession(caseData.id);
             }}
             aria-label="New session in case"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -90,7 +102,7 @@ export function CaseNode({ caseData }: { caseData: Case }) {
               }
             }}
             aria-label="Delete case"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring pointer-coarse:size-11 pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center"
           >
             <Trash className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
