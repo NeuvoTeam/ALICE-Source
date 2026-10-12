@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Plus, Trash } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, Plus, Trash } from "lucide-react";
 import { SessionNode } from "./SessionNode";
 import { useClientNavStore } from "@/stores/useClientNavStore";
 import EditableName from "./EditableName";
@@ -29,53 +29,70 @@ export function CaseNode({ caseData }: { caseData: Case }) {
     <div className="space-y-1">
 
       {/* Case Row */}
-      <div className="group flex items-center justify-between">
-
-        <button
-          type="button"
+      <div className="group flex items-center justify-between rounded-md hover:bg-sidebar-accent/50 transition-colors px-1 py-0.5">
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-sidebar-accent/50 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          className="flex min-w-0 flex-1 items-center gap-1.5 px-1 py-1 text-xs font-medium cursor-pointer text-foreground select-none"
         >
           <ChevronRight
-            className={`h-4 w-4 transition-transform ${
+            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
               open ? "rotate-90" : ""
             }`}
             aria-hidden="true"
           />
 
+          {open ? (
+            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary" />
+          ) : (
+            <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
+
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex-1"
+            className="flex-1 min-w-0 truncate"
           >
             <EditableName
               value={caseData.name}
               onSave={(newName) => renameCase(caseData.id, newName)}
             />
           </div>
-        </button>
+
+          <span className="text-[10px] text-muted-foreground font-normal px-1 shrink-0">
+            {sessions.length}
+          </span>
+        </div>
 
         {/* Actions */}
-        <div className="mr-2 hidden items-center gap-1 group-hover:flex group-focus-within:flex">
+        <div
+          className="hidden items-center gap-0.5 group-hover:flex group-focus-within:flex shrink-0 pr-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              createSession(caseData.id);
+              void createSession(caseData.id);
             }}
-            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            aria-label="New session in case"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
 
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (confirm("Delete this case and all sessions?")) {
-                deleteCase(caseData.id);
+                void deleteCase(caseData.id);
               }
             }}
-            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            aria-label="Delete case"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
           >
-            <Trash className="h-4 w-4" aria-hidden="true" />
+            <Trash className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>

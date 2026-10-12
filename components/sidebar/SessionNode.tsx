@@ -1,12 +1,19 @@
 "use client";
 
-import { Trash, Copy, Check, ExternalLink } from "lucide-react";
+import { Trash, Copy, Check, ExternalLink, FileText, MoreHorizontal, Pencil } from "lucide-react";
 import { useClientNavStore } from "@/stores/useClientNavStore";
 import EditableName from "./EditableName";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api";
 import { apiFetch } from "@/lib/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Session = {
   id: string;
@@ -51,6 +58,7 @@ export function SessionNode({
   const isSelected = selectedSessionId === session.id;
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"copy" | "open" | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // ✅ COPY — mint a fresh signed link, then copy it
   const handleCopy = async (e: React.MouseEvent) => {
@@ -111,68 +119,87 @@ export function SessionNode({
       tabIndex={0}
       onClick={() => void selectSession(caseId, session.id)}
       className={cn(
-        "group flex items-center justify-between px-3 py-1.5 rounded-md text-sm cursor-pointer",
-        "transition-all duration-150 hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        isSelected && "bg-sidebar-accent font-medium"
+        "group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer select-none",
+        "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        isSelected
+          ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-2xs border border-border/40"
+          : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
       )}
     >
       {/* LEFT */}
-      <div className="min-w-0 flex-1">
-        <EditableName
-          value={session.name}
-          onSave={(newName) =>
-            renameSession(caseId, session.id, newName)
-          }
-        />
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <FileText className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-primary" : "text-muted-foreground")} />
+        <div className="min-w-0 flex-1">
+          <EditableName
+            value={session.name}
+            isEditing={isEditing}
+            onEditChange={setIsEditing}
+            onSave={(newName) =>
+              renameSession(caseId, session.id, newName)
+            }
+          />
+        </div>
       </div>
 
-      {/* RIGHT ACTIONS */}
-      <div className="hidden items-center gap-1 group-hover:flex group-focus-within:flex">
-
-        {/* COPY CLIENT LINK */}
+      {/* RIGHT ACTIONS - COMPACT & NO TOOLTIP OCCLUSION */}
+      <div
+        className="hidden items-center gap-0.5 group-hover:flex group-focus-within:flex shrink-0 ml-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* QUICK COPY LINK */}
         <button
           type="button"
           onClick={handleCopy}
           disabled={busy !== null}
-          title="Copy client link"
+          aria-label="Copy client link"
           className={cn(
-            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:opacity-50",
-            copied ? "text-emerald-600" : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            "rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:opacity-50",
+            copied
+              ? "text-primary font-bold bg-primary/10"
+              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
           {copied ? (
-            <Check className="h-4 w-4" aria-hidden="true" />
+            <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           ) : (
-            <Copy className="h-4 w-4" aria-hidden="true" />
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
           )}
         </button>
 
-        {/* OPEN CLIENT LINK */}
-        <button
-          type="button"
-          onClick={handleOpen}
-          disabled={busy !== null}
-          title="Open client link"
-          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-sidebar-accent disabled:opacity-50"
-        >
-          <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-sidebar-accent-foreground" aria-hidden="true" />
-        </button>
-
-        {/* DELETE */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirm("Delete this session?")) {
-              deleteSession(caseId, session.id);
-            }
-          }}
-          title="Delete session"
-          className="rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:bg-destructive/10"
-        >
-          <Trash className="h-4 w-4 text-muted-foreground group-hover:text-destructive" aria-hidden="true" />
-        </button>
-
+        {/* MORE OPTIONS DROPDOWN */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="More session actions"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44 text-xs">
+            <DropdownMenuItem onClick={handleOpen} disabled={busy !== null}>
+              <ExternalLink className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+              <span>Open in new tab</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <Pencil className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+              <span>Rename session</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => {
+                if (confirm("Delete this session?")) {
+                  deleteSession(caseId, session.id);
+                }
+              }}
+            >
+              <Trash className="mr-2 h-3.5 w-3.5" />
+              <span>Delete session</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useClientNavStore } from "@/stores/useClientNavStore"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import {
@@ -546,151 +546,251 @@ export default function VignetteGenerator({
   }
 
   return (
-    <Card className="max-w-2xl mx-auto shadow-2xl border-t-4 border-t-primary rounded-4xl overflow-hidden bg-card text-card-foreground">
-      <CardHeader className="border-b border-border bg-muted/50 px-5 pb-6 sm:px-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 rounded-xl">
-              <BrainCircuit className="h-5 w-5 text-primary" />
-            </div>
-            <CardTitle className="text-xl font-black tracking-tight text-foreground uppercase">
-              ALICE 
-            </CardTitle>
+    <div className="space-y-6">
+
+      {/* SESSION TOP BAR & CONTEXT RIBBON */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <BrainCircuit className="h-5 w-5" />
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {sessionName && (
-              <span className="max-w-[12rem] truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                {sessionName}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-foreground truncate">
+                {sessionName || "Clinical Encounter"}
+              </h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {selectedModalities.join(" / ")}
               </span>
-            )}
-            <div className="px-3 py-1 rounded-full border border-border bg-background text-[10px] font-bold text-muted-foreground">
-              PHASE {step}
-              {isSaving ? " · saving…" : ""}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {clientName ? `Patient: ${clientName} · ` : ""}
+              {step === 1 ? "Phase 1: Input & Scribe Notes" : "Phase 2: Practice Package Formulated"}
+              {isSaving ? " · Saving changes…" : ""}
+            </p>
           </div>
         </div>
-        <Progress value={step * 33.3} className="mt-6 h-1.5 bg-muted" />
-      </CardHeader>
 
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {practicePackage && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyClientLink}
+                className="h-8 text-xs font-semibold"
+              >
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                Copy Client Link
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={isExporting}
+                className="h-8 text-xs font-semibold"
+              >
+                {isExporting ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Export PDF
+              </Button>
+            </>
+          )}
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/40 text-[11px] font-semibold text-muted-foreground">
+            <span className={`h-2 w-2 rounded-full ${step === 2 ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span>PHASE {step} OF 2</span>
+          </div>
+        </div>
+      </div>
+
+      {/* DEGRADED ADVISORY */}
       {degradedWarning && (
-        <div className="mx-5 mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 sm:mx-8 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-          ⚠️ AI unavailable: {degradedWarning}
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          ⚠️ AI Service Advisory: {degradedWarning}
         </div>
       )}
 
-      <CardContent className="px-5 pt-8 pb-10 sm:px-8">
-        {step === 1 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="relative">
+      {/* DUAL PANE WORKBENCH */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        {/* LEFT COLUMN: NOTES & SCRIBE INPUT (5 COLS) */}
+        <div className="lg:col-span-5 space-y-4">
+          <Card className="border-border/70 shadow-xs">
+            <CardHeader className="border-b pb-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold">Clinical Notes &amp; Scribe</CardTitle>
+                  <CardDescription className="text-xs">
+                    Paste from Heidi Health or dictate session notes
+                  </CardDescription>
+                </div>
+
+                <Button
+                  onClick={handleHeidiImport}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold bg-background shadow-xs shrink-0"
+                >
+                  <ClipboardPaste className="h-3.5 w-3.5 mr-1.5" />
+                  Paste Heidi Notes
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4 space-y-4">
               <Textarea
                 value={sessionInput}
                 onChange={(e) => setSessionInput(e.target.value)}
                 onBlur={() => {
                   if (sessionInput.trim()) persistNotes(sessionInput)
                 }}
-                placeholder="Paste Heidi notes here..."
-                className="min-h-[220px] rounded-4xl border-2 bg-muted/50 p-6 text-base focus:border-primary/20"
+                placeholder="Paste Heidi transcript/notes or record session observations here…"
+                className="min-h-[260px] rounded-xl border-border/80 bg-background p-4 text-sm leading-relaxed font-sans focus-visible:ring-1 focus-visible:ring-primary resize-y"
               />
-              <Button
-                onClick={handleHeidiImport}
-                variant="outline"
-                size="sm"
-                className="absolute top-4 right-4 rounded-full border-border bg-background shadow-sm"
-              >
-                <ClipboardPaste className="h-4 w-4 mr-2" /> Paste from Heidi
-              </Button>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <div
-                aria-live="polite"
-                className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider"
-              >
-                <span className="text-muted-foreground">
-                  {notesLength.toLocaleString()} /{" "}
-                  {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters ·{" "}
-                  {notesBudget}
-                </span>
-                {notesTooLong ? (
-                  <span className="text-destructive">Too long to send</span>
-                ) : notesLong ? (
-                  <span className="text-amber-600 dark:text-amber-400">Long note</span>
-                ) : null}
+              {/* TOKEN & CHARACTER BUDGET METER */}
+              <div className="space-y-1.5 rounded-xl border bg-muted/30 p-3 text-xs">
+                <div className="flex items-center justify-between text-[11px] font-semibold">
+                  <span className="text-muted-foreground">Groq TPM Input Budget</span>
+                  <span className={notesTooLong ? "text-destructive font-bold" : notesLong ? "text-amber-600 font-bold" : "text-muted-foreground"}>
+                    {notesLength.toLocaleString()} / {SESSION_NOTES_MAX_CHARS.toLocaleString()} chars
+                  </span>
+                </div>
+
+                <Progress
+                  value={Math.min(100, Math.round((notesTokens / 8000) * 100))}
+                  className="h-1.5 bg-muted"
+                />
+
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{notesBudget}</span>
+                  {notesTooLong ? (
+                    <span className="text-destructive font-semibold">Exceeds Groq limit</span>
+                  ) : notesLong ? (
+                    <span className="text-amber-600 font-semibold">Approaching limit</span>
+                  ) : (
+                    <span>Normal budget</span>
+                  )}
+                </div>
+
+                {notesTooLong && (
+                  <p className="mt-1 text-[11px] font-medium text-destructive">
+                    {GROQ_TPM_LIMIT_NOTE} Please trim notes to ~{SESSION_NOTES_MAX_CHARS.toLocaleString()} characters.
+                  </p>
+                )}
               </div>
 
-              {notesTooLong && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
-                  {GROQ_TPM_LIMIT_NOTE} Trim these notes to about{" "}
-                  {SESSION_NOTES_MAX_CHARS.toLocaleString()} characters — as they
-                  stand, the request is rejected before any AI work happens.
+              {/* MODALITY SELECTOR */}
+              <div className="space-y-2 pt-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Therapeutic Framework
+                </label>
+                <ModalitySelector
+                  selectedModalities={selectedModalities}
+                  onChange={(mods) => setSelectedModalities(mods)}
+                  disabled={isProcessing}
+                />
+              </div>
+
+              {/* ANALYZE BUTTON */}
+              <Button
+                onClick={handleAnalyzeAndGenerate}
+                className="h-11 w-full font-bold shadow-sm"
+                disabled={!sessionInput || isProcessing || notesTooLong}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Synthesizing Formulation…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Analyze &amp; Recommend Practice
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN: CLINICAL SYNTHESIS & PRACTICE TASK (7 COLS) */}
+        <div className="lg:col-span-7 space-y-4">
+          {step === 1 && !practicePackage && !analysis ? (
+            /* EMPTY WORKBENCH STATE */
+            <Card className="border-dashed border-border/80 bg-card/60 shadow-xs">
+              <CardContent className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <BrainCircuit className="h-7 w-7" />
                 </div>
-              )}
-
-              {notesLong && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-                  {GROQ_TPM_LIMIT_NOTE} Generation should still work, but a second
-                  run inside the same minute may be rate limited.
+                <div className="space-y-1.5 max-w-md">
+                  <h3 className="text-base font-bold text-foreground">
+                    Awaiting Session Formulation
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Paste clinical encounter notes on the left and select therapeutic frameworks (CBT / ACT / DBT). ALICE will synthesize clinical rationale and generate structured practice tasks here.
+                  </p>
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-4 py-4">
-              <ModalitySelector 
-                selectedModalities={selectedModalities}
-                onChange={(mods) => {
-                  setSelectedModalities(mods);
-                }}
-                disabled={isProcessing}
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-2 max-w-sm w-full pt-2 text-left text-xs text-muted-foreground">
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="font-semibold text-foreground">CBT 3 C&apos;s</p>
+                    <p className="text-[10px] mt-0.5">Catch, Check, Correct thought records</p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="font-semibold text-foreground">ACT Defusion</p>
+                    <p className="text-[10px] mt-0.5">Interactive values reflection canvas</p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="font-semibold text-foreground">Activity Log</p>
+                    <p className="text-[10px] mt-0.5">Weekly scheduling &amp; behavioural activation</p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="font-semibold text-foreground">Client Delivery</p>
+                    <p className="text-[10px] mt-0.5">Signed, expiring links (no login required)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            /* ACTIVE FORMULATION & PRACTICE TASK WORKBENCH */
+            <div className="space-y-4">
 
-            <Button
-              onClick={handleAnalyzeAndGenerate}
-              className="h-14 w-full rounded-md text-lg font-bold shadow-lg"
-              disabled={!sessionInput || isProcessing || notesTooLong}
-            >
-              {isProcessing ? (
-                <Loader2 className="animate-spin mr-2" aria-hidden="true" />
-              ) : (
-                <Sparkles className="mr-2" aria-hidden="true" />
-              )}
-              Analyze & Recommend
-            </Button>
-          </div>
-        )}
+              {/* FORMULATION RATIONALE CARD */}
+              <div className="rounded-xl border border-blue-200/70 bg-blue-50/50 p-4 text-xs font-medium leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200 shadow-2xs">
+                <span className="font-bold text-blue-950 dark:text-blue-100 uppercase tracking-wider text-[10px] block mb-1">
+                  Clinical Synthesis &amp; Formulation
+                </span>
+                {analysis?.rationale && analysis.rationale !== PLACEHOLDER_RATIONALE
+                  ? `"${analysis.rationale}"`
+                  : `"No formulation rationale recorded yet. Click Analyze & Recommend to generate."`}
+              </div>
 
-        {step === 2 && (
-          <div className="space-y-6 animate-in slide-in-from-right">
-            <div className="rounded-4xl border border-blue-100 bg-blue-50/50 p-6 text-sm italic font-medium leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
-              {analysis?.rationale &&
-              analysis.rationale !== PLACEHOLDER_RATIONALE
-                ? `"${analysis.rationale}"`
-                : `"No formulation yet — run Analyze & Recommend. (An earlier run stored no usable analysis.)"`}
-            </div>
-
-            <div className="p-6 border-2 rounded-4xl bg-white text-zinc-900 space-y-8 shadow-sm sm:p-10">
-              <div className="flex flex-col gap-6 border-b pb-8">
-                <div className="flex justify-between items-start">
+              {/* PRACTICE TASK CARD */}
+              <Card className="border-border/70 shadow-xs overflow-hidden">
+                <CardHeader className="border-b bg-muted/30 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-2xl font-black uppercase tracking-tight leading-none">
-                      Client Practice Task
-                    </h3>
-                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mt-3">
-                      ALICE
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <CardTitle className="text-base font-bold text-foreground">
+                        Client Practice Task
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-0.5">
+                      Interactive task assigned to {clientName || "the patient"}
+                    </CardDescription>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-green-100 bg-green-50 dark:border-green-900/50 dark:bg-green-950/40">
-                    <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
 
-                <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/50 p-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Override Activity Format
-                    </label>
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row">
+                  {/* FORMAT SELECTOR & REGENERATE */}
+                  <div className="flex items-center gap-2">
                     <Select
                       value={activityFormat}
                       onValueChange={(val: string) => {
@@ -698,90 +798,104 @@ export default function VignetteGenerator({
                       }}
                       disabled={isProcessing}
                     >
-                      <SelectTrigger className="h-12 flex-1 rounded-md border-input bg-background">
-                        <SelectValue placeholder="Select activity format" />
+                      <SelectTrigger className="h-9 w-44 text-xs bg-background">
+                        <SelectValue placeholder="Activity Format" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="activity_log">Activity Log (activity_log)</SelectItem>
-                        <SelectItem value="thought_record">Thought Record (thought_record)</SelectItem>
-                        <SelectItem value="two_choice_worksheet">Dual-Response Skills (two_choice_worksheet)</SelectItem>
-                        <SelectItem value="reflection_prompt">Reflection Prompt (reflection_prompt)</SelectItem>
+                        <SelectItem value="thought_record" className="text-xs">
+                          Thought Record (CBT)
+                        </SelectItem>
+                        <SelectItem value="activity_log" className="text-xs">
+                          Activity Log (Schedule)
+                        </SelectItem>
+                        <SelectItem value="two_choice_worksheet" className="text-xs">
+                          Dual-Response Skills
+                        </SelectItem>
+                        <SelectItem value="reflection_prompt" className="text-xs">
+                          Reflection Prompt (Canvas)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button 
+
+                    <Button
                       onClick={handleRegenerateExplicit}
                       disabled={isProcessing}
                       variant="outline"
-                      className="h-12 rounded-md border-input bg-background px-6"
+                      size="sm"
+                      className="h-9 text-xs font-semibold bg-background shrink-0"
                     >
-                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />}
-                      {isProcessing ? "Generating..." : "Regenerate"}
+                      {isProcessing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5 mr-1 text-primary" />
+                      )}
+                      Regen
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-4 sm:p-6">
+                  {activityFormat === "reflection_prompt" ? (
+                    <ReflectionCanvas
+                      clientId={clientId}
+                      submissionId={generatedSubmissionId}
+                    />
+                  ) : (
+                    <DynamicTaskForm
+                      clientId={clientId}
+                      taskType={activityFormat}
+                      initialData={generatedTaskData}
+                      submissionId={generatedSubmissionId}
+                    />
+                  )}
+                </CardContent>
+
+                {/* SHARING & EXPORT BAR */}
+                <div className="border-t bg-muted/20 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Client Delivery
+                    </p>
+                    {linkStatus ? (
+                      <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">{linkStatus}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Signed expiring link valid for client homework.</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyClientLink}
+                      className="h-9 text-xs font-semibold"
+                    >
+                      <Copy className="mr-1.5 h-3.5 w-3.5" />
+                      Copy Client Link
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={handleDownloadPdf}
+                      disabled={isExporting || !practicePackage}
+                      className="h-9 text-xs font-semibold shadow-xs"
+                    >
+                      {isExporting ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Export A4 PDF
                     </Button>
                   </div>
                 </div>
-              </div>
-
-              {activityFormat === "reflection_prompt" ? (
-                <ReflectionCanvas
-                  clientId={clientId}
-                  submissionId={generatedSubmissionId}
-                />
-              ) : (
-                <DynamicTaskForm
-                  clientId={clientId}
-                  taskType={activityFormat}
-                  initialData={generatedTaskData}
-                  submissionId={generatedSubmissionId}
-                />
-              )}
+              </Card>
             </div>
-            
-            <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3">
-              <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                Client link · signed &amp; expiring
-              </div>
+          )}
+        </div>
 
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleCopyClientLink}
-                  className="w-full h-11 rounded-md font-bold"
-                >
-                  <Copy className="h-4 w-4 mr-2" aria-hidden="true" /> Copy Client Link
-                </Button>
-              </div>
+      </div>
 
-              {linkStatus && (
-                <div className="text-[11px] font-medium text-muted-foreground">
-                  {linkStatus}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                variant="outline"
-                onClick={() => setStep(1)}
-                className="h-12 rounded-md"
-              >
-                Back to Notes
-              </Button>
-              <Button
-                onClick={handleDownloadPdf}
-                className="h-12 flex-1 rounded-md bg-foreground font-bold text-background hover:bg-foreground/90"
-                disabled={isExporting || !practicePackage}
-              >
-                {isExporting ? (
-                  <Loader2 className="animate-spin mr-2" aria-hidden="true" />
-                ) : (
-                  <Download className="mr-2" aria-hidden="true" />
-                )}
-                Export PDF
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    </div>
   )
 }

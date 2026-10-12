@@ -1,289 +1,263 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Sparkles, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function SignupPage() {
-  const [firstName, setFirstName] =
-    useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const [lastName, setLastName] =
-    useState("");
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const [email, setEmail] =
-    useState("");
+  const isFormValid =
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
+    emailRegex.test(email) &&
+    password.length >= 8 &&
+    password === confirmPassword;
 
-  const [password, setPassword] =
-    useState("");
+  const handleSignup = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
+    setSuccess(null);
 
-  const [
-    confirmPassword,
-    setConfirmPassword,
-  ] = useState("");
-
-  const handleSignup = async () => {
     if (!firstName.trim()) {
-      alert("First name is required");
+      setError("First name is required.");
       return;
     }
 
     if (!lastName.trim()) {
-      alert("Last name is required");
+      setError("Last name is required.");
       return;
     }
 
-    if (!email.trim()) {
-      alert("Email is required");
+    if (!email.trim() || !emailRegex.test(email)) {
+      setError("Please enter a valid email address.");
       return;
     }
 
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      alert("Please enter a valid email");
-      return;
-    }
-
-    if (!password.trim()) {
-      alert("Password is required");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
 
     try {
-      const res = await fetch(
-        "https://clinical-ai-backend.neuvoteam.workers.dev/auth/signup",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            email,
-            password,
-          }),
-        }
-      );
+      setLoading(true);
+
+      const res = await fetch(`${CLINICAL_AI_API_BASE}/auth/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
 
       const data = await res.json();
 
       if (!res.ok) {
-        console.error(
-          "Signup Error:",
-          data
-        );
-      
-        if (
-          data?.error_code ===
-          "over_email_send_rate_limit"
-        ) {
-          alert(
-            "Limit reached."
-          );
+        if (data?.error_code === "over_email_send_rate_limit") {
+          setError("Rate limit reached. Please wait a few minutes before trying again.");
           return;
         }
-      
-        alert(
-          data?.msg ||
-          data?.error ||
-          "Signup failed"
-        );
-      
+
+        setError(data?.msg || data?.error || "Registration failed. Please try again.");
         return;
       }
 
-      alert(
-        data.message ||
-          "Verification email sent"
-      );
-
+      setSuccess(data.message || "Verification email sent. Please check your inbox to activate your account.");
       setFirstName("");
       setLastName("");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
     } catch (err) {
-      console.error(
-        "Signup Exception:",
-        err
-      );
-    
-      alert(
-        JSON.stringify(err, null, 2)
-      );
+      console.error("Signup Exception:", err);
+      setError("An unexpected error occurred. Please check your connection.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isFormValid =
-    firstName.trim().length > 0 &&
-    lastName.trim().length > 0 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      email
-    ) &&
-    password.length >= 8 &&
-    password === confirmPassword;
-
-  const inputStyle = {
-    width: "100%",
-    padding: 12,
-    marginBottom: 12,
-    border: "1px solid #d1d5db",
-    borderRadius: 10,
-    boxSizing:
-      "border-box" as const,
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background:
-          "linear-gradient(to bottom, #f8fafc, #eef6ff)",
-      }}
-    >
-      <div
-        style={{
-          width: 520,
-          background: "#fff",
-          padding: 48,
-          borderRadius: 16,
-          boxShadow:
-            "0 12px 30px rgba(15,23,42,0.08)",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            textAlign: "center",
-            fontSize: 42,
-            fontWeight: 800,
-            color: "#0f172a",
-          }}
-        >
-          ALICE
-        </h1>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50/60 p-4 dark:bg-background">
+      <Card className="w-full max-w-lg border-border/70 shadow-sm">
+        <CardHeader className="space-y-2 text-center pb-6">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Sparkles className="h-6 w-6" />
+          </div>
+          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
+            Create Clinician Account
+          </CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
+            Join the ALICE clinical AI workspace
+          </CardDescription>
+        </CardHeader>
 
-        <p
-          style={{
-            textAlign: "center",
-            color: "#64748b",
-            fontSize: 14,
-            marginTop: 8,
-            marginBottom: 24,
-          }}
-        >
-          Create your account
-        </p>
+        <form onSubmit={handleSignup}>
+          <CardContent className="space-y-4">
+            {error && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-        <input
-          placeholder="First Name"
-          value={firstName}
-          onChange={(e) =>
-            setFirstName(e.target.value)
-          }
-          style={inputStyle}
-        />
+            {success && (
+              <div
+                role="status"
+                className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-50 p-3 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+              >
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{success}</span>
+              </div>
+            )}
 
-        <input
-          placeholder="Last Name"
-          value={lastName}
-          onChange={(e) =>
-            setLastName(e.target.value)
-          }
-          style={inputStyle}
-        />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  First Name
+                </Label>
+                <Input
+                  id="firstName"
+                  placeholder="Jane"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-11"
+                />
+              </div>
 
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) =>
-            setEmail(e.target.value)
-          }
-          style={inputStyle}
-        />
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Last Name
+                </Label>
+                <Input
+                  id="lastName"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-11"
+                />
+              </div>
+            </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) =>
-            setPassword(e.target.value)
-          }
-          style={inputStyle}
-        />
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Email Address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="clinician@practice.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+                className="h-11"
+              />
+            </div>
 
-        <input
-          type="password"
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChange={(e) =>
-            setConfirmPassword(
-              e.target.value
-            )
-          }
-          style={{
-            ...inputStyle,
-            marginBottom: 16,
-          }}
-        />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Password (min 8)
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-11"
+                />
+              </div>
 
-        <button
-          onClick={handleSignup}
-          disabled={!isFormValid}
-          style={{
-            width: "100%",
-            padding: 12,
-            border: "none",
-            borderRadius: 10,
-            background:
-              isFormValid
-                ? "#06b6d4"
-                : "#cbd5e1",
-            color: "#fff",
-            fontWeight: 600,
-            cursor:
-              isFormValid
-                ? "pointer"
-                : "not-allowed",
-          }}
-        >
-          Create Account
-        </button>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Confirm Password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-11"
+                />
+              </div>
+            </div>
+          </CardContent>
 
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 16,
-          }}
-        >
-          <button
-            onClick={() => {
-              window.location.href =
-                "/login";
-            }}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#06b6d4",
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            Already have an account?
-            Login
-          </button>
-        </div>
-      </div>
+          <CardFooter className="flex flex-col gap-4 pt-2">
+            <Button
+              type="submit"
+              className="h-11 w-full font-semibold shadow-sm"
+              disabled={loading || !isFormValid}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account…
+                </>
+              ) : (
+                "Create Clinician Account"
+              )}
+            </Button>
+
+            <div className="text-center text-xs text-muted-foreground">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-semibold text-foreground underline underline-offset-4 hover:text-foreground/80"
+              >
+                Sign In
+              </Link>
+            </div>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

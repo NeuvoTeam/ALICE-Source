@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, PanelLeft, PanelLeftClose } from "lucide-react"
+import { useSidebar } from "@/components/dashboard-shell"
 import { CLINICAL_AI_API_BASE as API_BASE } from "@/lib/clinical-ai-api"
 import { apiFetch } from "@/lib/auth"
 import { Client } from "@/types";
@@ -41,6 +42,7 @@ export function ClientView({ client }: { client: Client }) {
   const [material, setMaterial] = useState<AssignedMaterial | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const { isOpen, toggleSidebar } = useSidebar()
 
   useEffect(() => {
     // No pre-set: `isLoading` initialises to `true` and this effect is the loader's only
@@ -85,17 +87,47 @@ export function ClientView({ client }: { client: Client }) {
 
   if (!material || !isRenderableTask(material.practice_package)) {
     return (
-      <main className="flex-1 flex items-center justify-center bg-background p-8 min-h-[50vh]">
-        <div className="text-center">
-          <h2 className="text-xl font-medium mb-2">No active worksheets</h2>
-          <p className="text-muted-foreground">You have completed all assigned worksheets.</p>
+      <main className="flex-1 flex flex-col bg-background p-4 sm:p-8 min-h-[50vh]">
+        <div className="flex items-center gap-3 mb-6 pb-3 border-b">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            title={isOpen ? "Collapse navigation sidebar" : "Expand navigation sidebar"}
+            aria-label={isOpen ? "Collapse navigation sidebar" : "Expand navigation sidebar"}
+          >
+            {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+          </button>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">{client.name} — Assigned Materials</h2>
+            <p className="text-xs text-muted-foreground">Interactive practice worksheets and reflections</p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <h3 className="text-base font-medium mb-1">No active worksheets</h3>
+          <p className="text-xs text-muted-foreground">You have completed all assigned worksheets.</p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="flex-1 overflow-auto bg-background p-0 sm:p-8">
+    <main className="flex-1 overflow-auto bg-background p-4 sm:p-8">
+      <div className="flex items-center gap-3 mb-6 pb-3 border-b">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+          title={isOpen ? "Collapse navigation sidebar" : "Expand navigation sidebar"}
+          aria-label={isOpen ? "Collapse navigation sidebar" : "Expand navigation sidebar"}
+        >
+          {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+        </button>
+        <div>
+          <h2 className="text-lg font-bold text-foreground">{client.name} — Assigned Materials</h2>
+          <p className="text-xs text-muted-foreground">Interactive practice worksheets and reflections</p>
+        </div>
+      </div>
       <DynamicTaskForm 
         clientId={CLIENT_ID}
         taskType={material.practice_package.task_type}

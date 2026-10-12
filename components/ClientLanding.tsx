@@ -1,85 +1,121 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-
+import {
+  Search,
+  Plus,
+  RotateCw,
+  User,
+  Users,
+  ChevronRight,
+  Mail,
+  Phone,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { CLINICAL_AI_API_BASE } from "@/lib/clinical-ai-api";
 import { apiFetch } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Client = {
   id: string;
   name: string;
 };
 
-const API_BASE =
-  "https://clinical-ai-backend.neuvoteam.workers.dev";
+const COUNTRY_CODES = [
+  { code: "+65", label: "🇸🇬 +65 (Singapore)" },
+  { code: "+61", label: "🇦🇺 +61 (Australia)" },
+  { code: "+1", label: "🇺🇸 +1 (US / Canada)" },
+  { code: "+44", label: "🇬🇧 +44 (UK)" },
+  { code: "+852", label: "🇭🇰 +852 (Hong Kong)" },
+  { code: "+886", label: "🇹🇼 +886 (Taiwan)" },
+  { code: "+60", label: "🇲🇾 +60 (Malaysia)" },
+  { code: "+62", label: "🇮🇩 +62 (Indonesia)" },
+  { code: "+66", label: "🇹🇭 +66 (Thailand)" },
+  { code: "+84", label: "🇻🇳 +84 (Vietnam)" },
+  { code: "+63", label: "🇵🇭 +63 (Philippines)" },
+  { code: "+91", label: "🇮🇳 +91 (India)" },
+  { code: "+81", label: "🇯🇵 +81 (Japan)" },
+  { code: "+82", label: "🇰🇷 +82 (South Korea)" },
+  { code: "+86", label: "🇨🇳 +86 (China)" },
+];
 
-  export default function ClientLanding({
-    onSelectClient,
-  }: {
-    onSelectClient: (
-      client: Client,
-      options?: { bootstrap?: boolean }
-    ) => void | Promise<void>;
-  }) {
+export default function ClientLanding({
+  onSelectClient,
+}: {
+  onSelectClient: (
+    client: Client,
+    options?: { bootstrap?: boolean }
+  ) => void | Promise<void>;
+}) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [clickedId, setClickedId] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
 
+  // New Client Form
+  const [showAddClient, setShowAddClient] = useState(false);
   const [firstName, setFirstName] = useState("");
-const [middleName, setMiddleName] = useState("");
-const [lastName, setLastName] = useState("");
-
-const [email, setEmail] = useState("");
-
-const [countryCode, setCountryCode] =
-  useState("+65");
-
-const [phoneNumber, setPhoneNumber] =
-  useState("");
-
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+65");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-const [showAddClient, setShowAddClient] =
-  useState(false);
-  const emailRegex =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const isFormValid =
-  firstName.trim().length > 0 &&
-  lastName.trim().length > 0 &&
-  emailRegex.test(email) &&
-  /^\d+$/.test(phoneNumber) &&
-  phoneNumber.length >= 6;
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
+    emailRegex.test(email) &&
+    /^\d+$/.test(phoneNumber) &&
+    phoneNumber.length >= 6 &&
+    phoneNumber.length <= 15;
 
-  // Stable identity: the mount effect below depends on it, and it only ever calls `setState`
-  // and module constants. Loading is set by the callers that need a spinner (create, refresh);
-  // the mount path already starts with `loading === true` (lint rank 8g, register row B7).
   const fetchClients = useCallback(async () => {
     try {
-      const res = await apiFetch(
-        `${API_BASE}/clients`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const res = await apiFetch(`${CLINICAL_AI_API_BASE}/clients`, {
+        method: "GET",
+        cache: "no-store",
+      });
 
       if (!res.ok) {
-        throw new Error(
-          `Failed to load clients (${res.status})`
-        );
+        throw new Error(`Failed to load clients (${res.status})`);
       }
 
       const data = await res.json();
-
-      const parsed = Array.isArray(data)
-        ? data
-        : [];
-
+      const parsed = Array.isArray(data) ? data : [];
       setClients(parsed);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load clients:", err);
       setClients([]);
     } finally {
       setLoading(false);
@@ -87,8 +123,6 @@ const [showAddClient, setShowAddClient] =
   }, []);
 
   useEffect(() => {
-    // The loader runs as this effect's own async task: nothing is written synchronously in
-    // the effect body (lint rank 8g, register row B7).
     void (async () => {
       await fetchClients();
     })();
@@ -96,18 +130,13 @@ const [showAddClient, setShowAddClient] =
 
   const fetchClient = async (id: string) => {
     try {
-      const res = await apiFetch(
-        `${API_BASE}/client/${id}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const res = await apiFetch(`${CLINICAL_AI_API_BASE}/client/${id}`, {
+        method: "GET",
+        cache: "no-store",
+      });
 
       if (!res.ok) {
-        throw new Error(
-          `Failed to load client (${res.status})`
-        );
+        throw new Error(`Failed to load client (${res.status})`);
       }
 
       return await res.json();
@@ -117,105 +146,78 @@ const [showAddClient, setShowAddClient] =
     }
   };
 
-  const handleClientClick = async (
-    client: Client
-  ) => {
+  const handleClientClick = async (client: Client) => {
     setClickedId(client.id);
-
-    const fullClient = await fetchClient(
-      client.id
-    );
-
+    const fullClient = await fetchClient(client.id);
     onSelectClient(fullClient || client);
   };
 
-  const handleCreateClient = async () => {
+  const handleCreateClient = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setFormError(null);
+
     if (!firstName.trim()) {
-      alert("First name is required");
+      setFormError("First name is required.");
       return;
     }
-    
+
     if (!lastName.trim()) {
-      alert("Last name is required");
+      setFormError("Last name is required.");
       return;
     }
-    
-    if (!email.trim()) {
-      alert("Email is required");
+
+    if (!email.trim() || !emailRegex.test(email)) {
+      setFormError("Please enter a valid email address.");
       return;
     }
-    
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    if (!emailRegex.test(email)) {
-      alert("Please enter a valid email");
+
+    if (!phoneNumber.trim() || !/^\d+$/.test(phoneNumber)) {
+      setFormError("Phone number can only contain numbers.");
       return;
     }
-    
-    if (!phoneNumber.trim()) {
-      alert("Phone number is required");
-      return;
-    }
-    if (!/^\d+$/.test(phoneNumber)) {
-      alert("Phone number can only contain numbers");
-      return;
-    }
-    
-    if (
-      phoneNumber.length < 6 ||
-      phoneNumber.length > 15
-    ) {
-      alert(
-        "Phone number must be between 6 and 15 digits"
-      );
+
+    if (phoneNumber.length < 6 || phoneNumber.length > 15) {
+      setFormError("Phone number must be between 6 and 15 digits.");
       return;
     }
 
     try {
       setCreating(true);
 
-      const res = await apiFetch(
-        `${API_BASE}/clients`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            first_name: firstName,
-            middle_name: middleName,
-            last_name: lastName,
-            email,
-            country_code: countryCode,
-            phone_number: phoneNumber,
-          }),
-        }
-      );
+      const res = await apiFetch(`${CLINICAL_AI_API_BASE}/clients`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          first_name: firstName.trim(),
+          middle_name: middleName.trim() || undefined,
+          last_name: lastName.trim(),
+          email: email.trim(),
+          country_code: countryCode,
+          phone_number: phoneNumber.trim(),
+        }),
+      });
 
       if (!res.ok) {
-        throw new Error(
-          `Failed to create client (${res.status})`
-        );
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || `Failed to create client (${res.status})`);
       }
 
+      // Reset form
       setFirstName("");
-setMiddleName("");
-setLastName("");
-
-setEmail("");
-
-setCountryCode("+65");
-setPhoneNumber("");
+      setMiddleName("");
+      setLastName("");
+      setEmail("");
+      setCountryCode("+65");
+      setPhoneNumber("");
+      setShowAddClient(false);
 
       setLoading(true);
       await fetchClients();
-
-setShowAddClient(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to create client");
+      setFormError(err instanceof Error ? err.message : "Failed to register new client.");
     } finally {
       setCreating(false);
     }
@@ -223,517 +225,324 @@ setShowAddClient(false);
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) =>
-      client.name
-        .toLowerCase()
-        .includes(search.toLowerCase())
+      client.name.toLowerCase().includes(search.toLowerCase())
     );
   }, [clients, search]);
 
+  const initials = (name: string) =>
+    name
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "CL";
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        paddingTop: 40,
-background:
-  "linear-gradient(to bottom, #f8fafc, #eef6ff)",
-      }}
-    >
-      <div
-        style={{
-          width: 720,
-          background: "white",
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          padding: 32,
-          boxShadow:
-  "0 10px 30px rgba(15,23,42,0.08)",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: 24,
-          }}
-        >
-          <h1
-  style={{
-    margin: 0,
-    fontSize: 42,
-    fontWeight: 800,
-    letterSpacing: "-0.04em",
-    color: "#0f172a",
-  }}
->
-  ALICE
-</h1>
-  
-          
+    <div className="min-h-screen bg-slate-50/60 dark:bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+
+        {/* WORKSPACE HEADER */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Clients &amp; Caseload
+              </h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Select a client to open their clinical formulation workspace or register a new patient.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLoading(true);
+                void fetchClients();
+              }}
+              disabled={loading}
+              className="h-10 text-xs font-medium"
+            >
+              <RotateCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+
+            <Button
+              onClick={() => {
+                setFormError(null);
+                setShowAddClient(true);
+              }}
+              className="h-10 text-xs font-semibold shadow-sm"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Client
+            </Button>
+          </div>
         </div>
-  
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          <input
-            placeholder="Search clients..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            style={{
-              flex: 1,
-              padding: 14,
-borderRadius: 12,
-fontSize: 15,
-              border: "1px solid #d1d5db",
-            }}
-          />
-          
-  
-          <button
-            onClick={() => {
-              setLoading(true);
-              void fetchClients();
-            }}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "none",
-              background: "#06b6d4",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            ↻
-          </button>
-  
-          <button
-            onClick={() =>
-              setShowAddClient(
-                !showAddClient
-              )
-            }
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "none",
-              background: "#06b6d4",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            + NEW
-          </button>
-        </div>
-  
-        {showAddClient && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(15,23,42,0.35)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 999,
-    }}
-  >
-    <div
-      style={{
-        width: 420,
-        background: "#fff",
-        borderRadius: 20,
-        padding: 24,
-        boxShadow:
-          "0 20px 50px rgba(0,0,0,0.15)",
-      }}
-    >
-      <h3
-  style={{
-    marginTop: 0,
-    marginBottom: 8,
-    fontSize: 22,
-  }}
->
-  New Client
-</h3>
 
-<div
-  style={{
-    fontSize: 12,
-    color: "#6b7280",
-    marginBottom: 16,
-  }}
->
-  * Required fields
-</div>
-      <div
-  style={{
-    height: 1,
-    background: "#e5e7eb",
-    marginBottom: 18,
-  }}
-/>
-<div
-  style={{
-    display: "grid",
-    gap: 12,
-  }}
->
-  <input
-    placeholder="First Name *"
-    value={firstName}
-    onChange={(e) =>
-      setFirstName(e.target.value)
-    }
-    style={{
-      padding: 12,
-      borderRadius: 10,
-      border: "1px solid #d1d5db",
-    }}
-  />
-
-  <input
-    placeholder="Middle Name (Optional)"
-    value={middleName}
-    onChange={(e) =>
-      setMiddleName(e.target.value)
-    }
-    style={{
-      padding: 12,
-      borderRadius: 10,
-      border: "1px solid #d1d5db",
-    }}
-  />
-
-  <input
-    placeholder="Last Name *"
-    value={lastName}
-    onChange={(e) =>
-      setLastName(e.target.value)
-    }
-    style={{
-      padding: 12,
-      borderRadius: 10,
-      border: "1px solid #d1d5db",
-    }}
-  />
-
-<div>
-  <label
-    style={{
-      display: "block",
-      marginBottom: 6,
-      fontSize: 13,
-      fontWeight: 600,
-      color: "#374151",
-    }}
-  >
-    Email{" "}
-    <span
-      style={{
-        color: "#ef4444",
-      }}
-    >
-      *
-    </span>
-  </label>
-
-  <input
-    placeholder="name@email.com"
-    type="email"
-    value={email}
-    onChange={(e) =>
-      setEmail(e.target.value)
-    }
-    style={{
-      width: "100%",
-      padding: 12,
-      borderRadius: 10,
-      border: "1px solid #d1d5db",
-    }}
-  />
-
-<div
-  style={{
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 4,
-  }}
->
-  Required for client invitation
-</div>
-</div>
-
-  <div
-    style={{
-      display: "flex",
-      gap: 10,
-    }}
-  >
-    <select
-      value={countryCode}
-      onChange={(e) =>
-        setCountryCode(e.target.value)
-      }
-      style={{
-        width: 110,
-        padding: 12,
-        borderRadius: 10,
-        border: "1px solid #d1d5db",
-      }}
-    >
-      <option value="+65">
-        🇸🇬 +65
-      </option>
-
-      <option value="+652">
-        🇭🇰 +852
-      </option>
-
-      <option value="+886">
-        🇹🇼 +886
-      </option>
-
-      <option value="+86">
-        🇨🇳 +86
-      </option>
-
-      <option value="+82">
-        🇰🇷 +82
-      </option>
-
-      <option value="+81">
-        🇯🇵 +81
-      </option>
-
-      <option value="+60">
-        🇲🇾 +60
-      </option>
-      
-      <option value="+62">
-        🇮🇩 +62
-      </option>
-
-      <option value="+66">
-        🇹🇭 +66
-      </option>
-
-      <option value="+84">
-        🇻🇳 +84
-      </option>
-
-      <option value="+63">
-        🇵🇭 +63
-      </option>
-
-      <option value="+91">
-        🇮🇳 +91
-      </option>
-      
-      <option value="+61">
-        🇦🇺 +61
-      </option>
-
-      <option value="+44">
-        🇬🇧 +44
-      </option>
-
-      <option value="+1">
-        🇺🇸 +1
-      </option>
-    </select>
-
-    <input
-  type="tel"
-  inputMode="numeric"
-  placeholder="Phone Number *"
-  value={phoneNumber}
-  onChange={(e) =>
-    setPhoneNumber(
-      e.target.value.replace(/\D/g, "")
-    )
-  }
-  style={{
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    border: "1px solid #d1d5db",
-  }}
-/>
-  </div>
-</div>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
-        <button
-          onClick={() =>
-            setShowAddClient(false)
-          }
-          style={{
-            padding: "10px 16px",
-            borderRadius: 10,
-            border: "1px solid #d1d5db",
-            background: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
-
-        <button
-  onClick={handleCreateClient}
-  disabled={
-    creating || !isFormValid
-  }
-  style={{
-    padding: "10px 16px",
-    borderRadius: 10,
-    border: "none",
-    background:
-      creating || !isFormValid
-        ? "#cbd5e1"
-        : "#06b6d4",
-    color: "#fff",
-    cursor:
-      creating || !isFormValid
-        ? "not-allowed"
-        : "pointer",
-  }}
->
-  {creating
-    ? "Creating..."
-    : "Create Client"}
-</button>
-
-      </div>
-    </div>
-  </div>
-)}
-        {loading ? (
-          <p>Loading...</p>
-        ) : filteredClients.length === 0 ? (
-          <div>No clients available</div>
-        ) : (
-          <div>
-            {filteredClients.map(
-              (client) => (
-                <div
-                  key={client.id}
-                  onClick={() =>
-                    handleClientClick(
-                      client
-                    )
-                  }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: 16,
-                    marginBottom: 10,
-                  
-                    border:
-                      clickedId === client.id
-                        ? "1px solid #60a5fa"
-                        : "1px solid #e5e7eb",
-                  
-                    borderRadius: 16,
-                    cursor: "pointer",
-                  
-                    background:
-                      clickedId === client.id
-                        ? "#eff6ff"
-                        : "white",
-                  
-                    transition:
-                      "all 0.2s ease",
-                  
-                    boxShadow:
-                      "0 1px 2px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems:
-                        "center",
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 48,
-height: 48,
-borderRadius: "50%",
-background: "#e0f2fe",
-
-                        display: "flex",
-                        alignItems:
-                          "center",
-                        justifyContent:
-                          "center",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {client.name
-                        .split(" ")
-                        .map(
-                          (part) =>
-                            part[0]
-                        )
-                        .slice(0, 2)
-                        .join("")}
-                    </div>
-  
-                    <div>
-                      <div
-                        style={{
-                          fontWeight:
-                            600,
-                        }}
-                      >
-                        {client.name}
-                      </div>
-  
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color:
-                            "#64748b",
-                        }}
-                      >
-                        Active Client 
-                      </div>
-                    </div>
-                  </div>
-  
-                  <div
-                    style={{
-                      fontSize: 20,
-                      color:
-                        "#94a3b8",
-                    }}
-                  >
-                    ›
-                  </div>
-                </div>
-              )
+        {/* SEARCH & FILTERS BAR */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search clients by name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 pl-10 pr-9 bg-background shadow-xs text-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
           </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>
+              {filteredClients.length} of {clients.length} Clients
+            </span>
+          </div>
+        </div>
+
+        {/* CASELOAD LIST / GRID */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">Loading patient directory…</p>
+          </div>
+        ) : filteredClients.length === 0 ? (
+          <Card className="border-dashed bg-background/50">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <User className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">
+                {search ? `No clients found for "${search}"` : "No clients in caseload yet"}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-sm mb-6">
+                {search
+                  ? "Check spelling or clear search filter to see all registered patients."
+                  : "Register your first client to start creating sessions, formulation notes, and homework activities."}
+              </p>
+              {search ? (
+                <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+                  Clear search
+                </Button>
+              ) : (
+                <Button onClick={() => setShowAddClient(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add First Client
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredClients.map((client) => {
+              const isSelected = clickedId === client.id;
+              return (
+                <Card
+                  key={client.id}
+                  onClick={() => handleClientClick(client)}
+                  className={`group relative overflow-hidden transition-all duration-150 cursor-pointer hover:border-foreground/30 hover:shadow-md ${
+                    isSelected ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "bg-card"
+                  }`}
+                >
+                  <CardContent className="p-5 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 font-bold text-slate-700 text-sm border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
+                        {initials(client.name)}
+                      </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          {client.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                          <span>Active Caseload</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground group-hover:bg-muted group-hover:text-foreground transition-colors">
+                      {isSelected ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         )}
+
+      </div>
+
+      {/* NEW CLIENT DIALOG */}
+      <Dialog open={showAddClient} onOpenChange={setShowAddClient}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Register New Client</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Add client details to establish a case file and enable practice assignments.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateClient} className="space-y-4 py-2">
+            {formError && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-first-name" className="text-xs font-semibold">
+                  First Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="new-first-name"
+                  placeholder="Jane"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={creating}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="new-last-name" className="text-xs font-semibold">
+                  Last Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="new-last-name"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={creating}
+                  required
+                />
+              </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-middle-name" className="text-xs font-semibold">
+                Middle Name <span className="text-muted-foreground font-normal">(Optional)</span>
+              </Label>
+              <Input
+                id="new-middle-name"
+                placeholder="Elizabeth"
+                value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-email" className="text-xs font-semibold">
+                Email Address <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="new-email"
+                  type="email"
+                  placeholder="client@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={creating}
+                  required
+                  className="pl-9"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Used for delivering practice assignments.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-phone" className="text-xs font-semibold">
+                Phone Number <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex gap-2">
+                <Select
+                  value={countryCode}
+                  onValueChange={setCountryCode}
+                  disabled={creating}
+                >
+                  <SelectTrigger className="w-[125px] shrink-0 text-xs">
+                    <SelectValue placeholder="Code" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    {COUNTRY_CODES.map((item) => (
+                      <SelectItem key={item.code} value={item.code} className="text-xs">
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="new-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="91234567"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                    disabled={creating}
+                    required
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4 gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAddClient(false)}
+                disabled={creating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={creating || !isFormValid}
+                className="font-semibold shadow-sm"
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registering…
+                  </>
+                ) : (
+                  "Create Client Profile"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
