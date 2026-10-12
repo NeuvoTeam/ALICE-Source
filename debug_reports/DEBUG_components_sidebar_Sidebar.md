@@ -1,4 +1,8 @@
-﻿# Audit Report: Sidebar.tsx
+﻿> **FILE DELETED 2026-10-10.** `components/sidebar/Sidebar.tsx` was removed from the tree as unreferenced
+> (repo-wide reference search came back empty — see `documentation.md` §13.3). This report is
+> retained as a point-in-time audit of the file as it stood before deletion.
+
+# Audit Report: Sidebar.tsx
 
 Path: `D:\Work\Neuvo\ALICE\Source\components\sidebar\Sidebar.tsx`
 

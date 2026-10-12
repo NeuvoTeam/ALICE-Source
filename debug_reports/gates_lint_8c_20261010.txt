@@ -1,0 +1,31 @@
+== npx tsc --noEmit ==
+exit 0 (no output)
+
+== npm test ==
+> my-project@0.1.0 test
+> node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+
+== npm run build ==
+exit 0
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze/session
+├ ƒ /cases/[caseId]/sessions/[sessionId]
+├ ○ /client-login
+├ ○ /dashboard
+├ ○ /forgot-password
+├ ƒ /homework/[sessionId]
+├ ○ /login
+├ ƒ /practice/[sessionId]
+├ ƒ /practitioner/tasks/[id]/review
+├ ○ /signup
+└ ○ /test-auth
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

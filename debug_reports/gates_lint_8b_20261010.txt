@@ -1,0 +1,128 @@
+ALICE lint 8b — apply the Geist Mono font (variable wiring + generic fallback)
+Card t_c2816da0 · operator decision "Apply" (via Jin, 2026-10-10) · branch `alan` · NO PUSH
+================================================================================
+
+Tree
+----
+base   e3b77fa  refactor(lint): delete the 15 dead bindings and 3 stray EOF expressions  (card 8a, parent b84b6f5)
+8b     ONE local commit on top (hash in the "Post-commit git state" section below)
+files  app/layout.tsx (2 lines), app/globals.css (1 line), documentation.md (4 edits), debug_reports/*8b* (evidence)
+
+The change, exactly the four points of the card / register §5.1
+--------------------------------------------------------------
+1. app/layout.tsx:10  Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
+2. app/globals.css:84  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+3. app/layout.tsx:47  <body className={`${geist.className} ${geistMono.variable} antialiased`}>
+4. --font-sans untouched (app/globals.css:83 still `'Geist', 'Geist Fallback'`)
+
+Gates (all on the committed tree, raw output in the sibling files)
+-----------------------------------------------------------------
+npx tsc --noEmit        exit 0, no output
+npm test                exit 0 — 35/35 worker + 12/12 PDF + 15/15 hydration = 62/62   (test_8b_20261010.txt)
+npm run lint            exit 0 — 0 errors / 71 warnings  (was 0 errors / 72 warnings: −1, the C7 no-unused-vars)
+                        before: lint_8b_before_20261010.txt   after: lint_8b_after_20261010.txt
+npm run build           exit 0 — 13 routes, byte-identical to the pre-change build  (build_8b_after_20261010.txt,
+                        routes_8b_diff_20261010.txt)
+
+Criterion 1 — emitted CSS (css_8b_before_after_20261010.txt)
+------------------------------------------------------------
+BEFORE (tree e3b77fa):
+  .font-mono{font-family:Geist Mono,Geist Mono Fallback}
+AFTER:
+  .font-mono{font-family:var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace}
+  .geist_mono_d6617093-module__z61v7q__variable{--font-geist-mono:"Geist Mono", "Geist Mono Fallback"}
+  <body class="geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased">
+
+CORRECTION to the register (measured, and it matters for the "before" story):
+  the register §5.1 claimed no `Geist Mono` @font-face was emitted before the change.
+  It was: the pre-change build already carried 6 `font-family:Geist Mono` @font-face rules
+  (latin + 5 subset unicode-ranges) plus `font-family:Geist Mono Fallback` (src:local(Arial),
+  size-adjust:134.59%). Next 16.2.4 (Turbopack) emits the @font-face CSS for a loader call
+  whether or not the loader's class is referenced; only the class binding was tree-shaken.
+  Consequence: the clinical values were ALREADY monospaced before this change wherever the
+  webfont loaded (measured below), so this card's real pre-change defects were the missing
+  generic fallback and the dead binding — not a proportional rendering.
+
+Criterion 2 — the final stack, and the measured limit
+-----------------------------------------------------
+Final token:  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace
+The token literally ends in the generic `monospace` keyword. The stated consequence — "a failed
+webfont load degrades to a monospace face rather than a proportional one" — is NOT achieved,
+and the reason is measurable: the value Next generates for `--font-geist-mono` ends in its own
+`"Geist Mono Fallback"` face, `src: local(Arial)`, a PROPORTIONAL face that sits ahead of
+`ui-monospace` in the resolved stack.
+
+  webfont blocked (fresh browser, CDP Network.setBlockedURLs ["*.woff2"], before any navigation):
+    BEFORE  after  —  both 14/14 `.font-mono` elements PROPORTIONAL
+      computed stack (after): "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, Menlo, monospace
+      advance test on that stack: i×10 = 47.84px, W×10 = 203.22px   (proportional — Arial won)
+      `Geist Mono` faces: error (6), `Geist Mono Fallback`: loaded
+      the stack with the Geist families stripped — `ui-monospace, SFMono-Regular, Menlo, monospace` —
+      measures 87.97px / 87.97px: MONOSPACED. The guarantee therefore sits one family-list edit away.
+    evidence: font_8b_measure_before_blocked_20261010.json, font_8b_measure_after_blocked_20261010.json,
+              font_8b_review_webfont_blocked_20261010.png (values visibly proportional)
+
+  Remedy tested and rejected: `adjustFontFallback: false` on the loader. In Next 16.2.4/Turbopack it
+  does NOT remove the `Geist Mono Fallback` face or the trailing family: after that build the CSS still
+  read `--font-geist-mono:"Geist Mono", "Geist Mono Fallback"` and the fallback @font-face still carried
+  its size-adjust overrides (only the module hash changed). Reverted; that state is not in the commit.
+  The one family-list edit that does deliver the guarantee is dropping the var() reference —
+  `--font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace` — which trades away
+  Next's metric-adjusted fallback (small layout-shift benefit) for the monospace degradation. That is
+  an operator call, and §7.1 explicitly reserves this font question to the operator; the card's
+  prescribed wiring is what is committed.
+
+Criterion 3 — measured on the real components (not a claim)
+-----------------------------------------------------------
+Method: the production build was served with `npm start` (port 3100) and a real browser was driven
+over CDP. `window.fetch` was stubbed from a `Page.addScriptToEvaluateOnNewDocument` payload and a
+synthetic token put in localStorage, so AuthGuard's `/auth/me` and the page's
+`/tasks/submissions/<id>/bundle` GET both answered with NON-CLINICAL fixture data (synthetic
+activity schedule, synthetic note, synthetic audit rows) — no production credential and no PHI.
+The review page therefore rendered normally, behind its real AuthGuard, with no bypass of it.
+
+  app/practitioner/tasks/[id]/review/page.tsx — 14 `.font-mono` elements, all 14 measured monospaced
+  (advance test i×10 = 96.00px, W×10 = 96.00px, computed font-family
+   "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, Menlo, monospace):
+     :277  SPAN  "6 Oct 2026, 1:03 pm" / "22222222…" / "11111111…" / "8 Oct 2026, 5:07 pm" / "55555555…"  (AuditStrip, 5 elements)
+     :365  P     "6 Oct 2026, 1:03 pm · by 44444444…" (×3 audit rows)
+     :343  CODE  "status_audit_log"
+     :573  SPAN  "09:00" / "14:00" / "11:00" (weekly schedule slots)
+     :886  P     "6 Oct 2026, 3:05 pm · 33333333…" (practitioner note)
+     :872  CODE  "submission_practitioner_notes"
+   evidence: font_8b_measure_after_normal_20261010.json, font_8b_review_webfont_loaded_20261010.png
+   (compare with the 10.9 ms-per-digit differences vs the blocked screenshot)
+
+  components/ui/chart.tsx:236 — this file has ZERO importers anywhere in the repo (the app never
+  renders a chart), so its tooltip cannot be reached by navigation. It was still measured from the
+  REAL module: the compiled `ChartContainer` + `BarChart` + `ChartTooltip`/
+  `ChartTooltipContent` were esbuild-bundled from `@/components/ui/chart` (so the real component, not
+  a copy), served from the Hermes scratch dir on port 3101, injected into the running production page
+  (same origin, so the shipped CSS and font wiring apply) and opened with a trusted CDP mouse move:
+     SPAN  "42"  class "text-foreground font-mono font-medium tabular-nums"
+     computed "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, Menlo, monospace
+     advance i×10 96.00px = W×10 96.00px → monospaced
+   evidence: font_8b_measure_after_chart_20261010.json, font_8b_chart_tooltip_mounted_20261010.png
+
+Criterion 4 — lint
+------------------
+before 0 errors / 72 warnings  →  after 0 errors / 71 warnings  (−1: the C7 `no-unused-vars` on `geistMono`).
+Raw: lint_8b_before_20261010.txt, lint_8b_after_20261010.txt
+
+Criterion 5 — gates + routes: see the gate table above; the route list is byte-identical (13 routes,
+before vs after) — routes_8b_diff_20261010.txt.
+
+Hygiene
+-------
+* No harness route and no harness file was created inside the repo tree. The measurements ran against
+  the real production server; the only repo additions are evidence files under debug_reports/.
+  `app/` contains exactly the two edited files.
+* `scratch/` at the repo root is an UNTRACKED directory of 42 files left by earlier runs (before.json,
+  lint_after.txt, assemble-log.mjs, …); it predates this card, is not linted, and was NOT touched.
+  Flagging it as a hygiene hotspot for the operator — it is not in .gitignore, so `git status` shows
+  it on every run (`?? scratch/`).
+* `next-env.d.ts` is rewritten by every production build (it flips the `./.next/dev/types/routes.d.ts`
+  reference to `./.next/types/routes.d.ts`). That build churn was reverted with `git checkout --`
+  and is not part of the commit; `npx tsc --noEmit` passes with the tracked version
+  (both `./.next/types/` and `./.next/dev/types/` exist).
+* NOT PUSHED. `origin/alan` was at b84b6f5; the branch runs ahead again by this commit.

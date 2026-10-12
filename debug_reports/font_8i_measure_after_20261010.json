@@ -1,0 +1,1170 @@
+{
+ "review": {
+  "loaded": {
+   "url": "http://localhost:3314/practitioner/tasks/probe-id/review",
+   "probeCalls": [
+    "https://clinical-ai-backend.neuvoteam.workers.dev/auth/me",
+    "https://clinical-ai-backend.neuvoteam.workers.dev/tasks/submissions/probe-id/bundle"
+   ],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": true,
+   "geistMonoFallbackCheck": false,
+   "faces": [
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | loaded | 100 900",
+    "Geist Fallback | unloaded | normal",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "geistMonoDom": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "6 Oct 2026, 1:03 pm",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 1,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "22222222\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 2,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "11111111\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 3,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "8 Oct 2026, 5:07 pm",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 4,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "55555555\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 5,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "09:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 6,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "14:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 7,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "11:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 8,
+     "tag": "CODE",
+     "cls": "font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm",
+     "text": "submission_practitioner_notes",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 9,
+     "tag": "P",
+     "cls": "mt-1.5 text-[11px] text-muted-foreground font-mono",
+     "text": "6 Oct 2026, 3:05 pm \u00b7 33333333\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 10,
+     "tag": "CODE",
+     "cls": "font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm",
+     "text": "status_audit_log",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 11,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "6 Oct 2026, 1:03 pm \u00b7 by 44444444\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 12,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "7 Oct 2026, 11:10 am \u00b7 by 33333333\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 13,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "8 Oct 2026, 5:07 pm \u00b7 by 55555555\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 14,
+   "monospacedCanvas": 14,
+   "monospacedDom": 14,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  },
+  "blocked": {
+   "url": "http://localhost:3314/practitioner/tasks/probe-id/review",
+   "probeCalls": [
+    "https://clinical-ai-backend.neuvoteam.workers.dev/auth/me",
+    "https://clinical-ai-backend.neuvoteam.workers.dev/tasks/submissions/probe-id/bundle"
+   ],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": false,
+   "geistMonoFallbackCheck": true,
+   "faces": [
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist Fallback | loaded | normal",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 47.83,
+     "wide": 203.21,
+     "monospaced": false
+    },
+    "geistMonoDom": {
+     "narrow": 47.84,
+     "wide": 203.22,
+     "monospaced": false
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "6 Oct 2026, 1:03 pm",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 1,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "22222222\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 2,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "11111111\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 3,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "8 Oct 2026, 5:07 pm",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 4,
+     "tag": "SPAN",
+     "cls": "font-medium text-foreground font-mono",
+     "text": "55555555\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 5,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "09:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 6,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "14:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 7,
+     "tag": "SPAN",
+     "cls": "w-24 shrink-0 text-xs text-muted-foreground pt-0.5 font-mono",
+     "text": "11:00",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 8,
+     "tag": "CODE",
+     "cls": "font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm",
+     "text": "submission_practitioner_notes",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 9,
+     "tag": "P",
+     "cls": "mt-1.5 text-[11px] text-muted-foreground font-mono",
+     "text": "6 Oct 2026, 3:05 pm \u00b7 33333333\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 10,
+     "tag": "CODE",
+     "cls": "font-mono text-[10px] bg-muted px-1 py-0.5 rounded-sm",
+     "text": "status_audit_log",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 11,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "6 Oct 2026, 1:03 pm \u00b7 by 44444444\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 12,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "7 Oct 2026, 11:10 am \u00b7 by 33333333\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 13,
+     "tag": "P",
+     "cls": "mt-1 text-[11px] text-muted-foreground font-mono",
+     "text": "8 Oct 2026, 5:07 pm \u00b7 by 55555555\u2026",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 14,
+   "monospacedCanvas": 14,
+   "monospacedDom": 14,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  }
+ },
+ "practice": {
+  "loaded": {
+   "url": "http://localhost:3314/practice/probe-session",
+   "probeCalls": [
+    "https://clinical-ai-backend.neuvoteam.workers.dev/client-homework/probe-session"
+   ],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": true,
+   "geistMonoFallbackCheck": false,
+   "faces": [
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | loaded | 100 900",
+    "Geist Fallback | unloaded | normal",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "geistMonoDom": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u25a1",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 1,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u2261",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 2,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u22ef",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 3,
+   "monospacedCanvas": 3,
+   "monospacedDom": 3,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  },
+  "blocked": {
+   "url": "http://localhost:3314/practice/probe-session",
+   "probeCalls": [
+    "https://clinical-ai-backend.neuvoteam.workers.dev/client-homework/probe-session"
+   ],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": false,
+   "geistMonoFallbackCheck": true,
+   "faces": [
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist Fallback | loaded | normal",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 47.83,
+     "wide": 203.21,
+     "monospaced": false
+    },
+    "geistMonoDom": {
+     "narrow": 47.84,
+     "wide": 203.22,
+     "monospaced": false
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u25a1",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 1,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u2261",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    },
+    {
+     "i": 2,
+     "tag": "SPAN",
+     "cls": "font-mono text-xs leading-none",
+     "text": "\u22ef",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 3,
+   "monospacedCanvas": 3,
+   "monospacedDom": 3,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  }
+ },
+ "fontprobe": {
+  "loaded": {
+   "url": "http://localhost:3314/fontprobe",
+   "probeCalls": [],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": true,
+   "geistMonoFallbackCheck": false,
+   "faces": [
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | unloaded | 100 900",
+    "Geist | loaded | 100 900",
+    "Geist Fallback | unloaded | normal",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | unloaded | 100 900",
+    "Geist Mono | loaded | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "geistMonoDom": {
+     "narrow": 96,
+     "wide": 96,
+     "monospaced": true
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "text-foreground font-mono font-medium tabular-nums",
+     "text": "17",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 96,
+      "wide": 96,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 1,
+   "monospacedCanvas": 1,
+   "monospacedDom": 1,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  },
+  "blocked": {
+   "url": "http://localhost:3314/fontprobe",
+   "probeCalls": [],
+   "bodyClass": "geist_9e050971-module__05dp7a__className geist_mono_d6617093-module__z61v7q__variable antialiased",
+   "varFontMonoRoot": "",
+   "varFontGeistMonoBody": "\"Geist Mono\", \"Geist Mono Fallback\"",
+   "bodyComputedFontFamily": "Geist, \"Geist Fallback\"",
+   "geistMonoCheck": false,
+   "geistMonoFallbackCheck": true,
+   "faces": [
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist | error | 100 900",
+    "Geist Fallback | loaded | normal",
+    "Geist Mono | error | 100 900",
+    "Geist Mono | error | 100 900",
+    "Geist Mono | error | 100 900",
+    "Geist Mono | error | 100 900",
+    "Geist Mono | error | 100 900",
+    "Geist Mono | error | 100 900",
+    "Geist Mono Fallback | unloaded | normal"
+   ],
+   "references": {
+    "geistMonoCanvas": {
+     "narrow": 47.83,
+     "wide": 203.21,
+     "monospaced": false
+    },
+    "geistMonoDom": {
+     "narrow": 47.84,
+     "wide": 203.22,
+     "monospaced": false
+    },
+    "tailCanvas": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    },
+    "tailDom": {
+     "narrow": 87.97,
+     "wide": 87.97,
+     "monospaced": true
+    }
+   },
+   "elements": [
+    {
+     "i": 0,
+     "tag": "SPAN",
+     "cls": "text-foreground font-mono font-medium tabular-nums",
+     "text": "17",
+     "computedFontFamily": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "declared": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+     "canvas": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "dom": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     },
+     "tail": {
+      "narrow": 87.97,
+      "wide": 87.97,
+      "monospaced": true
+     }
+    }
+   ],
+   "elementCount": 1,
+   "monospacedCanvas": 1,
+   "monospacedDom": 1,
+   "proportionalCanvas": 0,
+   "proportionalDom": 0
+  }
+ }
+}

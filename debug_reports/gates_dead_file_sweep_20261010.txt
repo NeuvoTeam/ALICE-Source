@@ -1,0 +1,879 @@
+# Gates & raw evidence — card t_e3b204c2 (dead-file sweep, 2026-10-10)
+
+Tree: D:\Work\Neuvo\ALICE\Source · branch alan · base 3b191e4 (card 5) · local only, NO PUSH.
+
+Section 1 was captured on the tree BEFORE the 15 deletions — that is the point of it: every deleted
+file still exists there, so the searches show that the file's own definition is the only occurrence.
+Sections 2-4 were captured after the deletions, on the staged tree.
+
+================================================================================
+## 1. Reference searches (pre-deletion transcript, tree at 3b191e4)
+================================================================================
+
+===== SECTION A: per-file name sweeps (case-insensitive), EX set:
+EX="--exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml"
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'clinical-folder-tree' -e 'ClinicalFolderTree' . | grep -v '^./debug_reports/' | grep -v '^./OVERNIGHT_REPORT.md'
+./components/clinical-folder-tree.tsx:7:export interface ClinicalFolderTreeProps {
+./components/clinical-folder-tree.tsx:13:export function ClinicalFolderTree({
+./components/clinical-folder-tree.tsx:17:}: ClinicalFolderTreeProps) {
+./documentation.md:282:`components/clinical-folder-tree.tsx` is an unused alternate (see §13).
+./documentation.md:863:  this approach; the hidden role-play/quiz blocks and the unreferenced `components/clinical-folder-tree.tsx`
+./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'use-toast' -e 'useToast' . | grep -v '^./debug_reports/'
+./app/dashboard/page.tsx:9:import { useToast } from "@/hooks/use-toast";
+./app/dashboard/page.tsx:34:  const { toast } = useToast();
+./components/ui/toaster.tsx:3:import { useToast } from '@/hooks/use-toast'
+./components/ui/toaster.tsx:14:  const { toasts } = useToast()
+./components/ui/use-toast.ts:171:function useToast() {
+./components/ui/use-toast.ts:191:export { useToast, toast }
+./documentation.md:103:| `hooks/` | `use-clinical-workspace.ts` (local-only workspace — see §8), `use-mobile.ts`, `use-toast.ts` |
+./documentation.md:905:- Toast feedback is wired to `hooks/use-toast.ts`, and `app/layout.tsx` mounts `<Toaster />` from
+./documentation.md:908:  `components/ui/toaster.tsx` reads `@/hooks/use-toast`, the same module the call sites use.
+./documentation.md:1239:| Unused components | `components/clinical-folder-tree.tsx` is a truncated stub referencing an undefined `ClinicalFolderTreeProps`; it is the only unreferenced component left. The other three — `components/session-history-panel.tsx`, `components/sidebar/Sidebar.tsx` and `components/sidebar/EditableText.tsx` — were deleted on 2026-10-10 after a repo-wide reference search (static imports, dynamic `import()`, `next/dynamic`, barrels, tests, scripts, Tailwind `@source` globs and Markdown) came back empty for each; see `debug_reports/DEAD_COMPONENT_DELETION_20261010.md`. `components/ui/use-toast.ts` duplicates `hooks/use-toast.ts` and stays for now — out of scope |
+./hooks/use-toast.ts:171:function useToast() {
+./hooks/use-toast.ts:191:export { useToast, toast }
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'use-mobile' -e 'useIsMobile' . | grep -v '^./debug_reports/'
+./components/ui/sidebar.tsx:8:import { useIsMobile } from '@/hooks/use-mobile'
+./components/ui/sidebar.tsx:69:  const isMobile = useIsMobile()
+./components/ui/use-mobile.tsx:5:export function useIsMobile() {
+./documentation.md:103:| `hooks/` | `use-clinical-workspace.ts` (local-only workspace — see §8), `use-mobile.ts`, `use-toast.ts` |
+./documentation.md:900:  `lg:hidden`, so no chrome is added on desktop. The repo's `hooks/use-mobile.ts` was not used: its
+./hooks/use-mobile.ts:5:export function useIsMobile() {
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml 'sonner' . | grep -v '^./debug_reports/'
+./components/ui/sonner.tsx:4:import { Toaster as Sonner, ToasterProps } from 'sonner'
+./components/ui/sonner.tsx:10:    <Sonner
+./documentation.md:909:  `components/ui/sonner.tsx` exports a second `Toaster`, but no call site uses sonner, so it is
+./package.json:63:    "sonner": "^1.7.1",
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'styles/globals' -e '@@/styles' -e "['\"]\./styles" -e "['\"]\.\./styles" -e 'styles/' . | grep -v '^./debug_reports/'
+./documentation.md:107:| `styles/globals.css` | Duplicate of the Tailwind theme (the canonical copy per `components.json` is `app/globals.css`) |
+./documentation.md:1248:| Duplicate theme | `styles/globals.css` duplicates `app/globals.css`; only the latter is referenced by `components.json` and imported by `app/layout.tsx` (verified 2026-10-10 as **dead**: no source file imports `styles/`, it is absent from `.next/static`, and the rendered `/login` computes `--background` `#f6f9fb` and `--radius` `.75rem` — `app/globals.css`'s values, not `#ffffff` / `.625rem`. It is left in place: deletion is a separate card) |
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'patch-cloudflare' -e 'patch-tasks' -e 'patch-vignette' . | grep -v '^./debug_reports/'
+./eslint.config.mjs:41:    files: ["patch-cloudflare.js", "patch-tasks.js", "patch-vignette.js"],
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml 'dispatch-inbox' . | grep -v '^./debug_reports/'
+./.clinerules:36:- **DeepSeek Cloud Scope:** When running on DeepSeek API, operate STRICTLY on generic UI (Tailwind, React components, Canvas DOM pointer events), standalone scripts (`dispatch-inbox.ps1`, Node tools), and synthetic test suites.
+./scripts/run-silent.vbs:2:WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""D:\Work\Neuvo\ALICE\Source\scripts\dispatch-inbox.ps1""", 0, False
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'README' -e 'readme' . | grep -v '^./debug_reports/'
+./documentation.md:1249:| Empty README | `README.md` is zero bytes; this document is not linked from anywhere in the repo |
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'ai-config' -e 'intake.txt' -e 'session.txt' . | grep -v '^./debug_reports/'
+./documentation.md:119:| `ai-config/` | `mcp.json` (MCP server registration; contains a placeholder subdomain) and `prompts/` (`intake.txt`, `session.txt` — both empty) |
+./documentation.md:961:(`https://alice-mcp.neuvoteam.workers.dev/`), `ai-config/mcp.json` (a placeholder
+./documentation.md:1242:| Empty placeholders | `ai-config/prompts/intake.txt`, `ai-config/prompts/session.txt`, `supabase/functions/`, `public/placeholder-*` |
+./documentation.md:1243:| Stale MCP config | `ai-config/mcp.json` still points at `alice-mcp.YOUR-SUBDOMAIN.workers.dev`, unlike `.cursor/config.json` |
+./OVERNIGHT_REPORT.md:268:   - `ai-config/mcp.json` → `alice-mcp.YOUR-SUBDOMAIN.workers.dev` (placeholder, already stale)
+./workers/mcp-gateway/src/index.ts:14:    // (.cursor/config.json, ai-config/mcp.json). Until it is set these routes 404.
+exit=0
+
+$ grep -rniI --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'mcp-gateway/src/memory' -e 'memory.ts' . | grep -v '^./debug_reports/'
+./documentation.md:966:imported — `src/index.ts` inlines both; `src/memory.ts` is empty.
+./documentation.md:1241:| Unused MCP sources | `workers/mcp-gateway/src/tools.ts` and `src/context.ts` are never imported (the gateway inlines both); `src/memory.ts` is empty |
+exit=0
+
+===== SECTION B: dynamic imports / next/dynamic
+$ grep -rnE 'import\(|dynamic\(' --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.js' --include='*.jsx' --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml .
+./components/main-content.tsx:22:const VignetteGenerator = dynamic(() => import("./vignette-generator"), {
+./components/vignette-generator.tsx:256:      const { downloadPracticePackagePdf } = await import("@/lib/export-practice-pdf")
+./next.config.mjs:1:/** @type {import('next').NextConfig} */
+./postcss.config.mjs:1:/** @type {import('postcss-load-config').Config} */
+./tests/worker.test.mjs:112:const worker = (await import(pathToFileURL(workerFile).href)).default
+exit=0
+
+===== SECTION C: barrels
+$ find components app lib hooks stores -maxdepth 2 -iname 'index.*' -not -path '*/node_modules/*'
+components/canvas/index.ts
+components/tasks/index.ts
+exit=0
+
+===== SECTION D: config surfaces
+$ grep -rn 'paths\|"@/' tsconfig.json
+25:    "paths": {
+26:      "@/*": [
+exit=0
+
+$ grep -n '@source\|@import\|content' app/globals.css
+1:@import 'tailwindcss' source(none);
+2:@source '../app';
+3:@source '../components';
+4:@source '../lib';
+5:@source '../hooks';
+6:@source '../stores';
+7:@import 'tw-animate-css';
+exit=0
+
+$ cat components.json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+exit=0
+
+$ grep -rn 'patch-\|sonner\|styles' eslint.config.mjs
+41:    files: ["patch-cloudflare.js", "patch-tasks.js", "patch-vignette.js"],
+exit=0
+
+===== SECTION E: markdown sweep
+$ grep -rlniI --include='*.md' --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=scratch --exclude-dir=.gradle --exclude=*.tsbuildinfo --exclude=package-lock.json --exclude=pnpm-lock.yaml -e 'clinical-folder-tree' -e 'use-toast' -e 'use-mobile' -e 'sonner' -e 'styles/globals' -e 'patch-cloudflare' -e 'patch-vignette' -e 'patch-tasks' -e 'dispatch-inbox' -e 'README.md' .
+./debug_reports/DEAD_COMPONENT_DELETION_20261010.md
+./debug_reports/DEBUG_app_dashboard_page.md
+./debug_reports/DEBUG_components_clinical-folder-tree.md
+./debug_reports/DEBUG_components_ui_sonner.md
+./debug_reports/DEBUG_components_ui_use-mobile.md
+./debug_reports/DEBUG_components_ui_use-toast.md
+./debug_reports/DEBUG_hooks_use-mobile.md
+./debug_reports/DEBUG_hooks_use-toast.md
+./debug_reports/LINT_GATE_20261010.md
+./debug_reports/UI_DESTRUCTIVE_FOREGROUND_20261010.md
+./debug_reports/UI_MOBILE_DRAWER_20261010.md
+./debug_reports/UI_RADIUS_SCALE_20261010.md
+./debug_reports/UI_TOASTER_MOUNT_20261010.md
+./documentation.md
+./OVERNIGHT_REPORT.md
+exit=0
+
+===== SECTION F: backups / 0-byte / root scripts
+$ find . -path ./node_modules -prune -o -path ./.next -prune -o -path ./.git -prune -o -type f \( -name '*.bak*' -o -name '*.old' -o -name '*.orig' -o -name '*.tmp*' -o -name '*~' -o -name '*.swp' -o -name '*.save' -o -name '*.rej' \) -print
+./scripts/dispatch-inbox.ps1.bak-20261001-161325
+exit=0
+
+$ find . -path ./node_modules -prune -o -path ./.next -prune -o -path ./.git -prune -o -type f -size 0 -print
+./.gradle/9.2.0/gc.properties
+./.gradle/vcs-1/gc.properties
+./ai-config/prompts/intake.txt
+./ai-config/prompts/session.txt
+./README.md
+./workers/mcp-gateway/src/memory.ts
+exit=0
+
+$ find . -maxdepth 1 -type f -printf '%s\t%p\n' | sort -k2
+441	./.agyrules
+6524	./.clinerules
+727	./.cursorrules
+99	./.dev.vars
+203	./.gitattributes
+508	./.gitignore
+5713	./.hermes.md
+167	./.rooignore
+4238	./AGENTS.md
+636	./ARCHITECTURE.md
+383	./build.gradle.kts
+535	./CLAUDE.md
+427	./components.json
+109971	./documentation.md
+3155	./eslint.config.mjs
+7320	./FEATURE_PIPELINE.md
+535	./GEMINI.md
+181	./next.config.mjs
+257	./next-env.d.ts
+24567	./OVERNIGHT_REPORT.md
+4230	./overnight-debug.ps1
+2908	./package.json
+611748	./package-lock.json
+3983	./patch-cloudflare.js
+1069	./patch-tasks.js
+7922	./patch-vignette.js
+133137	./pnpm-lock.yaml
+144	./postcss.config.mjs
+0	./README.md
+202	./settings.gradle.kts
+695	./tsconfig.json
+251029	./tsconfig.tsbuildinfo
+1549	./wrangler.jsonc
+exit=0
+
+=== DONE ===
+
+================================================================================
+## 2. Gate outputs (post-deletion)
+================================================================================
+
+### 2.1 npx tsc --noEmit
+
+$ npx tsc --noEmit
+exit=0
+
+### 2.2 npm test
+
+$ npm test
+
+> my-project@0.1.0 test
+> node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs
+
+REQUEST POST /analyze/session
+PASS  1 analyze: JSON mode + reasoning_effort=low, single call
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+PASS  2 analyze: invalid JSON recovered by one temperature-0 retry
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+PASS  3 analyze: 502 BAD_AI_RESPONSE + reason/parseError  Expected double-quoted property name in JSON at position 73 (line 1 column 74)
+REQUEST POST /analyze/session
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=analyze, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+PASS  4 analyze: truncation retried with max_completion_tokens=4096
+REQUEST POST /analyze/session
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=analyze, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  5 analyze: 502 AI_TRUNCATED (not BAD_AI_RESPONSE)
+REQUEST POST /generate/practice-package
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+REQUEST POST /generate/practice-package
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  6 package: 502 and degraded 200 both carry a truthful code
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq error: GROQ ERROR 429 Rate limit reached (model=openai/gpt-oss-120b)
+PASS  7 analyze: retry that 429s reports GROQ_ERROR
+REQUEST GET /ai/probe
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+REQUEST GET /ai/probe
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+PASS  8 probe: reports attempts/reason/parse_error
+REQUEST GET /ai/health
+REQUEST POST /analyze/session
+PASS  9 health + non-reasoning model: no JSON mode, no reasoning_effort
+REQUEST POST /analyze/session
+PASS  10 GROQ_MAX_TOKENS => max_completion_tokens
+REQUEST POST /analyze/session
+PASS  11 persistence: analyze writes sessions + session_versions
+REQUEST POST /generate/practice-package
+PASS  12 persistence: package writes practice_package
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+REQUEST POST /generate/practice-package
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  13 persistence: failed and degraded runs write nothing
+REQUEST POST /generate/practice-package
+Groq retry: bad_shape (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=57) — retrying once at temperature 0
+PASS  14 package: a partial answer is retried and replaced, never filled with fallbacks
+REQUEST POST /generate/practice-package
+Groq retry: bad_shape (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=57) — retrying once at temperature 0
+Groq parse error: The model's answer did not match the required JSON shape (model=openai/gpt-oss-120b, reason=bad_shape, attempts=2, finish_reason=stop) the JSON parsed but did not match the practice-package contract (keys: homework) sample="{\"homework\":[\"Complete the decatastrophizing worksheet\"]}"
+PASS  15 package: unwrapped partial answer => 502 BAD_AI_SHAPE, no writes
+REQUEST POST /analyze/session
+Groq retry: bad_shape (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=26) — retrying once at temperature 0
+Groq parse error: The model's answer did not match the required JSON shape (model=openai/gpt-oss-120b, reason=bad_shape, attempts=2, finish_reason=stop) the JSON parsed but did not match the analyze contract (keys: inferredModality) sample="{\"inferredModality\":\"CBT\"}"
+PASS  16 analyze: missing rationale/riskFlags => 502, never defaulted
+REQUEST POST /analyze/session
+Groq retry: bad_shape (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=26) — retrying once at temperature 0
+PASS  17 analyze: partial answer recovered by the retry
+REQUEST POST /analyze/session
+Groq error: GROQ ERROR 400 Invalid schema for response_format (model=openai/gpt-oss-120b)
+Groq rejected the analyze JSON schema (400: Invalid schema for response_format) — falling back to json_object
+PASS  18 schema rejection (400) degrades to json_object instead of failing
+REQUEST POST /generate/practice-package
+Groq error: GROQ ERROR 400 Generated JSON does not match the expected schema. jsonschema: '' does not validate with /required: missing properties: 'scenario', 'quiz' (model=openai/gpt-oss-120b)
+Groq rejected the practice-package generation against the schema (400: Generated JSON does not match the expected schema. jsonschema: '' does not validate with /required: missing properties: 'scenario', 'quiz') — retrying with the schema
+Groq retry: schema_mismatch (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=n/a, length=0) — retrying once at temperature 0
+PASS  19 schema mismatch 400 => retried with the schema, not downgraded
+REQUEST POST /analyze/session
+PASS  20 GROQ_RESPONSE_FORMAT=schema sends strict json_schema
+REQUEST POST /analyze/session
+PASS  21 GROQ_RESPONSE_FORMAT=json_object sends json_object
+REQUEST POST /analyze/session
+REQUEST GET /ai/probe
+PASS  22 unescaped quote repaired without a retry (strategy=repaired)
+REQUEST POST /generate/practice-package
+PASS  23 nested unescaped quote repaired, package accepted
+REQUEST GET /clients
+REQUEST GET /clients
+PASS  24 guard: missing and malformed tokens are 401, nothing upstream
+REQUEST GET /clients
+REQUEST PATCH /sessions/sess-1
+PASS  25 guard: valid token 200, unauthenticated PATCH 401 with no write
+PASS  26 guard: OPTIONS preflight is exempt
+REQUEST GET /client-homework/session-0001
+PASS  27 public /client-homework: signed link, no token, no clinical fields
+REQUEST POST /auth/login
+PASS  28 guard: auth routes remain public
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+PASS  29 links: minting is clinician-only and its link opens anonymously
+REQUEST GET /client-link/session-0001
+PASS  30 links: ttl clamped to 30 days when 9999 was requested
+REQUEST GET /client-homework/session-0001
+Client link rejected (missing) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (bad_signature) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (expired) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (bad_signature) for session-…
+PASS  31 links: unsigned, tampered, expired, cross-session are all 403
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+CLIENT_LINK_SECRET missing or too short — client links are disabled
+Client link rejected (not_configured) for session-…
+PASS  32 links: missing CLIENT_LINK_SECRET fails closed
+REQUEST GET /client-homework/session-empty
+PASS  33 regression: no cross-session disclosure via submissions fallback
+REQUEST POST /generate/structured-task
+PASS  34 structured-task: normalizes nested 3 C's output from LLM
+REQUEST POST /generate/structured-task
+PASS  35 structured-task: invalid request schema returns 400
+
+35/35 checks passed
+(node:38764) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Work/Neuvo/ALICE/Source/lib/export-practice-pdf.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\D:\Work\Neuvo\ALICE\Source\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS  1 geometry: 174 mm column, body stops at 275 mm, footer at 281 mm
+PASS  2 sanitize: ☐ dropped, ⚠ and arrows mapped, Latin-1 accents kept
+PASS  3 collect: string rows, { task } rows, blanks and a null package
+PASS  4 short package: single-page PDF  6881 bytes
+PASS  5 empty package: renders the empty-state copy on one page
+PASS  6 25 tasks: multi-page, nothing dropped, all baselines inside the printable box  2 pages, deepest body line 262.4 mm
+PASS  7 60 tasks: pagination scales  4 pages
+PASS  8 6000-character task: hard-split across pages without overflow  75 lines
+PASS  9 determinism: identical layout for identical input
+PASS  10 footer: 'Page x of y' stamped on every page
+PASS  11 filename: ALICE_PracticePackage_YYYYMMDD_ClientName.pdf  ALICE_PracticePackage_20260916_JaneMayLow.pdf
+PASS  12 filename: accents folded, illegal characters dropped, capped, no invented segment
+
+12/12 checks passed
+(node:26488) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Work/Neuvo/ALICE/Source/lib/session-hydration.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\D:\Work\Neuvo\ALICE\Source\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS  1 guard: wait on the stub, keep when latched, hydrate when the payload lands
+PASS  2 race: the GET /client/:id stub never latches
+PASS  3 race: the payload rehydrates the notes, the analysis and Phase 3
+PASS  4 later write cannot reset the phase or stomp edits
+PASS  5 empty session: hydration completes on Phase 1
+PASS  6 blur-save after Next keeps Phase 2 and the typed notes
+PASS  7 Adjust -> Back -> blur-save stays on Phase 1 with the edits
+PASS  8 placeholder advisory survives a later write
+PASS  9 no advisory for a real formulation
+PASS  10 failed GET /sessions/:id leaves an empty Phase 1
+PASS  11 remount hydrates immediately
+PASS  12 re-selecting the same session leaves the clinician where they were
+PASS  13 losing the session clears local state and re-arms the latch
+PASS  14 the cleared latch hydrates a returning session
+PASS  15 counter-example: the pre-c902331 effect stuck on an empty Phase 1
+
+15/15 checks passed
+exit=0
+
+### 2.3 npm run build
+
+$ npm run build
+
+> my-project@0.1.0 build
+> next build
+
+▲ Next.js 16.2.4 (Turbopack)
+
+  Creating an optimized production build ...
+(node:37640) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 4.3s
+  Skipping validation of types
+  Finished TypeScript config validation in 12ms ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/10) ...
+  Generating static pages using 15 workers (2/10) 
+  Generating static pages using 15 workers (4/10) 
+  Generating static pages using 15 workers (7/10) 
+✓ Generating static pages using 15 workers (10/10) in 2.7s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze/session
+├ ƒ /cases/[caseId]/sessions/[sessionId]
+├ ○ /client-login
+├ ○ /dashboard
+├ ○ /forgot-password
+├ ƒ /homework/[sessionId]
+├ ○ /login
+├ ƒ /practice/[sessionId]
+├ ƒ /practitioner/tasks/[id]/review
+├ ○ /signup
+└ ○ /test-auth
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+exit=0
+
+### 2.4 route-list diff — before vs after the deletions (empty = byte-identical)
+
+$ diff scratch/routes_before.txt scratch/routes_after.txt
+exit=0
+
+### 2.5 npm run lint
+
+$ npm run lint
+
+> my-project@0.1.0 lint
+> eslint .
+
+
+D:\Work\Neuvo\ALICE\Source\app\api\analyze\session\route.ts
+   6:27  warning  'clientId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  33:19  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\dashboard\page.tsx
+  39:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\forgot-password\page.tsx
+  63:42  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\app\layout.tsx
+  10:7  warning  'geistMono' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Work\Neuvo\ALICE\Source\app\practice\[sessionId]\page.tsx
+   11:13  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  276:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx
+  1288:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx:1288:21
+  1286 |   }, [submissionId]);
+  1287 |
+> 1288 |   useEffect(() => { fetchBundle(); }, [fetchBundle]);
+       |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  1289 |
+  1290 |   const isLocked = bundle?.submission.status === "approved";
+  1291 |   const readOnly  = isLocked;  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\app\signup\page.tsx
+  112:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\backend\CloudFlare.js
+  190:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx
+  19:15  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  20:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  89:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx:89:5
+  87 |
+  88 |   useEffect(() => {
+> 89 |     fetchClients();
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |   }, []);
+  91 |
+  92 |   const fetchClient = async (id: string) => {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx
+   49:3   warning  'Upload' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   67:3   warning  'drawBackground' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  244:48  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx:244:48
+  242 |
+  243 |   // Force re-render only for UI counters (undo/redo availability)
+> 244 |   const [historyLen, setHistoryLen] = useState(strokesRef.current.length);
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  245 |   const [redoLen,    setRedoLen]    = useState(0);
+  246 |
+  247 |   // ── Upload state ─────────────────────────────────────────────────────────                                                                                                                                                                                                                                                                                                         react-hooks/refs
+  254:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx:254:5
+  252 |   useEffect(() => {
+  253 |     const mq = window.matchMedia("(prefers-color-scheme: dark)");
+> 254 |     setIsDark(mq.matches);
+      |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  255 |     const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+  256 |     mq.addEventListener("change", handler);
+  257 |     return () => mq.removeEventListener("change", handler);  react-hooks/set-state-in-effect
+  489:9   warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-expressions
+  567:7   warning  React Hook useImperativeHandle has missing dependencies: 'clientId' and 'submissionId'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\canvasUtils.ts
+  119:9  warning  'prev' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx
+  20:22  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  30:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx:30:5
+  28 |
+  29 |   useEffect(() => {
+> 30 |     setIsLoading(true)
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  31 |
+  32 |     const fetchVignettes = async () => {
+  33 |       try {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx
+  52:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx:52:5
+  50 |   // Picking a client or a session is navigation and must close the drawer.
+  51 |   useEffect(() => {
+> 52 |     setDrawerOpen(false);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  53 |   }, [selectedClientId, selectedSessionId]);
+  54 |
+  55 |   const sidebar = (  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx
+   26:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+   29:3   warning  'activeTab' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   90:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx:90:5
+  88 |
+  89 |   useEffect(() => {
+> 90 |     fetchVignettes();
+     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  91 |   }, [client.id, selectedSessionId]);
+  92 |
+  93 |   return (  react-hooks/set-state-in-effect
+   91:6   warning  React Hook useEffect has a missing dependency: 'fetchVignettes'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+  194:1   warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-expressions
+
+D:\Work\Neuvo\ALICE\Source\components\sidebar\CaseNode.tsx
+  108:1  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+D:\Work\Neuvo\ALICE\Source\components\sidebar\ClientNode.tsx
+  57:1  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+D:\Work\Neuvo\ALICE\Source\components\sidebar\EditableName.tsx
+  14:10  warning  'loading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  109:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  345:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:345:7
+  343 |   useEffect(() => {
+  344 |     if (externalSubmissionId) {
+> 345 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  346 |     }
+  347 |   }, [externalSubmissionId]);
+  348 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  461:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:461:5
+  459 |   useEffect(() => {
+  460 |     if (!persist) return;
+> 461 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  462 |     return () => {
+  463 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  464 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\ThreeCsForm.tsx
+  314:50  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx
+  98:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\ui\carousel.tsx:98:5
+   96 |   React.useEffect(() => {
+   97 |     if (!api) return
+>  98 |     onSelect(api)
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+   99 |     api.on('reInit', onSelect)
+  100 |     api.on('select', onSelect)
+  101 |  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx
+  611:26  warning  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+D:\Work\Neuvo\ALICE\Source\components\ui\sidebar.tsx:611:26
+  609 |   // Random width between 50 to 90%.
+  610 |   const width = React.useMemo(() => {
+> 611 |     return `${Math.floor(Math.random() * 40) + 50}%`
+      |                          ^^^^^^^^^^^^^ Cannot call impure function
+  612 |   }, [])
+  613 |
+  614 |   return (  react-hooks/purity
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+   28:10  warning  'generateStructuredTask' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   40:14  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   47:7   warning  'getDefaultActivity' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   54:36  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   64:32  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  132:10  warning  'sessionContext' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  132:26  warning  'setSessionContext' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  134:62  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  135:10  warning  'reflectionPrompt' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  135:28  warning  'setReflectionPrompt' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  135:60  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  154:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:154:7
+  152 |     if (!session) {
+  153 |       hydratedSessionRef.current = null
+> 154 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  155 |       setStep(1)
+  156 |       setSessionInput("")
+  157 |       setAnalysis(null)  react-hooks/set-state-in-effect
+  211:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  239:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  407:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  417:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  418:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  495:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  504:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  505:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  672:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts
+  33:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts:33:5
+  31 |     if (selectedClientId && findClient(hierarchy, selectedClientId)) return
+  32 |     const c = hierarchy.clients[0]
+> 33 |     setSelectedClientId(c.id)
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |     setSelectedCaseId(c.cases[0]?.id ?? null)
+  35 |     setSelectedSessionId(c.cases[0]?.sessions[0]?.id ?? null)
+  36 |   }, [hierarchy, selectedClientId])  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts
+  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts:14:5
+  12 |     }
+  13 |     mql.addEventListener('change', onChange)
+> 14 |     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  15 |     return () => mql.removeEventListener('change', onChange)
+  16 |   }, [])
+  17 |  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-toast.ts
+  18:7  warning  'actionTypes' is assigned a value but only used as a type  @typescript-eslint/no-unused-vars
+
+D:\Work\Neuvo\ALICE\Source\stores\useClientNavStore.ts
+  113:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  191:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  195:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  263:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  271:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  334:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  358:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  382:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  407:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  420:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  438:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  467:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  500:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  539:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  581:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  589:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\tests\worker.test.mjs
+  13:10  warning  'copyFile' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\Work\Neuvo\ALICE\Source\workers\mcp-gateway\src\index.ts
+    1:1   warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+    2:34  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+   48:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  107:59  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  186:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  218:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+
+✖ 91 problems (0 errors, 91 warnings)
+
+exit=0
+
+### 2.6 npm run docs:check
+
+$ npm run docs:check
+
+> my-project@0.1.0 docs:check
+> node scripts/check-docs.mjs && copy /Y D:\Work\Neuvo\ALICE\Source\documentation.md D:\Work\Neuvo\ALICE\Source\.obsidian_sync\ALICE_Master_Docs.md
+
+docs:check — ok (documentation.md moved with 5 path(s)).
+        1 file(s) copied.
+exit=0
+
+================================================================================
+## 3. Lint delta — card-4 baseline (98 warnings) vs post-sweep (91)
+================================================================================
+
+files-with-findings: 47 -> 42
+findings: 98 -> 91  (delta -7)
+
+--- files that vanished from the report entirely ---
+5  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx
+0  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx:23:5
+1  D:\Work\Neuvo\ALICE\Source\components\ui\use-mobile.tsx
+0  D:\Work\Neuvo\ALICE\Source\components\ui\use-mobile.tsx:14:5
+1  D:\Work\Neuvo\ALICE\Source\components\ui\use-toast.ts
+
+--- files whose count changed ---
+
+--- findings in the vanished files (baseline) ---
+  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx  4:23  warning  'CollapsibleContent' is defined but never used  @typescript-eslint/no-unused-vars
+  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx  4:43  warning  'CollapsibleTrigger' is defined but never used  @typescript-eslint/no-unused-vars
+  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx  15:3  warning  'selectedClientId' is defined but never used  @typescript-eslint/no-unused-vars
+  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx  16:3  warning  'selectedCaseId' is defined but never used  @typescript-eslint/no-unused-vars
+  D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx  23:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+  D:\Work\Neuvo\ALICE\Source\components\ui\use-mobile.tsx  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+  D:\Work\Neuvo\ALICE\Source\components\ui\use-toast.ts  18:7  warning  'actionTypes' is assigned a value but only used as a type  @typescript-eslint/no-unused-vars
+
+================================================================================
+## 4. Staging & freeze evidence
+================================================================================
+
+$ git diff --cached --name-status
+D	.gradle/9.2.0/gc.properties
+D	.gradle/vcs-1/gc.properties
+D	README.md
+D	ai-config/prompts/intake.txt
+D	ai-config/prompts/session.txt
+D	components/clinical-folder-tree.tsx
+D	components/ui/sonner.tsx
+D	components/ui/use-mobile.tsx
+D	components/ui/use-toast.ts
+M	debug_reports/DEBUG_components_clinical-folder-tree.md
+M	debug_reports/DEBUG_components_ui_sonner.md
+M	debug_reports/DEBUG_components_ui_use-mobile.md
+M	debug_reports/DEBUG_components_ui_use-toast.md
+M	documentation.md
+D	patch-cloudflare.js
+D	patch-tasks.js
+D	patch-vignette.js
+D	scripts/dispatch-inbox.ps1.bak-20261001-161325
+D	styles/globals.css
+D	workers/mcp-gateway/src/memory.ts
+exit=0
+
+$ git ls-remote --heads origin alan
+c6021602881baf5c69137579a4ac58ece7717966	refs/heads/alan
+exit=0
+
+The remote ref refs/heads/alan is unchanged: no push, no PR. The commit's own
+`git log --oneline --name-status` (deletions as D) is in the board handoff for this card.

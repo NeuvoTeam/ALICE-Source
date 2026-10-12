@@ -1,0 +1,19 @@
+docs:check — ok (documentation.md moved with 1 path(s)).
+[alan 587776b] chore(archive): archive the three orphaned kit files and record the orphaned embla dependency (lint 8j)
+ 19 files changed, 614 insertions(+), 5 deletions(-)
+ create mode 100644 archive/2026-10-10-unreferenced-ui-kit/README.md
+ rename {components => archive/2026-10-10-unreferenced-ui-kit/components}/ui/skeleton.tsx (100%)
+ rename {components => archive/2026-10-10-unreferenced-ui-kit/components}/ui/tooltip.tsx (100%)
+ rename {hooks => archive/2026-10-10-unreferenced-ui-kit/hooks}/use-mobile.ts (100%)
+ create mode 100644 debug_reports/agy_8j_readme_run.txt
+ create mode 100644 debug_reports/agy_8j_run.txt
+ create mode 100644 debug_reports/build_8j_after_20261010.txt
+ create mode 100644 debug_reports/build_8j_before_20261010.txt
+ create mode 100644 debug_reports/build_8j_before_probe_20261010.txt
+ create mode 100644 debug_reports/css_8j_delta_20261010.txt
+ create mode 100644 debug_reports/gates_8j_20261010.txt
+ create mode 100644 debug_reports/lint_8j_after_20261010.json
+ create mode 100644 debug_reports/lint_8j_before_20261010.json
+ create mode 100644 debug_reports/routes_8j_after_20261010.txt
+ create mode 100644 debug_reports/routes_8j_diff_20261010.txt
+ create mode 100644 debug_reports/test_8j_20261010.txt

@@ -1,0 +1,314 @@
+
+=== components_vignette-generator.tsx ===
+before 605 lines / 27047 bytes
+after  606 lines / 27109 bytes
+RESULT: emit differs — common prefix 25 lines, common suffix 455 lines
+--- before lines 26..150 ---
+  B26: import { decideSessionHydration } from "@/lib/session-hydration";
+  B27: import { upsertTaskDraft } from "@/lib/tasks";
+  B28: import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  B29: import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm";
+  B30: import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
+  B31: import { ModalitySelector } from "@/components/modality-selector";
+  B32: const TASK_VARIANTS = ["activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"];
+  B33: function isTaskVariant(v) {
+  B34:   return TASK_VARIANTS.includes(v);
+  B35: }
+  B36: const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable.";
+  B37: function extractHomeworkList(task) {
+  B38:   if (!task || typeof task !== "object") return [];
+  B39:   if (Array.isArray(task.homework) && task.homework.length > 0) {
+  B40:     return task.homework;
+  B41:   }
+  B42:   const items = [];
+  B43:   if (task.task_type === "two_choice_worksheet") {
+  B44:     if (task.title) items.push(task.title);
+  B45:     if (Array.isArray(task.prompts)) {
+  B46:       task.prompts.forEach((p, idx) => {
+  B47:         const q = typeof p === "string" ? p : p?.question;
+  B48:         if (q) items.push(`${idx + 1}. ${q}`);
+  B49:       });
+  B50:     }
+  B51:     if (task.reflection_prompt) {
+  B52:       items.push(`Reflection: ${task.reflection_prompt}`);
+  B53:     }
+  B54:   } else if (task.task_type === "thought_record") {
+  B55:     items.push("Complete 3 C's Thought Record");
+  B56:     if (task.situation) items.push(`Situation: ${task.situation}`);
+  B57:     if (task.automatic_thought) items.push(`Catch It (Automatic Thought): ${task.automatic_thought}`);
+  B58:     if (task.evidence_for || task.evidence_against) items.push("Check It: Review evidence for and against");
+  B59:     if (task.balanced_thought) items.push(`Correct It (Balanced Thought): ${task.balanced_thought}`);
+  B60:   } else if (task.task_type === "activity_log") {
+  B61:     items.push("Weekly Activity Schedule");
+  B62:     if (task.activity_description) items.push(`Scheduled Activity: ${task.activity_description}`);
+  B63:     if (task.activity_date) items.push(`Target Date: ${task.activity_date}`);
+  B64:     if (task.notes) items.push(`Notes: ${task.notes}`);
+  B65:   } else if (task.task_type === "reflection_prompt") {
+  B66:     items.push("Values & Defusion Canvas Reflection");
+  B67:     if (task.prompt) items.push(task.prompt);
+  B68:   }
+  B69:   return items.length > 0 ? items : ["Complete assigned practice task"];
+  B70: }
+  B71: function VignetteGenerator({
+  B72:   clientId,
+  B73:   caseId,
+  B74:   sessionId,
+  B75:   sessionName
+  B76: }) {
+  B77:   const saveSessionContent = useClientNavStore((s) => s.saveSessionContent);
+  B78:   const clientName = useClientNavStore((s) => s.client?.name);
+  B79:   const session = useClientNavStore(
+  B80:     (s) => s.client?.cases.find((c) => c.id === caseId)?.sessions.find((sess) => sess.id === sessionId)
+  B81:   );
+  B82:   const sessionHydratedId = useClientNavStore((s) => s.sessionHydratedId);
+  B83:   const hydratedSessionRef = useRef(null);
+  B84:   const [step, setStep] = useState(1);
+  B85:   const [sessionInput, setSessionInput] = useState("");
+  B86:   const [isProcessing, setIsProcessing] = useState(false);
+  B87:   const [isExporting, setIsExporting] = useState(false);
+  B88:   const [isSaving, setIsSaving] = useState(false);
+  B89:   const [analysis, setAnalysis] = useState(null);
+  B90:   const [practicePackage, setPracticePackage] = useState(null);
+  B91:   const [selectedModalities, setSelectedModalities] = useState(["CBT"]);
+  B92:   const [activityFormat, setActivityFormat] = useState("thought_record");
+  B93:   const [generatedSubmissionId, setGeneratedSubmissionId] = useState(null);
+  B94:   const [generatedTaskData, setGeneratedTaskData] = useState(null);
+  B95:   const [degradedWarning, setDegradedWarning] = useState(null);
+  B96:   const [linkStatus, setLinkStatus] = useState(null);
+  B97:   const notesLength = sessionInput.length;
+  B98:   const notesTokens = estimateTokens(notesLength);
+  B99:   const notesTooLong = notesLength > SESSION_NOTES_MAX_CHARS;
+  B100:   const notesLong = !notesTooLong && notesLength > SESSION_NOTES_WARN_CHARS;
+  B101:   const notesBudget = `\u2248${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`;
+  B102:   useEffect(() => {
+  B103:     if (!session) {
+  B104:       hydratedSessionRef.current = null;
+  B105:       setDegradedWarning(null);
+  B106:       setStep(1);
+  B107:       setSessionInput("");
+  B108:       setAnalysis(null);
+  B109:       setPracticePackage(null);
+  B110:       return;
+  B111:     }
+  B112:     const action = decideSessionHydration({
+  B113:       sessionId: session.id,
+  B114:       sessionHydratedId,
+  B115:       latchedSessionId: hydratedSessionRef.current
+  B116:     });
+  B117:     if (action !== "hydrate") return;
+  B118:     hydratedSessionRef.current = session.id;
+  B119:     setDegradedWarning(null);
+  B120:     setSessionInput(session.sessionNotes || "");
+  B121:     const storedAnalysis = session.analysis;
+  B122:     setAnalysis(storedAnalysis);
+  B123:     const parseModalities = (raw) => {
+  B124:       if (!raw) return ["CBT"];
+  B125:       const valid = ["CBT", "ACT", "DBT"];
+  B126:       const parsed = Array.from(
+  B127:         new Set(
+  B128:           raw.split(",").map((m) => m.trim().toUpperCase()).filter((m) => valid.includes(m))
+  B129:         )
+  B130:       );
+  B131:       return parsed.length > 0 ? parsed : ["CBT"];
+  B132:     };
+  B133:     if (session.modality) {
+  B134:       setSelectedModalities(parseModalities(session.modality));
+  B135:     } else if (storedAnalysis?.inferredModality) {
+  B136:       setSelectedModalities(parseModalities(storedAnalysis.inferredModality));
+  B137:     } else {
+  B138:       setSelectedModalities(["CBT"]);
+  B139:     }
+  B140:     if (storedAnalysis?.rationale === PLACEHOLDER_RATIONALE) {
+  B141:       setDegradedWarning(
+  B142:         "This session still holds a placeholder analysis from an earlier failed run \u2014 regenerate to replace it."
+  B143:       );
+  B144:     }
+  B145:     if (session.practicePackage) {
+  B146:       const pkg = session.practicePackage;
+  B147:       setPracticePackage(session.practicePackage);
+  B148:       setGeneratedTaskData(pkg);
+  B149:       if (pkg.task_type) {
+  B150:         setActivityFormat(pkg.task_type);
+--- after lines 26..151 ---
+  A26: import { isStructuredTask } from "@/lib/practice-package";
+  A27: import { decideSessionHydration } from "@/lib/session-hydration";
+  A28: import { upsertTaskDraft } from "@/lib/tasks";
+  A29: import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  A30: import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm";
+  A31: import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
+  A32: import { ModalitySelector } from "@/components/modality-selector";
+  A33: const TASK_VARIANTS = ["activity_log", "thought_record", "reflection_prompt", "two_choice_worksheet"];
+  A34: function isTaskVariant(v) {
+  A35:   return TASK_VARIANTS.includes(v);
+  A36: }
+  A37: const PLACEHOLDER_RATIONALE = "Clinical synthesis unavailable.";
+  A38: function extractHomeworkList(task) {
+  A39:   if (!task || typeof task !== "object") return [];
+  A40:   if (Array.isArray(task.homework) && task.homework.length > 0) {
+  A41:     return task.homework;
+  A42:   }
+  A43:   const items = [];
+  A44:   if (task.task_type === "two_choice_worksheet") {
+  A45:     if (task.title) items.push(task.title);
+  A46:     if (Array.isArray(task.prompts)) {
+  A47:       task.prompts.forEach((p, idx) => {
+  A48:         const q = typeof p === "string" ? p : p?.question;
+  A49:         if (q) items.push(`${idx + 1}. ${q}`);
+  A50:       });
+  A51:     }
+  A52:     if (task.reflection_prompt) {
+  A53:       items.push(`Reflection: ${task.reflection_prompt}`);
+  A54:     }
+  A55:   } else if (task.task_type === "thought_record") {
+  A56:     items.push("Complete 3 C's Thought Record");
+  A57:     if (task.situation) items.push(`Situation: ${task.situation}`);
+  A58:     if (task.automatic_thought) items.push(`Catch It (Automatic Thought): ${task.automatic_thought}`);
+  A59:     if (task.evidence_for || task.evidence_against) items.push("Check It: Review evidence for and against");
+  A60:     if (task.balanced_thought) items.push(`Correct It (Balanced Thought): ${task.balanced_thought}`);
+  A61:   } else if (task.task_type === "activity_log") {
+  A62:     items.push("Weekly Activity Schedule");
+  A63:     if (task.activity_description) items.push(`Scheduled Activity: ${task.activity_description}`);
+  A64:     if (task.activity_date) items.push(`Target Date: ${task.activity_date}`);
+  A65:     if (task.notes) items.push(`Notes: ${task.notes}`);
+  A66:   } else if (task.task_type === "reflection_prompt") {
+  A67:     items.push("Values & Defusion Canvas Reflection");
+  A68:     if (task.prompt) items.push(task.prompt);
+  A69:   }
+  A70:   return items.length > 0 ? items : ["Complete assigned practice task"];
+  A71: }
+  A72: function VignetteGenerator({
+  A73:   clientId,
+  A74:   caseId,
+  A75:   sessionId,
+  A76:   sessionName
+  A77: }) {
+  A78:   const saveSessionContent = useClientNavStore((s) => s.saveSessionContent);
+  A79:   const clientName = useClientNavStore((s) => s.client?.name);
+  A80:   const session = useClientNavStore(
+  A81:     (s) => s.client?.cases.find((c) => c.id === caseId)?.sessions.find((sess) => sess.id === sessionId)
+  A82:   );
+  A83:   const sessionHydratedId = useClientNavStore((s) => s.sessionHydratedId);
+  A84:   const hydratedSessionRef = useRef(null);
+  A85:   const [step, setStep] = useState(1);
+  A86:   const [sessionInput, setSessionInput] = useState("");
+  A87:   const [isProcessing, setIsProcessing] = useState(false);
+  A88:   const [isExporting, setIsExporting] = useState(false);
+  A89:   const [isSaving, setIsSaving] = useState(false);
+  A90:   const [analysis, setAnalysis] = useState(null);
+  A91:   const [practicePackage, setPracticePackage] = useState(null);
+  A92:   const [selectedModalities, setSelectedModalities] = useState(["CBT"]);
+  A93:   const [activityFormat, setActivityFormat] = useState("thought_record");
+  A94:   const [generatedSubmissionId, setGeneratedSubmissionId] = useState(null);
+  A95:   const [generatedTaskData, setGeneratedTaskData] = useState(null);
+  A96:   const [degradedWarning, setDegradedWarning] = useState(null);
+  A97:   const [linkStatus, setLinkStatus] = useState(null);
+  A98:   const notesLength = sessionInput.length;
+  A99:   const notesTokens = estimateTokens(notesLength);
+  A100:   const notesTooLong = notesLength > SESSION_NOTES_MAX_CHARS;
+  A101:   const notesLong = !notesTooLong && notesLength > SESSION_NOTES_WARN_CHARS;
+  A102:   const notesBudget = `\u2248${notesTokens.toLocaleString()} tokens of Groq's 8,000/minute`;
+  A103:   useEffect(() => {
+  A104:     if (!session) {
+  A105:       hydratedSessionRef.current = null;
+  A106:       setDegradedWarning(null);
+  A107:       setStep(1);
+  A108:       setSessionInput("");
+  A109:       setAnalysis(null);
+  A110:       setPracticePackage(null);
+  A111:       return;
+  A112:     }
+  A113:     const action = decideSessionHydration({
+  A114:       sessionId: session.id,
+  A115:       sessionHydratedId,
+  A116:       latchedSessionId: hydratedSessionRef.current
+  A117:     });
+  A118:     if (action !== "hydrate") return;
+  A119:     hydratedSessionRef.current = session.id;
+  A120:     setDegradedWarning(null);
+  A121:     setSessionInput(session.sessionNotes || "");
+  A122:     const storedAnalysis = session.analysis;
+  A123:     setAnalysis(storedAnalysis);
+  A124:     const parseModalities = (raw) => {
+  A125:       if (!raw) return ["CBT"];
+  A126:       const valid = ["CBT", "ACT", "DBT"];
+  A127:       const parsed = Array.from(
+  A128:         new Set(
+  A129:           raw.split(",").map((m) => m.trim().toUpperCase()).filter((m) => valid.includes(m))
+  A130:         )
+  A131:       );
+  A132:       return parsed.length > 0 ? parsed : ["CBT"];
+  A133:     };
+  A134:     if (session.modality) {
+  A135:       setSelectedModalities(parseModalities(session.modality));
+  A136:     } else if (storedAnalysis?.inferredModality) {
+  A137:       setSelectedModalities(parseModalities(storedAnalysis.inferredModality));
+  A138:     } else {
+  A139:       setSelectedModalities(["CBT"]);
+  A140:     }
+  A141:     if (storedAnalysis?.rationale === PLACEHOLDER_RATIONALE) {
+  A142:       setDegradedWarning(
+  A143:         "This session still holds a placeholder analysis from an earlier failed run \u2014 regenerate to replace it."
+  A144:       );
+  A145:     }
+  A146:     if (session.practicePackage) {
+  A147:       const stored = session.practicePackage;
+  A148:       setPracticePackage(stored);
+  A149:       setGeneratedTaskData(stored);
+  A150:       if (isStructuredTask(stored)) {
+  A151:         setActivityFormat(stored.task_type);
+handler anchors: handleAnalyzeAndGenerate before line 216 / after line 217; handleRegenerateExplicit before line 331 / after line 332
+difference window is before the first handler anchor: true (diff starts at line 26, first handler anchor at line 216)
+emit of handleAnalyzeAndGenerate IDENTICAL: true
+emit of handleRegenerateExplicit->EOF IDENTICAL: true
+
+=== components_client-view.tsx ===
+before 72 lines / 3022 bytes
+after  70 lines / 2981 bytes
+RESULT: emit differs — common prefix 6 lines, common suffix 62 lines
+--- before lines 7..10 ---
+  B7: import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm";
+  B8: function isStructuredTask(pkg) {
+  B9:   return !!pkg && typeof pkg === "object" && "task_type" in pkg;
+  B10: }
+--- after lines 7..8 ---
+  A7: import { isStructuredTask } from "@/lib/practice-package";
+  A8: import { DynamicTaskForm } from "@/components/tasks/DynamicTaskForm";
+
+=== components_tasks_DynamicTaskForm.tsx ===
+before 484 lines / 19690 bytes
+after  484 lines / 19690 bytes
+RESULT: emit is BYTE-IDENTICAL (type-only change -> identical runtime)
+
+=== stores_useClientNavStore.ts ===
+before 400 lines / 11500 bytes
+after  400 lines / 11500 bytes
+RESULT: emit is BYTE-IDENTICAL (type-only change -> identical runtime)
+
+=== types_tasks.ts ===
+before 1 lines / 0 bytes
+after  1 lines / 0 bytes
+RESULT: emit is BYTE-IDENTICAL (type-only change -> identical runtime)
+
+=== lib_practice-package.ts ===
+before 1 lines / 0 bytes
+after  7 lines / 139 bytes
+RESULT: emit differs — common prefix 0 lines, common suffix 1 lines
+--- before lines 1..0 ---
+--- after lines 1..6 ---
+  A1: function isStructuredTask(value) {
+  A2:   return !!value && typeof value === "object" && "task_type" in value;
+  A3: }
+  A4: export {
+  A5:   isStructuredTask
+  A6: };
+
+=== lib_export-practice-pdf.ts ===
+before 324 lines / 10062 bytes
+after  324 lines / 10089 bytes
+RESULT: emit differs — common prefix 115 lines, common suffix 208 lines
+--- before lines 116..116 ---
+  B116:   const raw = Array.isArray(pkg?.homework) ? pkg.homework : [];
+--- after lines 116..116 ---
+  A116:   const raw = pkg && "homework" in pkg && Array.isArray(pkg.homework) ? pkg.homework : [];
+
+files whose emit differs: 4 of 7

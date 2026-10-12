@@ -1,0 +1,10 @@
+=== debug_reports/lint_8l_before.json ===
+matched files: 117  errors: 0  warnings: 4  problems: 4
+by rule:
+   4  react-hooks/set-state-in-effect
+findings:
+   warn components/tasks/DynamicTaskForm.tsx:404:7  [react-hooks/set-state-in-effect]
+   warn components/tasks/DynamicTaskForm.tsx:529:5  [react-hooks/set-state-in-effect]
+   warn components/vignette-generator.tsx:177:7  [react-hooks/set-state-in-effect]
+   warn hooks/use-clinical-workspace.ts:40:5  [react-hooks/set-state-in-effect]
+

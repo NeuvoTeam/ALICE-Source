@@ -1,0 +1,14 @@
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze/session
+├ ƒ /cases/[caseId]/sessions/[sessionId]
+├ ○ /client-login
+├ ○ /dashboard
+├ ○ /forgot-password
+├ ƒ /homework/[sessionId]
+├ ○ /login
+├ ƒ /practice/[sessionId]
+├ ƒ /practitioner/tasks/[id]/review
+├ ○ /signup
+└ ○ /test-auth

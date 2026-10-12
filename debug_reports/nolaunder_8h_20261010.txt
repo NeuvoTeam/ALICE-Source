@@ -1,0 +1,18 @@
+=== ACCEPTANCE 2: no laundering — source-only diff check, debug_reports/ excluded ===
+
+$ git diff -U0 -- . ':(exclude)debug_reports' | grep -n '^+' | grep -E 'as any|as unknown as|@ts-expect-error|: any'
+exit=1  (1 = no matches, i.e. zero added laundering patterns in any added source line)
+
+=== the same scan over the whole changed source files, added or not ===
+
+$ grep -rn 'as any|as unknown as|@ts-expect-error' <the seven changed files>
+exit=1  (1 = no matches)
+
+=== corpus-wide corroboration: the rule the eight findings came from ===
+
+$ npx eslint .   # @typescript-eslint/no-explicit-any is downgraded to warn, not off, so its findings stay visible
+✖ 4 problems (0 errors, 4 warnings)
+
+
+A rule left at warn with 0 findings across all 120 linted files is a corpus-wide proof that no
+explicit 'any' remains anywhere in the repo, not only in the seven files this card touched.

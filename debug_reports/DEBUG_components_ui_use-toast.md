@@ -1,4 +1,10 @@
-﻿# Audit Report: use-toast.ts
+﻿> **FILE DELETED 2026-10-10.** `components/ui/use-toast.ts` was removed from the tree as a duplicate of
+> the live `hooks/use-toast.ts` (`app/dashboard/page.tsx:9` and `components/ui/toaster.tsx:3` import the
+> `hooks/` copy) — the repo-wide reference search found no importer of this path. See `documentation.md`
+> §13.3 and `debug_reports/DEAD_FILE_SWEEP_20261010.md`. Retained as a point-in-time audit of the file as
+> it stood before deletion; the live hook has its own audit (`DEBUG_hooks_use-toast.md`).
+
+# Audit Report: use-toast.ts
 
 Path: `D:\Work\Neuvo\ALICE\Source\components\ui\use-toast.ts`
 

@@ -24,5 +24,9 @@
     // Origin the signed client links point at (`/homework/:id`, `/practice/:id`).
     // Falls back to the first ALLOWED_ORIGINS entry when unset.
     "PUBLIC_APP_URL": "http://localhost:3000"
+    // REVIEW_QUEUE_CURSOR_SECRET is a secret (set via `npx wrangler secret put REVIEW_QUEUE_CURSOR_SECRET`
+    // or in .dev.vars locally). Dedicated HMAC-SHA256 key (minimum 16 characters) for signing review queue
+    // pagination cursors. The endpoint (GET /tasks/submissions) fails closed (HTTP 503 CURSOR_SECRET_UNCONFIGURED)
+    // and is completely unavailable until this secret is configured. Never falls back to a literal or cross-purpose key.
   }
 }

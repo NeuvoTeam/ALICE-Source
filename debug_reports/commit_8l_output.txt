@@ -1,0 +1,4 @@
+docs:check — ok (no behaviour-affecting path changed).
+[alan aa40377] chore(archive): archive the last orphan — the zero-importer workspace hook (lint 8l)
+ 4 files changed, 97 insertions(+), 28 deletions(-)
+ rename {hooks => archive/2026-10-10-unreferenced-ui-kit/hooks}/use-clinical-workspace.ts (100%)

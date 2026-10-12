@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { sessionNotes, clientId } = body;
+    const { sessionNotes } = body;
 
     if (!sessionNotes) {
       return NextResponse.json({ error: "Missing sessionNotes" }, { status: 400 });
@@ -30,12 +30,12 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json({ vignette: data.response });
 
-  } catch (error: any) {
+  } catch (error) {
     // This logs the actual JS error (like "fetch failed") to your terminal
     console.error("!!! BACKEND CRASH !!!", error);
     
     return NextResponse.json({ 
-      error: "Internal Server Error: " + error.message 
+      error: "Internal Server Error: " + (error instanceof Error ? error.message : String(error)) 
     }, { status: 500 });
   }
 }

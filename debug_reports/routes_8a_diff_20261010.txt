@@ -1,0 +1,18 @@
+routes before (card t_544572fd evidence, 13):  / /_not-found /api/analyze/session /cases/[caseId]/sessions/[sessionId] /client-login /dashboard /forgot-password /homework/[sessionId] /login /practice/[sessionId] /practitioner/tasks/[id]/review /signup /test-auth
+routes after  (this card, 13):                / /_not-found /api/analyze/session /cases/[caseId]/sessions/[sessionId] /client-login /dashboard /forgot-password /homework/[sessionId] /login /practice/[sessionId] /practitioner/tasks/[id]/review /signup /test-auth
+route list byte-identical: true
+
+line-by-line (before | after):
+○ /            | ○ /           
+○ /_not-found  | ○ /_not-found 
+ƒ /api/analyze/session | ƒ /api/analyze/session
+ƒ /cases/[caseId]/sessions/[sessionId] | ƒ /cases/[caseId]/sessions/[sessionId]
+○ /client-login | ○ /client-login
+○ /dashboard   | ○ /dashboard  
+○ /forgot-password | ○ /forgot-password
+ƒ /homework/[sessionId] | ƒ /homework/[sessionId]
+○ /login       | ○ /login      
+ƒ /practice/[sessionId] | ƒ /practice/[sessionId]
+ƒ /practitioner/tasks/[id]/review | ƒ /practitioner/tasks/[id]/review
+○ /signup      | ○ /signup     
+○ /test-auth   | ○ /test-auth  

@@ -1,0 +1,20 @@
+ALICE card 8i - emitted production CSS AFTER (globals.css token now literal)
+
+=== @font-face rules (production CSS chunks) ===
+--- .next/static/chunks/037.tcc7jhmtv.css
+      5 font-family:Geist
+      1 font-family:Geist Fallback
+      6 font-family:Geist Mono
+      1 font-family:Geist Mono Fallback
+--- .next/static/chunks/01z_myb0w8k77.css
+grep: .next/static/chunks/01z_myb0w8k77.css: No such file or directory
+
+=== .font-mono rule ===
+grep: .next/static/chunks/01z_myb0w8k77.css: No such file or directory
+
+=== default-mono-font-family + variable ===
+grep: .next/static/chunks/01z_myb0w8k77.css: No such file or directory
+--font-geist-mono:"Geist Mono", "Geist Mono Fallback"
+
+=== sans untouched ===
+--font-sans: 'Geist', 'Geist Fallback'

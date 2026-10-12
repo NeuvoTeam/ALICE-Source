@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-import type { PracticePackage } from '@/lib/practice-package'
+import type { PracticePackage, StoredPracticeTask } from '@/lib/practice-package'
 
 import { CLINICAL_AI_API_BASE as API } from '@/lib/clinical-ai-api'
 import { apiFetch } from '@/lib/auth'
@@ -26,7 +26,8 @@ export type Session = {
 
   quiz?: string[]
 
-  practicePackage?: PracticePackage | null
+  /** Either stored shape — see `StoredPracticeTask` in `lib/practice-package.ts`. */
+  practicePackage?: StoredPracticeTask | null
 
   analysis?: {
     rationale?: string
@@ -47,6 +48,35 @@ export type Client = {
   id: string
   name: string
   cases: Case[]
+}
+
+/** POST /generate/vignette (handleGenerate, backend/CloudFlare.js:2611) */
+type VignetteResult = { scenario: string; homework: string[]; quiz: string[] }
+
+type RawSessionRow = {
+  id: string
+  name?: string | null
+  sessionNotes?: string | null
+  session_notes?: string | null
+  vignette?: string | null
+  homework?: string[] | null
+  quiz?: string[] | null
+  practicePackage?: StoredPracticeTask | null
+  practice_package?: StoredPracticeTask | null
+  analysis?: Session['analysis']
+  modality?: string | null
+}
+
+type RawCaseRow = {
+  id: string
+  name?: string | null
+  sessions?: RawSessionRow[] | null
+}
+
+type RawClientTree = {
+  id: string
+  name?: string | null
+  cases?: RawCaseRow[] | null
 }
 
 type ClientNavState = {
@@ -110,19 +140,19 @@ type ClientNavState = {
   analyzeSession: (
     notes: string,
     sessionId?: string
-  ) => Promise<any>
+  ) => Promise<NonNullable<Session['analysis']>>
 
   generateVignette: (
     notes: string,
     modality?: string,
     sessionId?: string
-  ) => Promise<any>
+  ) => Promise<VignetteResult>
   
   generatePracticePackage: (
     notes: string,
     modality?: string,
     sessionId?: string
-  ) => Promise<any>
+  ) => Promise<PracticePackage>
   }
 /* =========================
    SAFE FETCH
@@ -146,10 +176,18 @@ async function safeFetch(url: string, options?: RequestInit) {
   return data;
 }
 
+/**
+ * Message from a caught value, without a cast. `safeFetch` only throws `Error`
+ * (`Request failed`), so the `String(err)` branch is unreachable in this module.
+ */
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 /* =========================
    NORMALIZER (STABLE)
 ========================= */
-function normalizeSession(s: any): Session {
+function normalizeSession(s: RawSessionRow): Session {
   return {
     id: s.id,
     name: s.name || 'Unnamed Session',
@@ -188,11 +226,11 @@ function normalizeSession(s: any): Session {
   }
 }
 
-function normalizeClientTree(client: any): Client {
+function normalizeClientTree(client: RawClientTree): Client {
   return {
     id: client.id,
     name: client.name || 'Unnamed Client',
-    cases: (client.cases || []).map((c: any) => ({
+    cases: (client.cases || []).map((c: RawCaseRow) => ({
       id: c.id,
       name: c.name || 'Unnamed Case',
       sessions: (c.sessions || []).map(normalizeSession),
@@ -260,7 +298,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       const data = await safeFetch(`${API}/clients`)
 
       set({
-        clients: (Array.isArray(data) ? data : []).map((c: any) => ({
+        clients: (Array.isArray(data) ? data : []).map((c: RawClientTree) => ({
           id: c.id,
           name: c.name || 'Unnamed Client',
           cases: [],
@@ -268,8 +306,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         loading: false,
       })
 
-    } catch (err: any) {
-      set({ error: err.message, loading: false })
+    } catch (err) {
+      set({ error: errorMessage(err), loading: false })
     }
   },
 
@@ -300,8 +338,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       if (target) {
         await get().selectSession(target.caseId, target.sessionId)
       }
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -331,8 +369,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
           sessionHydratedId: sessionId,
         })
       }
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -355,8 +393,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
       await get().selectClient(data.id, { bootstrap: true })
 
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -379,8 +417,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
 
       await get().selectClient(client.id) // ✅ consistency
 
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -404,8 +442,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         await get().selectSession(caseId, newest.id)
       }
 
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -417,8 +455,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       await safeFetch(`${API}/cases/${caseId}`, { method: 'DELETE' })
       await get().selectClient(client.id)
 
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -435,8 +473,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
       }
       await get().selectClient(client.id)
 
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
@@ -464,12 +502,12 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         body: JSON.stringify({ name }),
       })
   
-    } catch (err: any) {
+    } catch (err) {
       // ❌ Roll back the optimistic rename, then surface the failure
       set({
         client: previousClient,
         clients: previousClients,
-        error: err.message,
+        error: errorMessage(err),
       })
     }
   },
@@ -497,9 +535,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
-    } catch (err: any) {
+    } catch (err) {
       // ❌ Roll back the optimistic rename, then surface the failure
-      set({ client: previousClient, error: err.message })
+      set({ client: previousClient, error: errorMessage(err) })
     }
   },
 
@@ -536,9 +574,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
-    } catch (err: any) {
+    } catch (err) {
       // ❌ Roll back the optimistic rename, then surface the failure
-      set({ client: previousClient, error: err.message })
+      set({ client: previousClient, error: errorMessage(err) })
     }
   },
 
@@ -578,16 +616,16 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
           ),
         })
       }
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 
   loadLatestSession: async () => {
     try {
       return await safeFetch(`${API}/latest-session`)
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err) {
+      set({ error: errorMessage(err) })
     }
   },
 

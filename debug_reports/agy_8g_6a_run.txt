@@ -1,0 +1,32 @@
+I have completed the edits for the four sites in bucket 6a exactly as requested. 
+
+The `components/dashboard-shell.tsx` effect was replaced with a correct `useClientNavStore.subscribe()` call, and the two `useClientNavStore` variable bindings were removed to satisfy `@typescript-eslint/no-unused-vars`. The deliberately retained comments were added directly above the specific effects in the other three files.
+
+The raw self-check output has been redirected into `debug_reports/agy_8g_6a_lint.txt` (the `eslint`, `lint`, `tsc`, and `git diff` commands were all executed directly as instructed).
+
+Here is the plain text report of the results:
+
+**Raw `✖ N problems` lines before/after:**
+*   **Before:** `✖ 15 problems (0 errors, 15 warnings)`
+*   **After:** `✖ 14 problems (0 errors, 14 warnings)`
+
+**The four remaining findings by file:line (shifted from their original positions by the newly added comments):**
+*   `components/tasks/DynamicTaskForm.tsx:357:7`
+*   `components/tasks/DynamicTaskForm.tsx:473:5`
+*   `components/vignette-generator.tsx:168:7`
+*   `hooks/use-clinical-workspace.ts:40:5`
+
+**The raw `tsc` result:**
+The command (`npx tsc --noEmit`) exited with code 0 and produced no output.
+
+**The exact `git diff --stat`:**
+```text
+warning: in the working copy of 'components/dashboard-shell.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/tasks/DynamicTaskForm.tsx', LF will be replaced by CRLF the next time Git touches it
+ components/dashboard-shell.tsx       | 21 +++++++++++++++------
+ components/tasks/DynamicTaskForm.tsx | 12 ++++++++++++
+ components/vignette-generator.tsx    |  9 +++++++++
+ hooks/use-clinical-workspace.ts      |  7 +++++++
+ 4 files changed, 43 insertions(+), 6 deletions(-)
+```
+I see that the background logging task writing to `debug_reports/agy_8g_6a_lint.txt` has also successfully finished. Everything is complete according to the brief! Please let me know if you need any further checks or assistance.

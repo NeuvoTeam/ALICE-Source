@@ -1,0 +1,15 @@
+=== selector counts (individual, commas split) ===
+before: 1289
+after : 1289
+removed: 0   added: 0
+
+=== removed selectors (present before, missing after) ===
+
+=== added selectors ===
+
+=== live-source cross-check ===
+live source files scanned : 116
+string literals scanned   : 5352
+distinct class candidates : 3472
+candidates with a rule BEFORE: 724
+candidates whose rule existed BEFORE and is MISSING AFTER: 0

@@ -1,0 +1,21 @@
+=== selector counts (individual, commas split) ===
+before: 1295
+after : 1289
+removed: 6   added: 0
+
+=== removed selectors (present before, missing after) ===
+  - .animate-pulse
+  - .fade-in-0
+  - .fill-foreground
+  - .origin-\(--radix-tooltip-content-transform-origin\)
+  - .translate-y-\[calc\(-50\%_-_2px\)\]
+  - .zoom-in-95
+
+=== added selectors ===
+
+=== live-source cross-check ===
+live source files scanned : 117
+string literals scanned   : 5365
+distinct class candidates : 3470
+candidates with a rule BEFORE: 724
+candidates whose rule existed BEFORE and is MISSING AFTER: 0

@@ -1,0 +1,9 @@
+$ npx tsc --noEmit
+exit=0
+(no output)
+
+Command run from D:\Work\Neuvo\ALICE\Source on the card-8h tree (alan), after the seven source
+files were edited and before the commit. `next-env.d.ts` had been restored to HEAD beforehand,
+and no untracked .ts/.tsx helper exists anywhere under `tsconfig.json`'s `**/*.ts` include
+(`scratch/**` is eslint-ignored but NOT tsconfig-excluded, so the throwaway assignability probes
+were moved outside the repo and no longer participate in this run).

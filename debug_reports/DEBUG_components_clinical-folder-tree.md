@@ -1,4 +1,10 @@
-﻿# Audit Report: clinical-folder-tree.tsx
+﻿> **FILE DELETED 2026-10-10.** `components/clinical-folder-tree.tsx` was removed from the tree as
+> unreferenced: the per-file repo-wide reference search (static imports in both spellings, dynamic
+> `import()`, `next/dynamic`, barrels, tests, `scripts/`, config surfaces, Markdown) came back empty —
+> see `documentation.md` §13.3 and `debug_reports/DEAD_FILE_SWEEP_20261010.md`. This report is
+> retained as a point-in-time audit of the file as it stood before deletion.
+
+# Audit Report: clinical-folder-tree.tsx
 
 Path: `D:\Work\Neuvo\ALICE\Source\components\clinical-folder-tree.tsx`
 

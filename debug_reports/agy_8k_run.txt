@@ -1,0 +1,11 @@
+I have completed the requested changes for lint rank 8k. 
+
+Here are the details of the actions taken:
+- **`eslint.config.mjs`**: Removed the four dead rule downgrades (`@typescript-eslint/no-explicit-any`, `react-hooks/refs`, `react-hooks/purity`, and `react/no-unescaped-entities`) along with their comments. Added the specified `// Four dead downgrades were removed...` verbatim comment block above the rules object. The remaining `react-hooks/set-state-in-effect` rule downgrade and both scoped overrides were kept intact.
+- **`debug_reports/draft_8k_docs_20261010.md`**: Created the draft documentation file containing the rank-8k record paragraph, the two exact replacement snippets, and the exceptions audit table strictly using the measured values provided.
+
+After making the edits, I ran `npm run lint` on the repository root. The results were:
+- **Exit Code:** `0`
+- **Totals Line:** `✖ 4 problems (0 errors, 4 warnings)`
+
+The configuration edit is successful, and the documentation draft is ready for the reviewing agent to apply.

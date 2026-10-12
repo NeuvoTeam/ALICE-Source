@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { StructuredTaskSchema, StructuredTaskRequestSchema } from "../lib/ai/schemas.ts";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 const GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
 /** Last-resort default. `env.GROQ_MODEL` (wrangler.jsonc var) always wins. */
@@ -186,6 +187,125 @@ function clientLinkTtlDays(value) {
   return Math.min(Math.floor(parsed), CLIENT_LINK_MAX_TTL_DAYS)
 }
 
+/* ===============================
+   ✅ REVIEW QUEUE CURSOR SIGNING (HMAC-SHA256)
+   =============================== */
+/**
+ * Reads and trims REVIEW_QUEUE_CURSOR_SECRET from env (minimum 16 chars).
+ * Fails closed (returns null) if missing or too short.
+ * Never falls back to a literal or another purpose's secret (e.g. CLIENT_LINK_SECRET or SUPABASE_SERVICE_ROLE_KEY).
+ * When unset or too short, GET /tasks/submissions fails closed with HTTP 503 and code 'CURSOR_SECRET_UNCONFIGURED'.
+ */
+function reviewQueueCursorSecret(env) {
+  const raw = String(env?.REVIEW_QUEUE_CURSOR_SECRET || "").trim()
+
+  return raw.length >= 16 ? raw : null
+}
+
+const ISO_DATETIME_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/
+
+/**
+ * Signs keyset pagination cursors for `GET /tasks/submissions`.
+ * Carries:
+ *   - `id`: submission UUID (tie-breaker)
+ *   - `submitted_at`: ISO string or null (sort key)
+ *   - `is_null`: boolean (Clause 1: cross the NULL block safely)
+ *   - `dir`: 'asc' | 'desc' (Clause 2: direction enforcement)
+ */
+async function signReviewQueueCursor(payload, secret) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  const jsonStr = JSON.stringify(payload)
+  const encodedPayload = base64UrlFromBytes(new TextEncoder().encode(jsonStr))
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`cursor|${encodedPayload}`)
+  )
+
+  return `${encodedPayload}.${base64UrlFromBytes(new Uint8Array(signature))}`
+}
+
+async function verifyReviewQueueCursor(cursorStr, secret) {
+  if (typeof cursorStr !== "string" || !secret) return null
+  const parts = cursorStr.split(".")
+  if (parts.length !== 2) return null
+  const [encodedPayload, encodedSig] = parts
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    )
+
+    const sigBytes = base64UrlToBytes(encodedSig)
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      sigBytes,
+      new TextEncoder().encode(`cursor|${encodedPayload}`)
+    )
+
+    if (!valid) return null
+
+    const payloadBytes = base64UrlToBytes(encodedPayload)
+    const decodedStr = new TextDecoder().decode(payloadBytes)
+    return JSON.parse(decodedStr)
+  } catch {
+    return null
+  }
+}
+
+/* ===============================
+   ✅ CLIENT SUBMISSION RATE LIMITING & PAYLOAD CAP
+   =============================== */
+const CLIENT_SUBMISSION_MAX_REQUESTS = 60
+const CLIENT_SUBMISSION_WINDOW_MS = 60 * 1000
+const MAX_CLIENT_SUBMISSION_BYTES = 64 * 1024 // 64 KB request body cap
+const MAX_FORM_DATA_BYTES = 64 * 1024 // 64 KB integrity cap on form_data payload
+const clientSubmissionRateLimits = new Map()
+const CLIENT_SUBMISSION_ALLOWED_TASK_TYPES = new Set([
+  "activity_log",
+  "thought_record",
+  "behavioural_experiment",
+  "two_choice_worksheet",
+  "reflection_prompt",
+])
+
+function isClientSubmissionRateLimited(key) {
+  const now = Date.now()
+  if (clientSubmissionRateLimits.size > 1000) {
+    for (const [k, ts] of clientSubmissionRateLimits.entries()) {
+      if (!ts.length || ts[ts.length - 1] <= now - CLIENT_SUBMISSION_WINDOW_MS) {
+        clientSubmissionRateLimits.delete(k)
+      }
+    }
+  }
+  let timestamps = clientSubmissionRateLimits.get(key)
+  if (!timestamps) {
+    timestamps = []
+    clientSubmissionRateLimits.set(key, timestamps)
+  }
+  while (timestamps.length > 0 && timestamps[0] <= now - CLIENT_SUBMISSION_WINDOW_MS) {
+    timestamps.shift()
+  }
+  if (timestamps.length >= CLIENT_SUBMISSION_MAX_REQUESTS) {
+    return true
+  }
+  timestamps.push(now)
+  return false
+}
+
 export default {
   async fetch(request, env) {
 
@@ -237,9 +357,11 @@ export default {
     console.log("REQUEST", method, cleanPath)
 
     // ✅ Normalize base URL (prevents // issues)
-    const baseUrl = env.SUPABASE_URL.endsWith("/")
-      ? env.SUPABASE_URL.slice(0, -1)
-      : env.SUPABASE_URL
+    const baseUrl = env.SUPABASE_URL
+      ? env.SUPABASE_URL.endsWith("/")
+        ? env.SUPABASE_URL.slice(0, -1)
+        : env.SUPABASE_URL
+      : "http://localhost"
 
     const SUPABASE_URL = `${baseUrl}/rest/v1`
 
@@ -263,16 +385,37 @@ export default {
     const isPublicRoute =
       cleanPath.startsWith("/auth/") ||
       cleanPath === "/client-homework" ||
-      cleanPath.startsWith("/client-homework/")
+      cleanPath.startsWith("/client-homework/") ||
+      cleanPath === "/client-submissions" ||
+      cleanPath.startsWith("/client-submissions/")
+
+    function devBypassUser(env, url) {
+      const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"
+      if (env.DEV_AUTH_BYPASS === "1" && env.ENVIRONMENT === "development" && local) {
+        console.warn("⚠️ DEV_AUTH_BYPASS active — synthetic user", env.DEV_AUTH_USER_ID)
+        return { id: env.DEV_AUTH_USER_ID, email: "dev@localhost", dev_bypass: true }
+      }
+      return null
+    }
 
     let authUser = null
     if (!isPublicRoute) {
-      const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
-
-      if (errorResponse) return errorResponse
-      authUser = user
+      authUser = devBypassUser(env, url)
+      if (!authUser) {
+        const { errorResponse, user } = await requireUser(request, env, cors, baseUrl)
+        if (errorResponse) return errorResponse
+        authUser = user
+      }
     }
-
+    async function checkSessionAccess(sessionId) {
+      if (!sessionId) return false;
+      const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
+      if (!sessionRes.ok) return false;
+      const sessionData = await sessionRes.json()
+      if (!sessionData || !sessionData.length) return false;
+      const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
+      return await checkClientAccess(sessionClientId);
+    }
     async function checkClientAccess(clientId) {
       if (!clientId || !authUser?.id) return false
       const res = await fetch(`${SUPABASE_URL}/clinician_clients?clinician_id=eq.${authUser.id}&client_id=eq.${clientId}&select=id`, { headers: HEADERS })
@@ -452,20 +595,30 @@ if (method === "GET" && cleanPath === "/auth/me") {
     if (!mappingRes.ok) throw new Error(await mappingRes.text())
     
     const mappingData = await mappingRes.json()
-    const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+    const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id).filter(Boolean)
 
     if (clientIds.length === 0) {
       return respond([], cors)
     }
 
-    const res = await fetch(
+    let res = await fetch(
       `${SUPABASE_URL}/clients?id=in.(${clientIds.join(",")})&select=id,full_name`,
       { headers: HEADERS }
     )
   
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(text)
+      if (isMissingColumnError(text)) {
+        res = await fetch(
+          `${SUPABASE_URL}/clients?id=in.(${clientIds.join(",")})&select=id,first_name,last_name`,
+          { headers: HEADERS }
+        )
+        if (!res.ok) {
+          throw new Error(await res.text())
+        }
+      } else {
+        throw new Error(text)
+      }
     }
   
     let data
@@ -478,7 +631,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
     return respond(
       (Array.isArray(data) ? data : []).map(c => ({
         id: c.id,
-        name: c.full_name || `Client ${c.id.slice(0, 6)}`
+        name: c.full_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || `Client ${c.id.slice(0, 6)}`
       })),
       cors
     )
@@ -877,10 +1030,23 @@ if (method === "GET" && cleanPath === "/auth/me") {
         return respond({ error: "Session not found" }, cors, 404)
       }
 
-      const practiceHomework =
-        row.practice_package && Array.isArray(row.practice_package.homework)
-          ? row.practice_package.homework
-          : []
+      let practiceHomework = []
+
+      if (
+        row.practice_package &&
+        Array.isArray(row.practice_package.homework) &&
+        row.practice_package.homework.length > 0
+      ) {
+        practiceHomework = row.practice_package.homework
+      } else if (Array.isArray(row.homework) && row.homework.length > 0) {
+        practiceHomework = row.homework
+      } else if (row.practice_package && typeof row.practice_package === "object") {
+        practiceHomework = extractHomeworkFromPracticePackage(row.practice_package)
+      }
+
+      // No other source is consulted: `practice_task_submissions` has no
+      // session_id, so any lookup there can only be client-scoped and could
+      // surface another session's content through this session's link.
 
       return respond({
         sessionId: row.id,
@@ -891,6 +1057,8 @@ if (method === "GET" && cleanPath === "/auth/me") {
         // Deliberately narrow: this route is public, so it must never carry
         // session_notes, analysis or riskFlags.
         practiceHomework,
+        // The clinician's chosen activity, from THIS row only (allowlisted).
+        practiceTask: projectClientPracticeTask(row.practice_package),
       }, cors)
     }
 
@@ -962,7 +1130,7 @@ if (method === "GET" && cleanPath === "/auth/me") {
             )
             if (!mappingRes.ok) throw new Error(await mappingRes.text())
             const mappingData = await mappingRes.json()
-            const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id)
+            const clientIds = (Array.isArray(mappingData) ? mappingData : []).map(m => m.client_id).filter(Boolean)
             
             if (clientIds.length === 0) {
               return respond([], cors)
@@ -1272,8 +1440,1317 @@ if (method === "GET" && cleanPath === "/auth/me") {
       }
 
       /* =========================
+   ✅ TASK SUBMISSION ROUTES
+   New routes MUST stay above the catch-all "if (method === 'POST')" AI block.
+   ========================= */
+
+      /* ------------------------------------------------------------------
+         GET /tasks/submissions
+         Collection endpoint for the practitioner review queue.
+
+         Environment & Security Requirements:
+           - REVIEW_QUEUE_CURSOR_SECRET: Dedicated signing secret (minimum 16 characters).
+             Trimming applied; missing or too short fails closed immediately with HTTP 503
+             and code 'CURSOR_SECRET_UNCONFIGURED'. The endpoint is unavailable until configured.
+             Never falls back to a known literal or cross-purpose secrets (defence in depth).
+
+         Query params:
+           - status: allowlisted TaskStatus values (CSV or in.(...))
+           - client_id: UUID; intersected with caller's clients (never substituted)
+           - limit: integer in [1, 200], default 50. Non-integers/<=0 refused; >200 clamped
+           - cursor: HMAC-signed keyset carrying null-flag, ISO submitted_at, and direction
+           - order: 'asc' | 'desc'. Default: 'asc' for pending_practitioner_review (FIFO), 'desc' otherwise
+           - count_only: '1' -> returns { counts, pending_total } (no rows/cursor)
+
+         Tenant Scoping & Security:
+           - Authenticated only (requireUser, not in isPublicRoute, exact cleanPath match)
+           - Query-level scoping: clinician_clients -> client_id IN (...)
+           - client_id intersected: client_id=in.(caller) AND client_id=eq.<param>
+           - status rebuilt server-side from allowlist (never passed raw)
+           - No form_data in list payload
+           - No N+1: session_name and reflection_count arrive in the same single query via PostgREST embed
+           - counts and pending_total are tenant-scoped; counts respects client_id, pending_total does not
+           - Keyset cursor is HMAC-signed, direction-validated (Clause 2), and crosses NULL boundary (Clause 1)
+           - NULL submitted_at rows sort LAST deterministically
+      ------------------------------------------------------------------ */
+      if (method === "GET" && cleanPath === "/tasks/submissions") {
+        // 0. Dedicated cursor secret guard (F-a: defence in depth, fail closed with 503)
+        const cursorSecret = reviewQueueCursorSecret(env)
+        if (!cursorSecret) {
+          console.error(
+            "REVIEW_QUEUE_CURSOR_SECRET missing or too short — review queue is disabled"
+          )
+          return respond(
+            {
+              error: "REVIEW_QUEUE_CURSOR_SECRET missing or too short — review queue is disabled",
+              code: "CURSOR_SECRET_UNCONFIGURED",
+            },
+            cors,
+            503
+          )
+        }
+
+        // 1. Parse & validate client_id parameter (Amendment 4)
+        const rawClientId = url.searchParams.get("client_id")
+        let clientIdPredicate = ""
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (rawClientId !== null && rawClientId !== undefined && rawClientId.trim() !== "") {
+          const targetClientId = rawClientId.trim()
+          if (!UUID_REGEX.test(targetClientId)) {
+            return respond({ error: "Invalid client_id: must be a valid UUID" }, cors, 400)
+          }
+          // Intersect with caller's set; never substitute.
+          clientIdPredicate = `&client_id=eq.${encodeURIComponent(targetClientId)}`
+        }
+
+        // 2. Parse & validate status parameter (Amendment 3)
+        const rawStatus = url.searchParams.get("status")
+        const ALLOWED_TASK_STATUSES = new Set([
+          "draft",
+          "pending_practitioner_review",
+          "reviewed",
+          "approved",
+          "revision_requested",
+          "archived",
+        ])
+        let selectedStatuses = []
+        let statusPredicate = ""
+        if (rawStatus !== null && rawStatus !== undefined && rawStatus.trim() !== "") {
+          let cleaned = rawStatus.trim()
+          if (cleaned.startsWith("in.(") && cleaned.endsWith(")")) {
+            cleaned = cleaned.slice(4, -1)
+          }
+          const parts = cleaned.split(",").map((s) => s.trim()).filter(Boolean)
+          if (parts.length === 0) {
+            return respond({ error: "Invalid status parameter" }, cors, 400)
+          }
+          for (const st of parts) {
+            if (!ALLOWED_TASK_STATUSES.has(st)) {
+              return respond({ error: `Disallowed status value: ${st}` }, cors, 400)
+            }
+          }
+          selectedStatuses = Array.from(new Set(parts))
+          statusPredicate =
+            selectedStatuses.length === 1
+              ? `&status=eq.${encodeURIComponent(selectedStatuses[0])}`
+              : `&status=in.(${selectedStatuses.map(encodeURIComponent).join(",")})`
+        }
+
+        // 3. Direction determination & order parameter
+        const rawOrder = url.searchParams.get("order")
+        let direction = null
+        if (rawOrder !== null && rawOrder !== undefined && rawOrder.trim() !== "") {
+          const ord = rawOrder.trim().toLowerCase()
+          if (ord !== "asc" && ord !== "desc") {
+            return respond({ error: "Invalid order parameter: must be 'asc' or 'desc'" }, cors, 400)
+          }
+          direction = ord
+        } else {
+          // Default: Needs review (pending_practitioner_review) is oldest-submitted first (FIFO: asc);
+          // all other tabs are descending.
+          if (selectedStatuses.length === 1 && selectedStatuses[0] === "pending_practitioner_review") {
+            direction = "asc"
+          } else {
+            direction = "desc"
+          }
+        }
+
+        // 4. Parse & clamp limit parameter (Amendment 5)
+        // Decision: Reject non-integers, floats, negatives and zero with 400.
+        // Clamp integers > 200 to max allowed (200) to allow client ease while preventing bulk exports.
+        const rawLimit = url.searchParams.get("limit")
+        let limit = 50
+        if (rawLimit !== null && rawLimit !== undefined && rawLimit.trim() !== "") {
+          const trimmedLimit = rawLimit.trim()
+          if (!/^-?\d+$/.test(trimmedLimit)) {
+            return respond({ error: "Invalid limit: must be an integer" }, cors, 400)
+          }
+          const parsedLimit = parseInt(trimmedLimit, 10)
+          if (parsedLimit <= 0) {
+            return respond({ error: "Invalid limit: must be greater than 0" }, cors, 400)
+          }
+          limit = Math.min(parsedLimit, 200)
+        }
+
+        // 5. Parse & validate cursor parameter (Aya's Decided Clauses & F-b validation)
+        const rawCursor = url.searchParams.get("cursor")
+        let cursorObj = null
+        let cursorPredicate = ""
+
+        if (rawCursor !== null && rawCursor !== undefined && rawCursor.trim() !== "") {
+          cursorObj = await verifyReviewQueueCursor(rawCursor.trim(), cursorSecret)
+          if (!cursorObj) {
+            return respond({ error: "Invalid cursor: signature verification or decoding failed" }, cors, 400)
+          }
+          if (
+            !cursorObj.id ||
+            !UUID_REGEX.test(cursorObj.id) ||
+            typeof cursorObj.is_null !== "boolean" ||
+            (cursorObj.dir !== "asc" && cursorObj.dir !== "desc") ||
+            (!cursorObj.is_null &&
+              (typeof cursorObj.submitted_at !== "string" ||
+                !ISO_DATETIME_REGEX.test(cursorObj.submitted_at) ||
+                Number.isNaN(Date.parse(cursorObj.submitted_at))))
+          ) {
+            return respond({ error: "Invalid cursor: keyset payload validation failed" }, cors, 400)
+          }
+          // Clause 2: Carry direction in cursor and refuse on mismatch (400)
+          if (cursorObj.dir !== direction) {
+            return respond({ error: "Cursor direction mismatch" }, cors, 400)
+          }
+          // Keyset positioning across NULL boundary (Clause 1)
+          // NOTE (Lockstep Ordering Site 1 of 2): This query-level keyset filter and the PostgREST
+          // ordering (&order=submitted_at.${direction}.nullslast,id.${direction}) must stay in strict
+          // lockstep with the in-memory sorting and filtering below (Site 2, around rowsList.sort).
+          if (cursorObj.is_null) {
+            const cmp = direction === "asc" ? "gt" : "lt"
+            cursorPredicate = `&submitted_at=is.null&id=${cmp}.${encodeURIComponent(cursorObj.id)}`
+          } else {
+            const cmp = direction === "asc" ? "gt" : "lt"
+            cursorPredicate = `&or=(submitted_at.${cmp}.${encodeURIComponent(cursorObj.submitted_at)},and(submitted_at.eq.${encodeURIComponent(cursorObj.submitted_at)},id.${cmp}.${encodeURIComponent(cursorObj.id)}),submitted_at.is.null)`
+          }
+        }
+
+        const countOnly = url.searchParams.get("count_only") === "1"
+
+        // 6. Resolve caller's clients from clinician_clients (Tenant Scoping)
+        // Performed only after all input parameters have been validated.
+        const mappingRes = await fetch(
+          `${SUPABASE_URL}/clinician_clients?clinician_id=eq.${encodeURIComponent(authUser.id)}&select=client_id`,
+          { headers: HEADERS }
+        )
+        if (!mappingRes.ok) throw new Error(await mappingRes.text())
+        const mappingData = await mappingRes.json()
+        const callerClientIds = (Array.isArray(mappingData) ? mappingData : [])
+          .map((m) => m.client_id)
+          .filter(Boolean)
+
+
+        // If caller has no assigned clients, short-circuit to empty results
+        if (callerClientIds.length === 0) {
+          const emptyCounts = {
+            pending_practitioner_review: 0,
+            draft: 0,
+            reviewed: 0,
+            approved: 0,
+            revision_requested: 0,
+            archived: 0,
+          }
+          if (countOnly) {
+            return respond({ counts: emptyCounts, pending_total: 0 }, cors)
+          }
+          return respond({ rows: [], counts: emptyCounts, pending_total: 0, next_cursor: null }, cors)
+        }
+
+        const callerTenantPredicate = `client_id=in.(${callerClientIds.map(encodeURIComponent).join(",")})`
+
+        // 7. Outbound queries:
+        // - counts: tenant predicate YES, client_id YES; status / cursor / limit NEVER (Aya)
+        // - pending_total: tenant predicate YES, client_id NEVER; status=eq.pending_practitioner_review; cursor / limit NEVER (Aya)
+        // - rows: single query embedding sessions, client_reflections, clients (No N+1!)
+        const countsUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}${clientIdPredicate}&select=status`
+        const pendingTotalUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}&status=eq.pending_practitioner_review&select=status`
+        const rowsUrl = `${SUPABASE_URL}/practice_task_submissions?${callerTenantPredicate}${clientIdPredicate}${statusPredicate}${cursorPredicate}&order=submitted_at.${direction}.nullslast,id.${direction}&limit=${limit + 1}&select=id,client_id,task_type,status,submitted_at,created_at,updated_at,session_id,clients(full_name),sessions(name),client_reflections(id)`
+
+        const [countsRes, pendingTotalRes, rowsRes] = await Promise.all([
+          fetch(countsUrl, { headers: HEADERS }),
+          fetch(pendingTotalUrl, { headers: HEADERS }),
+          countOnly ? Promise.resolve(null) : fetch(rowsUrl, { headers: HEADERS }),
+        ])
+
+        if (!countsRes.ok) throw new Error(await countsRes.text())
+        if (!pendingTotalRes.ok) throw new Error(await pendingTotalRes.text())
+        if (rowsRes && !rowsRes.ok) throw new Error(await rowsRes.text())
+
+        const countsData = await countsRes.json()
+        const pendingTotalData = await pendingTotalRes.json()
+
+        const counts = {
+          pending_practitioner_review: 0,
+          draft: 0,
+          reviewed: 0,
+          approved: 0,
+          revision_requested: 0,
+          archived: 0,
+        }
+        if (Array.isArray(countsData)) {
+          for (const item of countsData) {
+            if (item.status && Object.prototype.hasOwnProperty.call(counts, item.status)) {
+              counts[item.status]++
+            }
+          }
+        }
+
+        const pending_total = Array.isArray(pendingTotalData) ? pendingTotalData.length : 0
+
+        if (countOnly) {
+          return respond({ counts, pending_total }, cors)
+        }
+
+        const rawRows = await rowsRes.json()
+        const rowsList = Array.isArray(rawRows) ? rawRows : []
+
+        // NOTE (Lockstep Ordering Site 2 of 2): In-memory deterministic ordering (NULLs last, then submitted_at
+        // by direction, then id by direction) and defensive keyset filtering below must stay in strict lockstep
+        // with the Supabase PostgREST query ordering and cursorPredicate above (Site 1, around lines 1570-1650).
+        // In-memory deterministic ordering: NULLs last, then submitted_at by direction, then id by direction
+        rowsList.sort((a, b) => {
+          const aNull = a.submitted_at === null || a.submitted_at === undefined
+          const bNull = b.submitted_at === null || b.submitted_at === undefined
+          if (aNull && !bNull) return 1
+          if (!aNull && bNull) return -1
+          if (!aNull && !bNull) {
+            const aTime = new Date(a.submitted_at).getTime()
+            const bTime = new Date(b.submitted_at).getTime()
+            if (aTime !== bTime) {
+              return direction === "asc" ? aTime - bTime : bTime - aTime
+            }
+          }
+          return direction === "asc"
+            ? String(a.id).localeCompare(String(b.id))
+            : String(b.id).localeCompare(String(a.id))
+        })
+
+        // Defensive in-memory cursor filtering against mocks/stubs that do not evaluate PostgREST queries
+        let filteredRows = rowsList
+        if (cursorObj) {
+          filteredRows = filteredRows.filter((r) => {
+            const rNull = r.submitted_at === null || r.submitted_at === undefined
+            if (cursorObj.is_null) {
+              if (!rNull) return false
+              return direction === "asc" ? r.id > cursorObj.id : r.id < cursorObj.id
+            } else {
+              if (rNull) return true
+              const rTime = new Date(r.submitted_at).getTime()
+              const cTime = new Date(cursorObj.submitted_at).getTime()
+              if (direction === "asc") {
+                if (rTime > cTime) return true
+                if (rTime === cTime) return r.id > cursorObj.id
+                return false
+              } else {
+                if (rTime < cTime) return true
+                if (rTime === cTime) return r.id < cursorObj.id
+                return false
+              }
+            }
+          })
+        }
+
+        const hasMore = filteredRows.length > limit
+        const pageRows = filteredRows.slice(0, limit)
+
+        const rows = pageRows.map((r) => {
+          const client_name =
+            r.client_name ??
+            (r.clients ? (Array.isArray(r.clients) ? r.clients[0]?.full_name : r.clients.full_name) : null) ??
+            null
+          const session_name =
+            r.session_name ??
+            (r.sessions ? (Array.isArray(r.sessions) ? r.sessions[0]?.name : r.sessions.name) : null) ??
+            null
+          const reflection_count =
+            typeof r.reflection_count === "number"
+              ? r.reflection_count
+              : Array.isArray(r.client_reflections)
+                ? r.client_reflections.length
+                : 0
+
+          return {
+            id: r.id,
+            client_id: r.client_id,
+            client_name,
+            task_type: r.task_type,
+            status: r.status,
+            submitted_at: r.submitted_at ?? null,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            reflection_count,
+            session_id: r.session_id ?? null,
+            session_name,
+          }
+        })
+
+        let next_cursor = null
+        if (hasMore && rows.length > 0) {
+          const lastRow = rows[rows.length - 1]
+          const isNull = lastRow.submitted_at === null || lastRow.submitted_at === undefined
+          next_cursor = await signReviewQueueCursor(
+            {
+              id: lastRow.id,
+              submitted_at: isNull ? null : lastRow.submitted_at,
+              is_null: isNull,
+              dir: direction,
+            },
+            cursorSecret
+          )
+        }
+
+        return respond({ rows, counts, pending_total, next_cursor }, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions
+         Upsert a practice-task submission in `draft` status.
+
+         Body (JSON):
+           { id?, client_id, task_type, form_data }
+           (practitioner_id is enforced from authUser.id)
+
+         • `id` omitted  → INSERT with status = 'draft'
+         • `id` present  → UPDATE where status = 'draft' (refuses other statuses)
+         Returns the upserted row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && cleanPath === "/tasks/submissions") {
+        const body = await safeJson(request)
+
+        if (!body?.client_id || !body?.task_type || !body?.form_data) {
+          return respond({ error: "Missing required fields: client_id, task_type, form_data" }, cors, 400)
+        }
+
+        if (!(await checkClientAccess(body.client_id))) {
+          return respond({ error: "Client not found or access denied" }, cors, 404)
+        }
+
+        let row
+
+        if (body.id) {
+          // UPDATE: only allow overwriting drafts
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!checkRes.ok) throw new Error(await checkRes.text())
+          const existing = await checkRes.json()
+
+          if (!existing?.length) {
+            return respond({ error: "Submission not found" }, cors, 404)
+          }
+          if (existing[0].status !== "draft") {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+
+          const patchRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify({
+                task_type: body.task_type,
+                form_data: body.form_data,
+                updated_at: new Date().toISOString(),
+              }),
+            }
+          )
+          if (!patchRes.ok) throw new Error(await patchRes.text())
+          const patchData = await patchRes.json()
+          row = Array.isArray(patchData) ? patchData[0] : patchData
+        } else {
+          // INSERT new draft
+          const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              client_id: body.client_id,
+              practitioner_id: authUser.id,
+              task_type: body.task_type,
+              form_data: body.form_data,
+              status: "draft",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }),
+          })
+          if (!insertRes.ok) throw new Error(await insertRes.text())
+          const insertData = await insertRes.json()
+          row = Array.isArray(insertData) ? insertData[0] : insertData
+        }
+
+        return respond(row, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/commit
+         Transition draft → pending_practitioner_review.
+         Writes a status_audit_log row atomically.
+         Body: (empty — submissionId is in the path)
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/commit$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        // Load existing row for access check and status gate
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "draft") {
+          return respond(
+            { error: `Cannot commit: status is '${submission.status}', expected 'draft'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        // Write status transition
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: HEADERS,
+            body: JSON.stringify({
+              status: "pending_practitioner_review",
+              updated_at: now,
+            }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Append audit log row (best-effort — failure does NOT roll back the status change)
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "draft",
+              new_status: "pending_practitioner_review",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /client-submissions/:sessionId?exp=<int>&sig=<hex>
+         Client-link submission route (Phase 2 contract, item 1).
+         Signed bearer link write surface - token-free, guarded by HMAC.
+         Upserts a practice-task submission in `draft` or `pending_practitioner_review`.
+
+         Invariant (Aya's ruling): One submission per session across all states.
+         The client surface holds no id (token-free, no localStorage/sessionStorage);
+         the session in the path is the resume handle.
+
+         Security & resolution constraints:
+         - Signed link HMAC verification via verifyClientLink(sessionId, url.searchParams, env).
+         - client_id is resolved strictly from the session row (with case_formulations fallback), never from body.
+         - practitioner_id is sent as an EXPLICIT null JSON value (never omitted, never fabricated).
+         - Resolve first by session_id: client link sends no id. Route resolves existing row by session_id:
+           * none: INSERT new row with explicit null practitioner_id and session_id from path.
+           * draft: UPDATE in place (autosave/resume path), keeping id=eq.<id>&session_id=eq.<path>&status=eq.draft scoping.
+           * pending_practitioner_review: do not overwrite; return existing row (UI renders sent receipt).
+           * revision_requested / approved / archived: do not overwrite; return existing row (UI renders locked).
+         - Retries never receive 409: returns 200 with { id, status } receipt so UI branches on status alone.
+         - Race backstop: if INSERT hits unique violation (23505), scoped SELECT by session_id returns existing row with 200.
+         - Backward compatibility: if body.id is provided, existing id + session_id + draft scoping is preserved (409 on non-draft update).
+         - submitted_at is written transactionally in the same statement when transitioning to pending_practitioner_review.
+         - Payload size capped at 64 KB on request body (Content-Length check + streaming byte-cap before JSON.parse, plus form_data cap); rate limited (60 req/min per IP:session).
+         - Receipt returns only { id, status } - no cross-row reads.
+         - Status audit log insert is best-effort with changed_by_user_id = null and truthful previous_status ('draft' on update, null on direct insert).
+      ------------------------------------------------------------------ */
+      if (method === "POST" && (cleanPath === "/client-submissions" || cleanPath.startsWith("/client-submissions/"))) {
+        const sessionId = cleanPath.split("/")[2]
+
+        if (!sessionId || sessionId.length < 10) {
+          return respond({ error: "Invalid session ID" }, cors, 400)
+        }
+
+        // 1. Auth: verify signed client link HMAC
+        const link = await verifyClientLink(sessionId, url.searchParams, env)
+        if (!link.ok) {
+          console.warn(
+            `Client link rejected (${link.reason}) for ${String(sessionId).slice(0, 8)}…`
+          )
+          return respond(
+            {
+              error:
+                "This link is invalid or has expired. Please ask your clinician for a new one.",
+            },
+            cors,
+            403
+          )
+        }
+
+        // 2. Rate limit
+        const clientIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "direct"
+        const rateLimitKey = `${clientIp}:${sessionId}`
+        if (isClientSubmissionRateLimited(rateLimitKey)) {
+          return respond({ error: "Too many requests. Please try again later." }, cors, 429)
+        }
+
+        // 3. Payload size check: Content-Length header (if present)
+        const contentLengthHeader = request.headers.get("content-length")
+        if (contentLengthHeader !== null) {
+          const contentLength = Number(contentLengthHeader)
+          if (Number.isFinite(contentLength) && contentLength > MAX_CLIENT_SUBMISSION_BYTES) {
+            return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+          }
+        }
+
+        // 4. Read body stream with byte-level cap before JSON.parse
+        // Streaming cap aborts reading chunks once MAX_CLIENT_SUBMISSION_BYTES is exceeded,
+        // mitigating memory buffering DoS on chunked/unbounded requests.
+        let rawBody = ""
+        if (request.body && typeof request.body.getReader === "function") {
+          const reader = request.body.getReader()
+          const chunks = []
+          let totalBytes = 0
+          let tooLarge = false
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              totalBytes += value.byteLength
+              if (totalBytes > MAX_CLIENT_SUBMISSION_BYTES) {
+                tooLarge = true
+                await reader.cancel()
+                break
+              }
+              chunks.push(value)
+            }
+          } finally {
+            reader.releaseLock()
+          }
+
+          if (tooLarge) {
+            return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+          }
+
+          const allBytes = new Uint8Array(totalBytes)
+          let offset = 0
+          for (const chunk of chunks) {
+            allBytes.set(chunk, offset)
+            offset += chunk.byteLength
+          }
+          rawBody = new TextDecoder().decode(allBytes)
+        } else {
+          try {
+            rawBody = await request.text()
+            if (new TextEncoder().encode(rawBody).length > MAX_CLIENT_SUBMISSION_BYTES) {
+              return respond({ error: "Payload exceeds maximum allowed size (64 KB)" }, cors, 413)
+            }
+          } catch {
+            return respond({ error: "Invalid request body" }, cors, 400)
+          }
+        }
+
+        let body
+        try {
+          body = JSON.parse(rawBody)
+        } catch {
+          return respond({ error: "Invalid JSON body" }, cors, 400)
+        }
+
+        if (!body || typeof body !== "object") {
+          return respond({ error: "Invalid JSON body" }, cors, 400)
+        }
+
+        if (!body.task_type || !body.form_data || typeof body.form_data !== "object") {
+          return respond({ error: "Missing required fields: task_type, form_data" }, cors, 400)
+        }
+
+        // 5. Allowlist task_type (F2)
+        if (!CLIENT_SUBMISSION_ALLOWED_TASK_TYPES.has(body.task_type)) {
+          return respond(
+            {
+              error:
+                "Invalid task_type: only 'activity_log', 'thought_record', 'behavioural_experiment', 'two_choice_worksheet', and 'reflection_prompt' are allowed",
+            },
+            cors,
+            400
+          )
+        }
+
+        // 6. Cap form_data payload size (64 KB)
+        const formDataStr = JSON.stringify(body.form_data)
+        if (new TextEncoder().encode(formDataStr).length > MAX_FORM_DATA_BYTES) {
+          return respond({ error: "form_data exceeds maximum allowed size (64 KB)" }, cors, 413)
+        }
+
+        // 7. Status allowlist: exactly 'draft' or 'pending_practitioner_review'
+        let targetStatus = "draft"
+        if (body.status !== undefined && body.status !== null) {
+          if (body.status !== "draft" && body.status !== "pending_practitioner_review") {
+            return respond(
+              { error: "Invalid status: only 'draft' and 'pending_practitioner_review' are allowed" },
+              cors,
+              400
+            )
+          }
+          targetStatus = body.status
+        }
+
+        // 8. Resolve client_id from session row (never from body)
+        const sessionRes = await fetch(
+          `${SUPABASE_URL}/sessions?id=eq.${encodeURIComponent(sessionId)}&select=client_id,case_formulations(client_id)`,
+          { headers: HEADERS }
+        )
+        if (!sessionRes.ok) throw new Error(await sessionRes.text())
+        const sessionData = await sessionRes.json()
+        if (!sessionData || !sessionData.length) {
+          return respond({ error: "Session not found" }, cors, 404)
+        }
+        const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id
+        if (!sessionClientId) {
+          return respond({ error: "Client not found for session" }, cors, 404)
+        }
+
+        const now = new Date().toISOString()
+        let row
+        let previousStatus = null
+
+        if (body.id) {
+          // 9. UPDATE: Scoped by id, session_id, and status=draft
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!checkRes.ok) throw new Error(await checkRes.text())
+          const existing = await checkRes.json()
+
+          if (!existing || !existing.length) {
+            return respond({ error: "Submission not found" }, cors, 404)
+          }
+
+          if (existing[0].status !== "draft") {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+
+          previousStatus = existing[0].status
+
+          const patchPayload = {
+            task_type: body.task_type,
+            form_data: body.form_data,
+            practitioner_id: null,
+            status: targetStatus,
+            updated_at: now,
+            ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+          }
+
+          const patchRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(body.id)}&session_id=eq.${encodeURIComponent(sessionId)}&status=eq.draft`,
+            {
+              method: "PATCH",
+              headers: HEADERS,
+              body: JSON.stringify(patchPayload),
+            }
+          )
+          if (!patchRes.ok) throw new Error(await patchRes.text())
+          const patchData = await patchRes.json()
+          if (!patchData || (Array.isArray(patchData) && patchData.length === 0)) {
+            return respond({ error: "Only draft submissions can be updated" }, cors, 409)
+          }
+          row = Array.isArray(patchData) ? patchData[0] : patchData
+        } else {
+          // 10. Client-link surface (no id): Resolve first by session_id (never client_id)
+          const existingRes = await fetch(
+            `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+            { headers: HEADERS }
+          )
+          if (!existingRes.ok) throw new Error(await existingRes.text())
+          const existingRows = await existingRes.json()
+          const existingRow = existingRows && existingRows.length ? existingRows[0] : null
+
+          if (!existingRow) {
+            // (a) none → INSERT as today (explicit null practitioner_id, session_id from path, client_id from session)
+            previousStatus = null
+            const insertPayload = {
+              client_id: sessionClientId,
+              session_id: sessionId,
+              practitioner_id: null,
+              task_type: body.task_type,
+              form_data: body.form_data,
+              status: targetStatus,
+              created_at: now,
+              updated_at: now,
+              ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+            }
+
+            const insertRes = await fetch(`${SUPABASE_URL}/practice_task_submissions`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify(insertPayload),
+            })
+            if (!insertRes.ok) {
+              const errText = await insertRes.text()
+              if (insertRes.status === 409 || errText.includes("23505")) {
+                // Race backstop: if INSERT hits unique violation (23505),
+                // scoped SELECT by session_id and return that row with 200 instead of erroring
+                const raceRes = await fetch(
+                  `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+                  { headers: HEADERS }
+                )
+                if (raceRes.ok) {
+                  const raceData = await raceRes.json()
+                  if (raceData && raceData.length > 0) {
+                    row = raceData[0]
+                    return respond({ id: row.id, status: row.status }, cors)
+                  }
+                }
+              }
+              throw new Error(errText)
+            }
+            const insertData = await insertRes.json()
+            row = Array.isArray(insertData) ? insertData[0] : insertData
+          } else if (existingRow.status === "draft") {
+            // (b) draft → UPDATE in place (autosave/resume path), keeping existing scoping
+            previousStatus = "draft"
+            const patchPayload = {
+              task_type: body.task_type,
+              form_data: body.form_data,
+              practitioner_id: null,
+              status: targetStatus,
+              updated_at: now,
+              ...(targetStatus === "pending_practitioner_review" ? { submitted_at: now } : {}),
+            }
+
+            const patchRes = await fetch(
+              `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(existingRow.id)}&session_id=eq.${encodeURIComponent(sessionId)}&status=eq.draft`,
+              {
+                method: "PATCH",
+                headers: HEADERS,
+                body: JSON.stringify(patchPayload),
+              }
+            )
+            if (!patchRes.ok) throw new Error(await patchRes.text())
+            const patchData = await patchRes.json()
+            if (!patchData || (Array.isArray(patchData) && patchData.length === 0)) {
+              // If concurrent transition moved row out of draft, fetch latest row and return
+              const raceRes = await fetch(
+                `${SUPABASE_URL}/practice_task_submissions?session_id=eq.${encodeURIComponent(sessionId)}&select=id,status`,
+                { headers: HEADERS }
+              )
+              if (raceRes.ok) {
+                const raceData = await raceRes.json()
+                if (raceData && raceData.length > 0) {
+                  return respond({ id: raceData[0].id, status: raceData[0].status }, cors)
+                }
+              }
+              return respond({ id: existingRow.id, status: existingRow.status }, cors)
+            }
+            row = Array.isArray(patchData) ? patchData[0] : patchData
+          } else if (existingRow.status === "pending_practitioner_review") {
+            // (c) pending_practitioner_review → do not overwrite; return row so UI renders sent receipt
+            return respond({ id: existingRow.id, status: existingRow.status }, cors)
+          } else {
+            // (d) revision_requested / approved / archived → return row; UI renders it locked
+            return respond({ id: existingRow.id, status: existingRow.status }, cors)
+          }
+        }
+
+        // 11. Best-effort audit log entry on commit (changed_by_user_id is null)
+        if (targetStatus === "pending_practitioner_review") {
+          try {
+            await fetch(`${SUPABASE_URL}/status_audit_log`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify({
+                submission_id: row.id,
+                previous_status: previousStatus,
+                new_status: "pending_practitioner_review",
+                changed_by_user_id: null,
+                changed_at: now,
+              }),
+            })
+          } catch (auditErr) {
+            console.error("status_audit_log insert failed (non-fatal):", auditErr)
+          }
+        }
+
+        // 12. Receipt returns ONLY id and status (no cross-row reads)
+        return respond({ id: row.id, status: row.status }, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         GET /tasks/submissions/:id/bundle
+         Returns the full review bundle:
+           { submission, reflections[], practitioner_notes[] }
+         The practitioner must have access to the submission's owning client.
+      ------------------------------------------------------------------ */
+      if (method === "GET" && /^\/tasks\/submissions\/[^/]+\/bundle$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        const submissionRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!submissionRes.ok) throw new Error(await submissionRes.text())
+        const submissionData = await submissionRes.json()
+
+        if (!submissionData?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = submissionData[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        // Fetch reflections, notes, and audit log in parallel
+        const [reflectionsRes, notesRes, auditRes] = await Promise.all([
+          fetch(
+            `${SUPABASE_URL}/client_reflections?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=created_at.asc`,
+            { headers: HEADERS }
+          ),
+          fetch(
+            `${SUPABASE_URL}/submission_practitioner_notes?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=created_at.asc`,
+            { headers: HEADERS }
+          ),
+          fetch(
+            `${SUPABASE_URL}/status_audit_log?submission_id=eq.${encodeURIComponent(submissionId)}&select=*&order=changed_at.asc`,
+            { headers: HEADERS }
+          ),
+        ])
+
+        if (!reflectionsRes.ok) throw new Error(await reflectionsRes.text())
+        if (!notesRes.ok) throw new Error(await notesRes.text())
+
+        const reflections = await reflectionsRes.json()
+        const practitioner_notes = await notesRes.json()
+        // audit log is best-effort — don't fail the whole bundle if it errors
+        const audit_log = auditRes.ok ? await auditRes.json() : []
+
+        return respond({ submission, reflections, practitioner_notes, audit_log }, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/notes
+         Append a practitioner note to a submission (append-only).
+
+         Body (JSON): { practitioner_id, notes }
+         Returns the newly created note row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/notes$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        if (!body?.notes || typeof body.notes !== "string" || !body.notes.trim()) {
+          return respond({ error: "Missing or empty 'notes' field" }, cors, 400)
+        }
+
+        // Load submission to gate on client access
+        const submissionRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=client_id`,
+          { headers: HEADERS }
+        )
+        if (!submissionRes.ok) throw new Error(await submissionRes.text())
+        const submissionData = await submissionRes.json()
+
+        if (!submissionData?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        if (!(await checkClientAccess(submissionData[0].client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        const insertRes = await fetch(`${SUPABASE_URL}/submission_practitioner_notes`, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({
+            submission_id: submissionId,
+            practitioner_id: body.practitioner_id ?? authUser.id,
+            notes: body.notes.trim(),
+            created_at: new Date().toISOString(),
+          }),
+        })
+        if (!insertRes.ok) throw new Error(await insertRes.text())
+        const noteData = await insertRes.json()
+        const note = Array.isArray(noteData) ? noteData[0] : noteData
+
+        return respond(note, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/approve
+         Practitioner Gateway — approve a submission.
+
+         Transitions status: pending_practitioner_review → approved
+         Sets reviewed_at to the current timestamp.
+         Appends a status_audit_log row (best-effort).
+
+         The DB trigger enforces immutability after this transition:
+         any subsequent PATCH on an approved row is rejected at the Postgres
+         level. This route does NOT attempt to write the row again after the
+         PATCH succeeds.
+
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/approve$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "pending_practitioner_review") {
+          return respond(
+            { error: `Cannot approve: status is '${submission.status}', expected 'pending_practitioner_review'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({
+              status: "approved",
+              reviewed_at: now,
+              updated_at: now,
+            }),
+          }
+        )
+        if (!patchRes.ok) {
+          const errText = await patchRes.text()
+          console.error("Approve PATCH failed:", errText)
+          return respond({ error: "Failed to approve submission", detail: errText }, cors, 502)
+        }
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Best-effort audit log
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "pending_practitioner_review",
+              new_status: "approved",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /tasks/submissions/:id/request-revision
+         Practitioner Gateway — send back to client for revision.
+
+         Transitions: pending_practitioner_review → revision_requested
+         Optionally accepts { reason } in the JSON body to record a
+         practitioner note explaining what needs changing.
+
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && /^\/tasks\/submissions\/[^/]+\/request-revision$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=*`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status !== "pending_practitioner_review") {
+          return respond(
+            { error: `Cannot request revision: status is '${submission.status}'` },
+            cors,
+            409
+          )
+        }
+
+        const now = new Date().toISOString()
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({ status: "revision_requested", updated_at: now }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        // Optionally persist the reason as a practitioner note
+        if (body?.reason && typeof body.reason === "string" && body.reason.trim()) {
+          try {
+            await fetch(`${SUPABASE_URL}/submission_practitioner_notes`, {
+              method: "POST",
+              headers: HEADERS,
+              body: JSON.stringify({
+                submission_id: submissionId,
+                practitioner_id: authUser.id,
+                notes: `[Revision requested] ${body.reason.trim()}`,
+                created_at: now,
+              }),
+            })
+          } catch (noteErr) {
+            console.error("Revision note insert failed (non-fatal):", noteErr)
+          }
+        }
+
+        // Best-effort audit log
+        try {
+          await fetch(`${SUPABASE_URL}/status_audit_log`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              previous_status: "pending_practitioner_review",
+              new_status: "revision_requested",
+              changed_by_user_id: authUser.id,
+              changed_at: now,
+            }),
+          })
+        } catch (auditErr) {
+          console.error("status_audit_log insert failed (non-fatal):", auditErr)
+        }
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         PATCH /tasks/submissions/:id/label
+         Practitioner Gateway — update the exercise label on a submission.
+
+         Body: { label: string }   (max 200 chars)
+         Stored in form_data.label (JSONB merge).
+
+         Only allowed when status is NOT 'approved' (immutability guard).
+         Returns the updated submission row.
+      ------------------------------------------------------------------ */
+      if (method === "PATCH" && /^\/tasks\/submissions\/[^/]+\/label$/.test(cleanPath)) {
+        const submissionId = cleanPath.split("/")[3]
+        const body = await safeJson(request)
+
+        if (!body?.label || typeof body.label !== "string" || !body.label.trim()) {
+          return respond({ error: "Missing or empty 'label' field" }, cors, 400)
+        }
+        if (body.label.length > 200) {
+          return respond({ error: "'label' must be 200 characters or fewer" }, cors, 400)
+        }
+
+        const loadRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}&select=client_id,status,form_data`,
+          { headers: HEADERS }
+        )
+        if (!loadRes.ok) throw new Error(await loadRes.text())
+        const existing = await loadRes.json()
+
+        if (!existing?.length) {
+          return respond({ error: "Submission not found" }, cors, 404)
+        }
+        const submission = existing[0]
+
+        if (!(await checkClientAccess(submission.client_id))) {
+          return respond({ error: "Access denied" }, cors, 403)
+        }
+
+        if (submission.status === "approved") {
+          return respond({ error: "Cannot modify an approved (locked) record" }, cors, 409)
+        }
+
+        const updatedFormData = { ...(submission.form_data || {}), label: body.label.trim() }
+
+        const patchRes = await fetch(
+          `${SUPABASE_URL}/practice_task_submissions?id=eq.${encodeURIComponent(submissionId)}`,
+          {
+            method: "PATCH",
+            headers: { ...HEADERS, Prefer: "return=representation" },
+            body: JSON.stringify({
+              form_data: updatedFormData,
+              updated_at: new Date().toISOString(),
+            }),
+          }
+        )
+        if (!patchRes.ok) throw new Error(await patchRes.text())
+        const updatedData = await patchRes.json()
+        const updated = Array.isArray(updatedData) ? updatedData[0] : updatedData
+
+        return respond(updated, cors)
+      }
+
+      /* ------------------------------------------------------------------
+         POST /reflections/upload
+         Upload a reflection image (multipart/form-data) to Supabase Storage
+         bucket "client-reflections", then INSERT a client_reflections row.
+
+         Form fields:
+           file          — the PNG/JPEG blob (already compressed client-side ≤ 2 MB)
+           submission_id — UUID of the owning practice_task_submission
+           client_id     — UUID of the client
+
+         Returns: { imageUrl, sizeBytes }
+
+         The client has already enforced the 1 200 px / 2 MB constraints; the
+         Worker also rejects anything over 2 MB as a defence-in-depth check.
+      ------------------------------------------------------------------ */
+      if (method === "POST" && cleanPath === "/reflections/upload") {
+        let formData
+        try {
+          formData = await request.formData()
+        } catch {
+          return respond({ error: "Invalid multipart body" }, cors, 400)
+        }
+
+        const file         = formData.get("file")
+        const submissionId = formData.get("submission_id")
+        const clientId     = formData.get("client_id")
+
+        if (!(file instanceof File)) {
+          return respond({ error: "Missing file field" }, cors, 400)
+        }
+        if (typeof submissionId !== "string" || !submissionId.trim()) {
+          return respond({ error: "Missing submission_id" }, cors, 400)
+        }
+        if (typeof clientId !== "string" || !clientId.trim()) {
+          return respond({ error: "Missing client_id" }, cors, 400)
+        }
+
+        // Defence-in-depth: enforce 2 MB server-side
+        const MAX_BYTES = 2 * 1024 * 1024
+        if (file.size > MAX_BYTES) {
+          return respond(
+            { error: `File too large (${(file.size / (1024 * 1024)).toFixed(2)} MB). Maximum is 2 MB.` },
+            cors,
+            413
+          )
+        }
+
+        // Validate MIME
+        const allowedMimes = ["image/png", "image/jpeg"]
+        if (!allowedMimes.includes(file.type)) {
+          return respond({ error: "Only image/png and image/jpeg are accepted" }, cors, 415)
+        }
+
+        // Access guard: practitioner must own the client
+        if (!(await checkClientAccess(clientId))) {
+          return respond({ error: "Client not found or access denied" }, cors, 403)
+        }
+
+        // Build a namespaced Storage path: reflections/<clientId>/<submissionId>/<timestamp>.ext
+        const ext       = file.type === "image/jpeg" ? "jpg" : "png"
+        const timestamp = Date.now()
+        const storagePath = `reflections/${clientId}/${submissionId}/${timestamp}.${ext}`
+
+        // ── Upload to Supabase Storage ──────────────────────────────────
+        const storageUrl = env.SUPABASE_URL.endsWith("/")
+          ? env.SUPABASE_URL.slice(0, -1)
+          : env.SUPABASE_URL
+
+        const uploadRes = await fetch(
+          `${storageUrl}/storage/v1/object/client-reflections/${storagePath}`,
+          {
+            method: "POST",
+            headers: {
+              "apikey":        env.SUPABASE_SERVICE_ROLE_KEY,
+              "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              "Content-Type":  file.type,
+              "x-upsert":      "true",
+            },
+            body: await file.arrayBuffer(),
+          }
+        )
+
+        if (!uploadRes.ok) {
+          const detail = await uploadRes.text().catch(() => "Unknown storage error")
+          console.error("Supabase Storage upload failed:", detail)
+          return respond({ error: "Image upload failed", detail }, cors, 502)
+        }
+
+        // ── Derive the public URL ───────────────────────────────────────
+        const imageUrl = `${storageUrl}/storage/v1/object/public/client-reflections/${storagePath}`
+
+        // ── Insert client_reflections row (best-effort) ─────────────────
+        try {
+          await fetch(`${SUPABASE_URL}/client_reflections`, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({
+              submission_id: submissionId,
+              client_id:     clientId,
+              image_url:     imageUrl,
+              canvas_data:   null,   // client sets this separately if vector data is needed
+              notes:         null,
+              created_at:    new Date().toISOString(),
+            }),
+          })
+        } catch (rowErr) {
+          console.error("client_reflections row insert failed (non-fatal):", rowErr)
+        }
+
+        return respond({ imageUrl, sizeBytes: file.size }, cors)
+      }
+
+      /* =========================
    ✅ AI ROUTES
    ========================= */
+if (method === "POST" && cleanPath === "/generate/structured-task") {
+  try {
+    const parsed = StructuredTaskRequestSchema.safeParse(await safeJson(request));
+    if (!parsed.success) return respond({ error: "INVALID_REQUEST", issues: parsed.error.issues }, cors, 400);
+    const { sessionContext, activityFormat, modalities, sessionId } = parsed.data;
+    
+    if (sessionId && !(await checkSessionAccess(sessionId))) return respond({ error: "Access denied" }, cors, 403);
+    const allowDegraded = url.searchParams.get("allowDegraded") === "1";
+    
+    const generated = await handleGenerateStructuredTask(sessionContext, activityFormat, modalities, env, cors, allowDegraded);
+    if (generated instanceof Response) return generated;
+    return respond(generated, cors);
+  } catch (err) {
+    console.error("Failed to generate structured task:", err);
+    return respond({ error: err.message || "Generation failed" }, cors, 500);
+  }
+}
+
 if (method === "POST") {
   const body = await safeJson(request)
 
@@ -1289,15 +2766,7 @@ if (method === "POST") {
   // `?allowDegraded=1` restores the legacy 200 + placeholder payload + `degraded: true`.
   const allowDegraded = url.searchParams.get("allowDegraded") === "1"
 
-  async function checkSessionAccess(sessionId) {
-    if (!sessionId) return false;
-    const sessionRes = await fetch(`${SUPABASE_URL}/sessions?id=eq.${sessionId}&select=client_id,case_formulations(client_id)`, { headers: HEADERS })
-    if (!sessionRes.ok) return false;
-    const sessionData = await sessionRes.json()
-    if (!sessionData || !sessionData.length) return false;
-    const sessionClientId = sessionData[0].client_id || sessionData[0].case_formulations?.client_id;
-    return await checkClientAccess(sessionClientId);
-  }
+
 
   if (body.sessionId && !(await checkSessionAccess(body.sessionId))) {
     return respond({ error: "Access denied" }, cors, 403)
@@ -1393,9 +2862,7 @@ if (method === "POST") {
     return respond(generated, cors)
   }
 
-  /* =========================
-     GENERATE PRACTICE PACKAGE
-     ========================= */
+
   if (cleanPath === "/generate/practice-package") {
     const modality =
       body.verifiedModality ||
@@ -1702,6 +3169,82 @@ function buildSessionPatch(body) {
 }
 
 /**
+ * Extracts a client-facing list of practice tasks from a structured task / practice package.
+ */
+function extractHomeworkFromPracticePackage(pkg) {
+  if (!pkg || typeof pkg !== "object") return []
+  if (Array.isArray(pkg.homework) && pkg.homework.length > 0) return pkg.homework
+
+  const items = []
+  if (pkg.task_type === "two_choice_worksheet") {
+    if (pkg.title) items.push(pkg.title)
+    if (Array.isArray(pkg.prompts)) {
+      pkg.prompts.forEach((p, idx) => {
+        const q = typeof p === "string" ? p : p?.question
+        if (q) items.push(`${idx + 1}. ${q}`)
+      })
+    }
+    if (pkg.reflection_prompt) items.push(`Reflection: ${pkg.reflection_prompt}`)
+  } else if (pkg.task_type === "thought_record") {
+    items.push("Complete 3 C's Thought Record")
+    if (pkg.situation) items.push(`Situation: ${pkg.situation}`)
+    if (pkg.automatic_thought) items.push(`Catch It: ${pkg.automatic_thought}`)
+    if (pkg.evidence_for || pkg.evidence_against) items.push("Check It: Review evidence for and against")
+    if (pkg.balanced_thought) items.push(`Correct It: ${pkg.balanced_thought}`)
+  } else if (pkg.task_type === "activity_log") {
+    items.push("Weekly Activity Schedule")
+    if (pkg.activity_description) items.push(`Activity: ${pkg.activity_description}`)
+    if (pkg.activity_date) items.push(`Date: ${pkg.activity_date}`)
+    if (pkg.notes) items.push(`Instructions: ${pkg.notes}`)
+  } else if (pkg.task_type === "reflection_prompt") {
+    items.push("Values & Defusion Canvas Reflection")
+    if (pkg.prompt) items.push(pkg.prompt)
+  }
+  return items.length > 0 ? items : ["Complete assigned practice task"]
+}
+
+/**
+ * Client-facing fields per structured activity, mirroring the
+ * `/generate/structured-task` output schemas (ACTIVITY_LOG_SCHEMA etc.).
+ * Anything not listed here — including `homework`, `degraded`, `warning` or a
+ * field added to `practice_package` later — never reaches the public route.
+ */
+const CLIENT_PRACTICE_TASK_FIELDS = {
+  activity_log: ["activity_date", "activity_description", "pleasure_rating", "mastery_rating", "notes"],
+  thought_record: [
+    "situation",
+    "automatic_thought",
+    "emotions",
+    "evidence_for",
+    "evidence_against",
+    "balanced_thought",
+    "outcome_emotion_intensity",
+    "notes",
+  ],
+  two_choice_worksheet: ["title", "prompts", "reflection_prompt", "notes"],
+  reflection_prompt: ["prompt", "suggested_background", "notes"],
+}
+
+/**
+ * Projects a session's own `practice_package` into `{ task_type, ...fields }`
+ * for `GET /client-homework/:id`, or `null` when it holds no recognised activity.
+ */
+function projectClientPracticeTask(pkg) {
+  if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return null
+
+  const taskType = pkg.task_type
+  if (!Object.prototype.hasOwnProperty.call(CLIENT_PRACTICE_TASK_FIELDS, taskType)) {
+    return null
+  }
+
+  const task = { task_type: taskType }
+  for (const field of CLIENT_PRACTICE_TASK_FIELDS[taskType]) {
+    if (pkg[field] !== undefined) task[field] = pkg[field]
+  }
+  return task
+}
+
+/**
  * Shapes a session row into the material list `components/client-view.tsx` renders.
  */
 function formatClientMaterial(row) {
@@ -1724,6 +3267,7 @@ function formatClientMaterial(row) {
     worksheetQuestions: questions,
     createdAt: row.created_at || null,
     modality: row.modality || null,
+    practice_package: pkg,
   }
 }
 
@@ -1965,6 +3509,289 @@ ${input}
 
   return respond(payload, cors)
 }
+
+function normalizeStructuredTask(json, expectedFormat) {
+  if (!json || typeof json !== 'object') return json;
+
+  // 1. Resolve task_type (handle missing, type instead of task_type, or mismatched)
+  if (!json.task_type) {
+    if (json.type && ['activity_log', 'thought_record', 'reflection_prompt', 'two_choice_worksheet'].includes(json.type)) {
+      json.task_type = json.type;
+    } else if (expectedFormat && expectedFormat !== 'auto') {
+      json.task_type = expectedFormat;
+    } else if (expectedFormat === 'auto') {
+      json.task_type = json.situation ? 'thought_record' : (json.prompts ? 'two_choice_worksheet' : (json.activity_date ? 'activity_log' : 'two_choice_worksheet'));
+    }
+  }
+  if (expectedFormat && expectedFormat !== 'auto' && json.task_type !== expectedFormat) {
+    json.task_type = expectedFormat;
+  }
+  delete json.type;
+
+  // 2. Normalization for thought_record (The 3 C's)
+  if (json.task_type === 'thought_record') {
+    // Unpack nested catch/check/correct if hallucinated
+    if (json.catch && typeof json.catch === 'object') {
+      if (!json.situation && json.catch.situation) json.situation = json.catch.situation;
+      if (!json.automatic_thought && json.catch.automatic_thought) json.automatic_thought = json.catch.automatic_thought;
+      if ((!json.emotions || !json.emotions.length) && json.catch.emotions) json.emotions = json.catch.emotions;
+      delete json.catch;
+    }
+    if (json.check && typeof json.check === 'object') {
+      if (!json.evidence_for && json.check.evidence_for) json.evidence_for = json.check.evidence_for;
+      if (!json.evidence_against && json.check.evidence_against) json.evidence_against = json.check.evidence_against;
+      delete json.check;
+    }
+    if (json.correct && typeof json.correct === 'object') {
+      if (!json.balanced_thought && json.correct.balanced_thought) json.balanced_thought = json.correct.balanced_thought;
+      if (json.outcome_emotion_intensity === undefined && json.correct.outcome_emotion_intensity !== undefined) {
+        json.outcome_emotion_intensity = json.correct.outcome_emotion_intensity;
+      }
+      delete json.correct;
+    }
+
+    // Ensure situation and automatic_thought are non-empty strings
+    json.situation = typeof json.situation === 'string' && json.situation.trim() ? json.situation : (json.situation ? String(json.situation) : "Identified situation");
+    json.automatic_thought = typeof json.automatic_thought === 'string' && json.automatic_thought.trim() ? json.automatic_thought : (json.automatic_thought ? String(json.automatic_thought) : "Automatic thought to evaluate");
+
+    // Flatten evidence_for / evidence_against if arrays or non-strings
+    if (Array.isArray(json.evidence_for)) {
+      json.evidence_for = json.evidence_for.map(String).join("\n");
+    } else if (typeof json.evidence_for !== 'string' || !json.evidence_for.trim()) {
+      json.evidence_for = json.evidence_for ? String(json.evidence_for) : "Evidence supporting this thought";
+    }
+
+    if (Array.isArray(json.evidence_against)) {
+      json.evidence_against = json.evidence_against.map(String).join("\n");
+    } else if (typeof json.evidence_against !== 'string' || !json.evidence_against.trim()) {
+      json.evidence_against = json.evidence_against ? String(json.evidence_against) : "Evidence challenging this thought";
+    }
+
+    if (Array.isArray(json.balanced_thought)) {
+      json.balanced_thought = json.balanced_thought.map(String).join("\n");
+    } else if (typeof json.balanced_thought !== 'string' || !json.balanced_thought.trim()) {
+      json.balanced_thought = json.balanced_thought ? String(json.balanced_thought) : "Alternative balanced perspective";
+    }
+
+    // Normalize emotions array: [{ label: string, intensity: number (0-100) }]
+    if (!Array.isArray(json.emotions)) {
+      json.emotions = [];
+    } else {
+      json.emotions = json.emotions.map(e => {
+        if (!e || typeof e !== 'object') return null;
+        const label = String(e.label || e.type || e.name || e.emotion || "Emotion").trim();
+        let intensity = typeof e.intensity === 'number' ? e.intensity : Number(e.intensity);
+        if (isNaN(intensity)) intensity = 50;
+        intensity = Math.max(0, Math.min(100, Math.round(intensity)));
+        return { label: label || "Emotion", intensity };
+      }).filter(Boolean);
+    }
+
+    // outcome_emotion_intensity: 0-100 number
+    let outcomeIntensity = typeof json.outcome_emotion_intensity === 'number'
+      ? json.outcome_emotion_intensity
+      : Number(json.outcome_emotion_intensity);
+    if (isNaN(outcomeIntensity)) outcomeIntensity = 0;
+    json.outcome_emotion_intensity = Math.max(0, Math.min(100, Math.round(outcomeIntensity)));
+  }
+
+  // 3. Normalization for activity_log
+  if (json.task_type === 'activity_log') {
+    json.activity_date = typeof json.activity_date === 'string' && json.activity_date.trim()
+      ? json.activity_date.trim()
+      : new Date().toISOString().slice(0, 10);
+    json.activity_description = typeof json.activity_description === 'string' && json.activity_description.trim()
+      ? json.activity_description.trim()
+      : "Scheduled activity plan";
+    let pleasure = typeof json.pleasure_rating === 'number' ? json.pleasure_rating : Number(json.pleasure_rating);
+    if (isNaN(pleasure)) pleasure = 0;
+    json.pleasure_rating = Math.max(0, Math.min(10, Math.round(pleasure)));
+    let mastery = typeof json.mastery_rating === 'number' ? json.mastery_rating : Number(json.mastery_rating);
+    if (isNaN(mastery)) mastery = 0;
+    json.mastery_rating = Math.max(0, Math.min(10, Math.round(mastery)));
+  }
+
+  // 4. Normalization for reflection_prompt
+  if (json.task_type === 'reflection_prompt') {
+    json.prompt = typeof json.prompt === 'string' && json.prompt.trim() ? json.prompt.trim() : "Reflect on today's session insights";
+    if (!["blank", "lined", "dotted"].includes(json.suggested_background)) {
+      json.suggested_background = "blank";
+    }
+  }
+
+  // 5. Normalization for two_choice_worksheet
+  if (json.task_type === 'two_choice_worksheet') {
+    json.title = typeof json.title === 'string' && json.title.trim() ? json.title.trim() : "Two-Choice Worksheet";
+    json.reflection_prompt = typeof json.reflection_prompt === 'string' && json.reflection_prompt.trim()
+      ? json.reflection_prompt.trim()
+      : "Reflect on how your choices support your therapeutic goals:";
+    if (!Array.isArray(json.prompts) || json.prompts.length === 0) {
+      json.prompts = [{ question: "Consider this scenario", options: ["Option A", "Option B"] }];
+    } else {
+      json.prompts = json.prompts.slice(0, 5).map((p, idx) => {
+        const question = typeof p?.question === 'string' && p.question.trim() ? p.question.trim() : `Scenario ${idx + 1}`;
+        let options = Array.isArray(p?.options) ? p.options.map(o => String(o).trim()).filter(Boolean) : [];
+        if (options.length < 2) {
+          options = [options[0] || "Option 1", "Option 2"];
+        } else if (options.length > 2) {
+          options = [options[0], options[1]];
+        }
+        return { question, options: [options[0], options[1]] };
+      });
+    }
+  }
+
+  // Clean notes
+  if (json.notes === null || json.notes === undefined) {
+    delete json.notes;
+  } else if (typeof json.notes !== 'string') {
+    json.notes = String(json.notes);
+  }
+
+  return json;
+}
+
+async function handleGenerateStructuredTask(sessionContext, activityFormat, modalities, env, cors, allowDegraded = false, debug = null) {
+  const safeModalities = Array.isArray(modalities) && modalities.length ? modalities : ['CBT'];
+
+  let formatInstructions = '';
+  if (activityFormat === 'auto') {
+    formatInstructions = `You must dynamically select the most clinically appropriate task format from the following list, OR generate a custom worksheet if none fit perfectly.
+
+Available Formats:
+1. "thought_record" - The 3 C's (Catch, Check, Correct)
+2. "activity_log" - Weekly Activity Schedule
+3. "reflection_prompt" - Open-ended journaling/drawing
+4. "two_choice_worksheet" - Custom Q&A Worksheet
+
+If generating a custom worksheet, use the "two_choice_worksheet" schema with your own custom title and custom prompts.
+
+Return ONLY a flat JSON object with a "task_type" key matching the chosen format, and the corresponding fields.
+
+Schema for "thought_record": { "task_type": "thought_record", "situation": "...", "automatic_thought": "...", "emotions": [{"label":"Anxiety", "intensity":70}], "evidence_for": "...", "evidence_against": "...", "balanced_thought": "...", "outcome_emotion_intensity": 0, "notes": "..." }
+
+Schema for "activity_log": { "task_type": "activity_log", "activity_date": "YYYY-MM-DD", "activity_description": "...", "pleasure_rating": 0, "mastery_rating": 0, "notes": "..." }
+
+Schema for "reflection_prompt": { "task_type": "reflection_prompt", "prompt": "...", "suggested_background": "blank", "notes": "..." }
+
+Schema for "two_choice_worksheet" (Custom Worksheet): { "task_type": "two_choice_worksheet", "title": "Custom Title", "prompts": [ { "question": "...", "options": ["...", "..."] } ], "reflection_prompt": "...", "notes": "..." }
+
+CRITICAL RULE: Choose ONE format and return ONLY its JSON object. DO NOT wrap the object in another key.`;
+  } else if (activityFormat === 'activity_log') {
+    formatInstructions = `Weekly Activity Schedule.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "activity_log",
+  "activity_date": "YYYY-MM-DD",
+  "activity_description": "detailed schedule guidance and timeslots",
+  "pleasure_rating": 0,
+  "mastery_rating": 0,
+  "notes": "clinical instructions"
+}`;
+  } else if (activityFormat === 'thought_record') {
+    formatInstructions = `The 3 C's (Catch, Check, Correct) Thought Record.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "thought_record",
+  "situation": "the specific situation or trigger to monitor",
+  "automatic_thought": "the automatic thought to catch",
+  "emotions": [
+    { "label": "Anxiety", "intensity": 70 }
+  ],
+  "evidence_for": "prompt or evidence supporting the thought",
+  "evidence_against": "prompt or evidence challenging the thought",
+  "balanced_thought": "a grounded, balanced alternative perspective",
+  "outcome_emotion_intensity": 0,
+  "notes": "clinical instructions"
+}
+CRITICAL RULES for thought_record:
+- DO NOT nest fields inside "catch", "check", or "correct" objects. All fields MUST be top-level keys.
+- "task_type" MUST be literally "thought_record".
+- "evidence_for" and "evidence_against" MUST be strings, not arrays of strings.
+- "emotions" items MUST have "label" (string) and "intensity" (number 0-100).`;
+  } else if (activityFormat === 'two_choice_worksheet') {
+    formatInstructions = `Two-Choice Worksheet.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "two_choice_worksheet",
+  "title": "worksheet title",
+  "prompts": [
+    {
+      "question": "scenario or question",
+      "options": ["Option 1", "Option 2"]
+    }
+  ],
+  "reflection_prompt": "open-ended reflection prompt",
+  "notes": "clinical instructions"
+}
+Rules: 1 to 5 prompts, exactly 2 short options per prompt, no diagnostic or outcome-interpretation language.`;
+  } else {
+    formatInstructions = `Reflection Canvas.
+Return ONLY a flat JSON object with this exact shape:
+{
+  "task_type": "reflection_prompt",
+  "prompt": "journaling or drawing prompt",
+  "suggested_background": "blank",
+  "notes": "clinical instructions"
+}
+"suggested_background" must be one of: "blank", "lined", "dotted".`;
+  }
+
+  const messages = [
+    {
+      role: 'system',
+      content: `You are a senior clinical psychologist acting as a clinical translation engine.
+Convert the practitioner's session context into a structured interactive worksheet grounded in ${safeModalities.join(' + ')}.
+Return ONLY JSON matching the requested activity format schema.
+Format rules:
+${formatInstructions}
+Strictly anchor the generated payload to the session context provided to guarantee output variability. Do NOT regurgitate generic handouts.`
+    },
+    {
+      role: 'user',
+      content: `Requested Format: ${activityFormat}
+
+Session Context / Clinical Focus:
+${sessionContext}`
+    }
+  ];
+
+  const schema = activityFormat === 'auto' ? undefined :
+    activityFormat === 'activity_log' ? ACTIVITY_LOG_SCHEMA
+    : activityFormat === 'thought_record' ? THOUGHT_RECORD_SCHEMA
+    : activityFormat === 'two_choice_worksheet' ? TWO_CHOICE_WORKSHEET_SCHEMA
+    : REFLECTION_PROMPT_SCHEMA;
+
+  const attempt = await generateJson(messages, env, 0.6, {
+    debug,
+    contract: 'structured-task',
+    isValid: (json) => {
+      normalizeStructuredTask(json, activityFormat);
+      const parsed = StructuredTaskSchema.safeParse(json);
+      if (!parsed.success) {
+        console.error("Zod validation failed for structured-task. Issues:", JSON.stringify(parsed.error.issues), "JSON:", JSON.stringify(json).substring(0, 500));
+        return false;
+      }
+      return activityFormat === 'auto' ? true : json.task_type === activityFormat;
+    },
+    schema: schema,
+    schemaName: 'structured_cbt_task',
+  });
+
+  if (!attempt.result.ok) {
+    if (allowDegraded) {
+      return respond(degradedGroqPayload({ task_type: activityFormat }, attempt.result), cors)
+    }
+    return groqFailureResponse(attempt.result, cors)
+  }
+
+  if (!attempt.parsed) {
+    return unparseableAiResponse(attempt, { task_type: activityFormat }, attempt.result, cors, allowDegraded);
+  }
+
+  return normalizeStructuredTask(attempt.parsed, activityFormat);
+}
+
 async function handleGeneratePracticePackage(
   input,
   modality,
@@ -2371,7 +4198,7 @@ function unparseableAiResponse(attempt, fallback, result, cors, degrade) {
     reason: diagnosis.reason,
     parseError: diagnosis.parseError,
     finishReason: result.finishReason || null,
-    length: content.length,
+    length: content?.length || 0,
     attempts,
   }
 
@@ -2423,13 +4250,15 @@ function unparseableAiResponse(attempt, fallback, result, cors, degrade) {
 function stripMarkdown(text) {
   if (!text) return ""
 
-  const fenced = String(text).match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const withoutThinking = String(text).replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+
+  const fenced = withoutThinking.match(/```(?:json)?\s*([\s\S]*?)```/i)
 
   if (fenced && fenced[1] && fenced[1].trim()) {
     return fenced[1].trim()
   }
 
-  return String(text).replace(/```/g, "").trim()
+  return withoutThinking.replace(/```/g, "").trim()
 }
 
 /* ===============================
@@ -2674,6 +4503,63 @@ const VIGNETTE_SCHEMA = {
     homework: { type: "array", items: { type: "string" } },
   },
 }
+
+
+const ACTIVITY_LOG_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "activity_date", "activity_description", "pleasure_rating", "mastery_rating", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["activity_log"] },
+    activity_date: { type: "string" },
+    activity_description: { type: "string" },
+    pleasure_rating: { type: "number" },
+    mastery_rating: { type: "number" },
+    notes: { type: "string" }
+  }
+};
+
+const THOUGHT_RECORD_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "situation", "automatic_thought", "emotions", "evidence_for", "evidence_against", "balanced_thought", "outcome_emotion_intensity", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["thought_record"] },
+    situation: { type: "string" },
+    automatic_thought: { type: "string" },
+    emotions: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: { type: "string" }, intensity: { type: "number" } }, required: ["label", "intensity"] } },
+    evidence_for: { type: "string" },
+    evidence_against: { type: "string" },
+    balanced_thought: { type: "string" },
+    outcome_emotion_intensity: { type: "number" },
+    notes: { type: "string" }
+  }
+};
+
+const REFLECTION_PROMPT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "prompt", "suggested_background", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["reflection_prompt"] },
+    prompt: { type: "string" },
+    suggested_background: { type: "string", enum: ["blank", "lined", "dotted"] },
+    notes: { type: "string" }
+  }
+};
+
+const TWO_CHOICE_WORKSHEET_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["task_type", "title", "prompts", "reflection_prompt", "notes"],
+  properties: {
+    task_type: { type: "string", enum: ["two_choice_worksheet"] },
+    title: { type: "string", description: "Title of the worksheet" },
+    prompts: { type: "array", items: { type: "object", additionalProperties: false, properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" } } }, required: ["question", "options"] } },
+    reflection_prompt: { type: "string" },
+    notes: { type: "string" }
+  }
+};
 
 const PRACTICE_PACKAGE_SCHEMA = {
   type: "object",

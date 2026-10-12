@@ -1,0 +1,291 @@
+I have completed the task and successfully eliminated all 20 occurrences of `@typescript-eslint/no-explicit-any` from `stores/useClientNavStore.ts` according to the required rules. 
+
+Here is the requested output format fulfilling the definition of done:
+
+### 1. `npx tsc --noEmit`
+The command exited `0` with empty output (no type errors).
+
+### 2. `npx eslint stores/useClientNavStore.ts -f json`
+- `errorCount`: **0**
+- `warningCount`: **0**
+- `@typescript-eslint/no-explicit-any` count: **0**
+
+### 3. Git Diffs
+**`git diff --stat stores/useClientNavStore.ts`**
+```text
+ stores/useClientNavStore.ts | 103 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 70 insertions(+), 33 deletions(-)
+```
+
+**`git diff stores/useClientNavStore.ts`**
+```diff
+warning: in the working copy of 'stores/useClientNavStore.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/stores/useClientNavStore.ts b/stores/useClientNavStore.ts
+index 35d6e14..253314f 100644
+--- a/stores/useClientNavStore.ts
++++ b/stores/useClientNavStore.ts
+@@ -49,6 +49,35 @@ export type Client = {
+   cases: Case[]
+ }
+ 
++/** POST /generate/vignette (handleGenerate, backend/CloudFlare.js:2611) */
++type VignetteResult = { scenario: string; homework: string[]; quiz: string[] }
++
++type RawSessionRow = {
++  id: string
++  name?: string | null
++  sessionNotes?: string | null
++  session_notes?: string | null
++  vignette?: string | null
++  homework?: string[] | null
++  quiz?: string[] | null
++  practicePackage?: PracticePackage | null
++  practice_package?: PracticePackage | null
++  analysis?: Session['analysis']
++  modality?: string | null
++}
++
++type RawCaseRow = {
++  id: string
++  name?: string | null
++  sessions?: RawSessionRow[] | null
++}
++
++type RawClientTree = {
++  id: string
++  name?: string | null
++  cases?: RawCaseRow[] | null
++}
++
+ type ClientNavState = {
+   client: Client | null
+   clients: Client[]
+@@ -110,19 +139,19 @@ type ClientNavState = {
+   analyzeSession: (
+     notes: string,
+     sessionId?: string
+-  ) => Promise<any>
++  ) => Promise<NonNullable<Session['analysis']>>
+ 
+   generateVignette: (
+     notes: string,
+     modality?: string,
+     sessionId?: string
+-  ) => Promise<any>
++  ) => Promise<VignetteResult>
+   
+   generatePracticePackage: (
+     notes: string,
+     modality?: string,
+     sessionId?: string
+-  ) => Promise<any>
++  ) => Promise<PracticePackage>
+   }
+ /* =========================
+    SAFE FETCH
+@@ -146,10 +175,18 @@ async function safeFetch(url: string, options?: RequestInit) {
+   return data;
+ }
+ 
++/**
++ * Message from a caught value, without a cast. `safeFetch` only throws `Error`
++ * (`Request failed`), so the `String(err)` branch is unreachable in this module.
++ */
++function errorMessage(err: unknown): string {
++  return err instanceof Error ? err.message : String(err)
++}
++
+ /* =========================
+    NORMALIZER (STABLE)
+ ========================= */
+-function normalizeSession(s: any): Session {
++function normalizeSession(s: RawSessionRow): Session {
+   return {
+     id: s.id,
+     name: s.name || 'Unnamed Session',
+@@ -188,11 +225,11 @@ function normalizeSession(s: any): Session {
+   }
+ }
+ 
+-function normalizeClientTree(client: any): Client {
++function normalizeClientTree(client: RawClientTree): Client {
+   return {
+     id: client.id,
+     name: client.name || 'Unnamed Client',
+-    cases: (client.cases || []).map((c: any) => ({
++    cases: (client.cases || []).map((c: RawCaseRow) => ({
+       id: c.id,
+       name: c.name || 'Unnamed Case',
+       sessions: (c.sessions || []).map(normalizeSession),
+@@ -260,7 +297,7 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+       const data = await safeFetch(`${API}/clients`)
+ 
+       set({
+-        clients: (Array.isArray(data) ? data : []).map((c: any) => ({
++        clients: (Array.isArray(data) ? data : []).map((c: RawClientTree) => ({
+           id: c.id,
+           name: c.name || 'Unnamed Client',
+           cases: [],
+@@ -268,8 +305,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+         loading: false,
+       })
+ 
+-    } catch (err: any) {
+-      set({ error: err.message, loading: false })
++    } catch (err) {
++      set({ error: errorMessage(err), loading: false })
+     }
+   },
+ 
+@@ -300,8 +337,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+       if (target) {
+         await get().selectSession(target.caseId, target.sessionId)
+       }
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -331,8 +368,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+           sessionHydratedId: sessionId,
+         })
+       }
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -355,8 +392,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+ 
+       await get().selectClient(data.id, { bootstrap: true })
+ 
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -379,8 +416,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+ 
+       await get().selectClient(client.id) // ✅ consistency
+ 
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -404,8 +441,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+         await get().selectSession(caseId, newest.id)
+       }
+ 
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -417,8 +454,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+       await safeFetch(`${API}/cases/${caseId}`, { method: 'DELETE' })
+       await get().selectClient(client.id)
+ 
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -435,8 +472,8 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+       }
+       await get().selectClient(client.id)
+ 
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+@@ -464,12 +501,12 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+         body: JSON.stringify({ name }),
+       })
+   
+-    } catch (err: any) {
++    } catch (err) {
+       // ❌ Roll back the optimistic rename, then surface the failure
+       set({
+         client: previousClient,
+         clients: previousClients,
+-        error: err.message,
++        error: errorMessage(err),
+       })
+     }
+   },
+@@ -497,9 +534,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ name }),
+       })
+-    } catch (err: any) {
++    } catch (err) {
+       // ❌ Roll back the optimistic rename, then surface the failure
+-      set({ client: previousClient, error: err.message })
++      set({ client: previousClient, error: errorMessage(err) })
+     }
+   },
+ 
+@@ -536,9 +573,9 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ name }),
+       })
+-    } catch (err: any) {
++    } catch (err) {
+       // ❌ Roll back the optimistic rename, then surface the failure
+-      set({ client: previousClient, error: err.message })
++      set({ client: previousClient, error: errorMessage(err) })
+     }
+   },
+ 
+@@ -578,16 +615,16 @@ export const useClientNavStore = create<ClientNavState>((set, get) => ({
+           ),
+         })
+       }
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+   loadLatestSession: async () => {
+     try {
+       return await safeFetch(`${API}/latest-session`)
+-    } catch (err: any) {
+-      set({ error: err.message })
++    } catch (err) {
++      set({ error: errorMessage(err) })
+     }
+   },
+ 
+```
+
+### 4. Summary of `any` sites removed
+*(Line numbers refer to their original positions in the file before the refactor)*
+- **Line 113:** `Promise<any>` → `Promise<NonNullable<Session['analysis']>>`
+- **Line 119:** `Promise<any>` → `Promise<VignetteResult>`
+- **Line 125:** `Promise<any>` → `Promise<PracticePackage>`
+- **Line 152:** `s: any` → `s: RawSessionRow`
+- **Line 191:** `client: any` → `client: RawClientTree`
+- **Line 195:** `c: any` → `c: RawCaseRow`
+- **Line 263:** `c: any` → `c: RawClientTree`
+- **Lines 271, 303, 334, 358, 382, 407, 420, 438, 467, 500, 539, 581, 589:** `catch (err: any)` → `catch (err)` (with `err.message` converted to `errorMessage(err)`).
+
+### 5. Type errors surfaced
+**"no real type errors surfaced"** (All changes type-checked successfully strictly by applying precise types corresponding to the live worker logic).

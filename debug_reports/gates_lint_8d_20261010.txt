@@ -1,0 +1,457 @@
+### Lint 8d gates — 2026-10-10T18:12:42+11:00 — HEAD(before commit) 1c3cb4407e60708dc88b82f26de606b8ae701e82
+
+=== npx tsc --noEmit ===
+tsc exit=0
+
+=== npm run lint (after) ===
+
+> my-project@0.1.0 lint
+> eslint .
+
+
+D:\Work\Neuvo\ALICE\Source\app\api\analyze\session\route.ts
+  33:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\dashboard\page.tsx
+  39:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\forgot-password\page.tsx
+  63:42  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\app\practice\[sessionId]\page.tsx
+   11:13  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  276:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx
+  1288:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\app\practitioner\tasks\[id]\review\page.tsx:1288:21
+  1286 |   }, [submissionId]);
+  1287 |
+> 1288 |   useEffect(() => { fetchBundle(); }, [fetchBundle]);
+       |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  1289 |
+  1290 |   const isLocked = bundle?.submission.status === "approved";
+  1291 |   const readOnly  = isLocked;  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\app\signup\page.tsx
+  112:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\backend\CloudFlare.js
+  190:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx
+  19:15  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  20:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  89:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\ClientLanding.tsx:89:5
+  87 |
+  88 |   useEffect(() => {
+> 89 |     fetchClients();
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |   }, []);
+  91 |
+  92 |   const fetchClient = async (id: string) => {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx
+  260:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\canvas\ReflectionCanvas.tsx:260:5
+  258 |   useEffect(() => {
+  259 |     const mq = window.matchMedia("(prefers-color-scheme: dark)");
+> 260 |     setIsDark(mq.matches);
+      |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  261 |     const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+  262 |     mq.addEventListener("change", handler);
+  263 |     return () => mq.removeEventListener("change", handler);  react-hooks/set-state-in-effect
+  495:9  warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-expressions
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx
+  20:22  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  30:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\client-view.tsx:30:5
+  28 |
+  29 |   useEffect(() => {
+> 30 |     setIsLoading(true)
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  31 |
+  32 |     const fetchVignettes = async () => {
+  33 |       try {  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx
+  52:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\dashboard-shell.tsx:52:5
+  50 |   // Picking a client or a session is navigation and must close the drawer.
+  51 |   useEffect(() => {
+> 52 |     setDrawerOpen(false);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  53 |   }, [selectedClientId, selectedSessionId]);
+  54 |
+  55 |   const sidebar = (  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx
+  26:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  88:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\main-content.tsx:88:5
+  86 |
+  87 |   useEffect(() => {
+> 88 |     fetchVignettes();
+     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  89 |   }, [client.id, selectedSessionId]);
+  90 |
+  91 |   return (  react-hooks/set-state-in-effect
+  89:6   warning  React Hook useEffect has a missing dependency: 'fetchVignettes'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  109:17  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  345:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:345:7
+  343 |   useEffect(() => {
+  344 |     if (externalSubmissionId) {
+> 345 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  346 |     }
+  347 |   }, [externalSubmissionId]);
+  348 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  461:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:461:5
+  459 |   useEffect(() => {
+  460 |     if (!persist) return;
+> 461 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  462 |     return () => {
+  463 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  464 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\ThreeCsForm.tsx
+  314:50  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+   40:14  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   47:36  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   57:32  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  126:62  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  145:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:145:7
+  143 |     if (!session) {
+  144 |       hydratedSessionRef.current = null
+> 145 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  146 |       setStep(1)
+  147 |       setSessionInput("")
+  148 |       setAnalysis(null)  react-hooks/set-state-in-effect
+  202:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  398:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  408:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  409:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  486:46  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  495:37  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  496:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  663:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts
+  33:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts:33:5
+  31 |     if (selectedClientId && findClient(hierarchy, selectedClientId)) return
+  32 |     const c = hierarchy.clients[0]
+> 33 |     setSelectedClientId(c.id)
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |     setSelectedCaseId(c.cases[0]?.id ?? null)
+  35 |     setSelectedSessionId(c.cases[0]?.sessions[0]?.id ?? null)
+  36 |   }, [hierarchy, selectedClientId])  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts
+  14:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-mobile.ts:14:5
+  12 |     }
+  13 |     mql.addEventListener('change', onChange)
+> 14 |     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  15 |     return () => mql.removeEventListener('change', onChange)
+  16 |   }, [])
+  17 |  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\stores\useClientNavStore.ts
+  113:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  191:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  195:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  263:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  271:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  334:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  358:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  382:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  407:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  420:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  438:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  467:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  500:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  539:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  581:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  589:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Work\Neuvo\ALICE\Source\workers\mcp-gateway\src\index.ts
+    1:1   warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+    2:34  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+   48:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  107:59  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  186:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  218:21  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+
+✖ 67 problems (0 errors, 67 warnings)
+
+lint exit=0
+
+=== npm test ===
+
+> my-project@0.1.0 test
+> node tests/worker.test.mjs && node tests/pdf-export.test.mjs && node tests/hydration-guard.test.mjs
+
+REQUEST POST /analyze/session
+PASS  1 analyze: JSON mode + reasoning_effort=low, single call
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+PASS  2 analyze: invalid JSON recovered by one temperature-0 retry
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+PASS  3 analyze: 502 BAD_AI_RESPONSE + reason/parseError  Expected double-quoted property name in JSON at position 73 (line 1 column 74)
+REQUEST POST /analyze/session
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=analyze, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+PASS  4 analyze: truncation retried with max_completion_tokens=4096
+REQUEST POST /analyze/session
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=analyze, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  5 analyze: 502 AI_TRUNCATED (not BAD_AI_RESPONSE)
+REQUEST POST /generate/practice-package
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+REQUEST POST /generate/practice-package
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  6 package: 502 and degraded 200 both carry a truthful code
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq error: GROQ ERROR 429 Rate limit reached (model=openai/gpt-oss-120b)
+PASS  7 analyze: retry that 429s reports GROQ_ERROR
+REQUEST GET /ai/probe
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+REQUEST GET /ai/probe
+Groq retry: invalid_json (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+PASS  8 probe: reports attempts/reason/parse_error
+REQUEST GET /ai/health
+REQUEST POST /analyze/session
+PASS  9 health + non-reasoning model: no JSON mode, no reasoning_effort
+REQUEST POST /analyze/session
+PASS  10 GROQ_MAX_TOKENS => max_completion_tokens
+REQUEST POST /analyze/session
+PASS  11 persistence: analyze writes sessions + session_versions
+REQUEST POST /generate/practice-package
+PASS  12 persistence: package writes practice_package
+REQUEST POST /analyze/session
+Groq retry: invalid_json (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=74) — retrying once at temperature 0
+Groq parse error: The model returned content that could not be parsed as JSON (model=openai/gpt-oss-120b, reason=invalid_json, attempts=2, finish_reason=stop) Expected double-quoted property name in JSON at position 73 (line 1 column 74) sample="{\"rationale\":\"Real formulation.\",\"inferredModality\":\"CBT\",\"riskFlags\":[],}"
+REQUEST POST /generate/practice-package
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq retry: truncated (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=length, length=70) — retrying once at temperature 0
+Groq warning: completion hit the token limit (model=openai/gpt-oss-120b)
+Groq parse error: The model's answer was cut off before the JSON was complete (model=openai/gpt-oss-120b, reason=truncated, attempts=2, finish_reason=length) the completion hit the token limit before the JSON closed sample="{\"homework\":[\"Log mood daily\"],\"scenario\":{\"title\":\"Performance review"
+PASS  13 persistence: failed and degraded runs write nothing
+REQUEST POST /generate/practice-package
+Groq retry: bad_shape (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=57) — retrying once at temperature 0
+PASS  14 package: a partial answer is retried and replaced, never filled with fallbacks
+REQUEST POST /generate/practice-package
+Groq retry: bad_shape (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=stop, length=57) — retrying once at temperature 0
+Groq parse error: The model's answer did not match the required JSON shape (model=openai/gpt-oss-120b, reason=bad_shape, attempts=2, finish_reason=stop) the JSON parsed but did not match the practice-package contract (keys: homework) sample="{\"homework\":[\"Complete the decatastrophizing worksheet\"]}"
+PASS  15 package: unwrapped partial answer => 502 BAD_AI_SHAPE, no writes
+REQUEST POST /analyze/session
+Groq retry: bad_shape (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=26) — retrying once at temperature 0
+Groq parse error: The model's answer did not match the required JSON shape (model=openai/gpt-oss-120b, reason=bad_shape, attempts=2, finish_reason=stop) the JSON parsed but did not match the analyze contract (keys: inferredModality) sample="{\"inferredModality\":\"CBT\"}"
+PASS  16 analyze: missing rationale/riskFlags => 502, never defaulted
+REQUEST POST /analyze/session
+Groq retry: bad_shape (contract=analyze, model=openai/gpt-oss-120b, finish_reason=stop, length=26) — retrying once at temperature 0
+PASS  17 analyze: partial answer recovered by the retry
+REQUEST POST /analyze/session
+Groq error: GROQ ERROR 400 Invalid schema for response_format (model=openai/gpt-oss-120b)
+Groq rejected the analyze JSON schema (400: Invalid schema for response_format) — falling back to json_object
+PASS  18 schema rejection (400) degrades to json_object instead of failing
+REQUEST POST /generate/practice-package
+Groq error: GROQ ERROR 400 Generated JSON does not match the expected schema. jsonschema: '' does not validate with /required: missing properties: 'scenario', 'quiz' (model=openai/gpt-oss-120b)
+Groq rejected the practice-package generation against the schema (400: Generated JSON does not match the expected schema. jsonschema: '' does not validate with /required: missing properties: 'scenario', 'quiz') — retrying with the schema
+Groq retry: schema_mismatch (contract=practice-package, model=openai/gpt-oss-120b, finish_reason=n/a, length=0) — retrying once at temperature 0
+PASS  19 schema mismatch 400 => retried with the schema, not downgraded
+REQUEST POST /analyze/session
+PASS  20 GROQ_RESPONSE_FORMAT=schema sends strict json_schema
+REQUEST POST /analyze/session
+PASS  21 GROQ_RESPONSE_FORMAT=json_object sends json_object
+REQUEST POST /analyze/session
+REQUEST GET /ai/probe
+PASS  22 unescaped quote repaired without a retry (strategy=repaired)
+REQUEST POST /generate/practice-package
+PASS  23 nested unescaped quote repaired, package accepted
+REQUEST GET /clients
+REQUEST GET /clients
+PASS  24 guard: missing and malformed tokens are 401, nothing upstream
+REQUEST GET /clients
+REQUEST PATCH /sessions/sess-1
+PASS  25 guard: valid token 200, unauthenticated PATCH 401 with no write
+PASS  26 guard: OPTIONS preflight is exempt
+REQUEST GET /client-homework/session-0001
+PASS  27 public /client-homework: signed link, no token, no clinical fields
+REQUEST POST /auth/login
+PASS  28 guard: auth routes remain public
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+PASS  29 links: minting is clinician-only and its link opens anonymously
+REQUEST GET /client-link/session-0001
+PASS  30 links: ttl clamped to 30 days when 9999 was requested
+REQUEST GET /client-homework/session-0001
+Client link rejected (missing) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (bad_signature) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (expired) for session-…
+REQUEST GET /client-homework/session-0001
+Client link rejected (bad_signature) for session-…
+PASS  31 links: unsigned, tampered, expired, cross-session are all 403
+REQUEST GET /client-link/session-0001
+REQUEST GET /client-homework/session-0001
+CLIENT_LINK_SECRET missing or too short — client links are disabled
+Client link rejected (not_configured) for session-…
+PASS  32 links: missing CLIENT_LINK_SECRET fails closed
+REQUEST GET /client-homework/session-empty
+PASS  33 regression: no cross-session disclosure via submissions fallback
+REQUEST POST /generate/structured-task
+PASS  34 structured-task: normalizes nested 3 C's output from LLM
+REQUEST POST /generate/structured-task
+PASS  35 structured-task: invalid request schema returns 400
+
+35/35 checks passed
+(node:38856) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Work/Neuvo/ALICE/Source/lib/export-practice-pdf.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\D:\Work\Neuvo\ALICE\Source\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS  1 geometry: 174 mm column, body stops at 275 mm, footer at 281 mm
+PASS  2 sanitize: ☐ dropped, ⚠ and arrows mapped, Latin-1 accents kept
+PASS  3 collect: string rows, { task } rows, blanks and a null package
+PASS  4 short package: single-page PDF  6881 bytes
+PASS  5 empty package: renders the empty-state copy on one page
+PASS  6 25 tasks: multi-page, nothing dropped, all baselines inside the printable box  2 pages, deepest body line 262.4 mm
+PASS  7 60 tasks: pagination scales  4 pages
+PASS  8 6000-character task: hard-split across pages without overflow  75 lines
+PASS  9 determinism: identical layout for identical input
+PASS  10 footer: 'Page x of y' stamped on every page
+PASS  11 filename: ALICE_PracticePackage_YYYYMMDD_ClientName.pdf  ALICE_PracticePackage_20260916_JaneMayLow.pdf
+PASS  12 filename: accents folded, illegal characters dropped, capped, no invented segment
+
+12/12 checks passed
+(node:34272) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Work/Neuvo/ALICE/Source/lib/session-hydration.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\D:\Work\Neuvo\ALICE\Source\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS  1 guard: wait on the stub, keep when latched, hydrate when the payload lands
+PASS  2 race: the GET /client/:id stub never latches
+PASS  3 race: the payload rehydrates the notes, the analysis and Phase 3
+PASS  4 later write cannot reset the phase or stomp edits
+PASS  5 empty session: hydration completes on Phase 1
+PASS  6 blur-save after Next keeps Phase 2 and the typed notes
+PASS  7 Adjust -> Back -> blur-save stays on Phase 1 with the edits
+PASS  8 placeholder advisory survives a later write
+PASS  9 no advisory for a real formulation
+PASS  10 failed GET /sessions/:id leaves an empty Phase 1
+PASS  11 remount hydrates immediately
+PASS  12 re-selecting the same session leaves the clinician where they were
+PASS  13 losing the session clears local state and re-arms the latch
+PASS  14 the cleared latch hydrates a returning session
+PASS  15 counter-example: the pre-c902331 effect stuck on an empty Phase 1
+
+15/15 checks passed
+test exit=0

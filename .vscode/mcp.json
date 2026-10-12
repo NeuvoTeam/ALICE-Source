@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "alice-mcp": {
+      "url": "https://alice-mcp.neuvoteam.workers.dev/",
+      "disabled": false,
+      "autoApprove": [
+        "GET /context",
+        "GET /tools"
+      ]
+    }
+  }
+}

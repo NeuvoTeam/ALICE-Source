@@ -1,5 +1,16 @@
+/** Bindings this gateway is deployed with (`wrangler.jsonc`): the MCP token secret
+ *  and the service binding to the ALICE backend. */
+type Env = {
+  MCP_TOKEN?: string
+  BACKEND: { fetch(request: Request): Promise<Response> }
+}
+
+function errorMessage(err: unknown): string | undefined {
+  return err instanceof Error ? err.message : undefined;
+}
+
 export default {
-  async fetch(req: Request, env: any): Promise<Response> {
+  async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
     /* =========================
@@ -45,10 +56,10 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
 
-      } catch (err: any) {
+      } catch (err) {
         return json({
           error: "Debug failed",
-          message: err?.message
+          message: errorMessage(err)
         }, 500);
       }
     }
@@ -104,7 +115,7 @@ export default {
         const { tool, input } = body;
 
         // ✅ helper for calling backend
-        const callBackend = async (path: string, options: any = {}) => {
+        const callBackend = async (path: string, options: { method?: string, body?: unknown } = {}) => {
           const res = await env.BACKEND.fetch(
             new Request(`https://backend${path}`, {
               method: options.method || "GET",
@@ -183,11 +194,11 @@ export default {
 
         return json({ error: "Unknown tool" }, 400);
 
-      } catch (err: any) {
+      } catch (err) {
         return json({
           error: "Execution failed",
-          message: err?.message,
-          stack: err?.stack
+          message: errorMessage(err),
+          stack: err instanceof Error ? err.stack : undefined
         }, 500);
       }
     }
@@ -215,7 +226,7 @@ function notFound() {
 /* =========================
    ✅ JSON HELPER
    ========================= */
-function json(data: any, status = 200) {
+function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json" }

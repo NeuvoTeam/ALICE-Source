@@ -11,7 +11,6 @@ type Props = {
 export default function EditableName({ value, onSave }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(value)
-  const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
     const trimmed = name.trim()
@@ -21,9 +20,7 @@ export default function EditableName({ value, onSave }: Props) {
       return
     }
 
-    setLoading(true)
     await onSave(trimmed)
-    setLoading(false)
     setIsEditing(false)
   }
 
@@ -37,7 +34,7 @@ export default function EditableName({ value, onSave }: Props) {
 
           {/* ✅ Larger click target + subtle hover */}
           <div
-            className="p-1 rounded hover:bg-sidebar-accent/50 cursor-pointer opacity-0 group-hover:opacity-100 transition"
+            className="hidden cursor-pointer rounded-md p-1 hover:bg-sidebar-accent/50 group-hover:block group-focus-within:block"
             onClick={(e) => {
               e.stopPropagation()
               setIsEditing(true)
@@ -75,7 +72,7 @@ export default function EditableName({ value, onSave }: Props) {
 
           {/* ✅ Save */}
           <div
-            className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/20 cursor-pointer"
+            className="rounded-md p-1 hover:bg-emerald-500/15 cursor-pointer"
             onClick={handleSave}
           >
             <Check className="h-3 w-3 text-green-600" />
@@ -83,7 +80,7 @@ export default function EditableName({ value, onSave }: Props) {
 
           {/* ✅ Cancel */}
           <div
-            className="p-1 rounded hover:bg-muted cursor-pointer"
+            className="rounded-md p-1 hover:bg-sidebar-accent cursor-pointer"
             onClick={() => {
               setName(value)
               setIsEditing(false)

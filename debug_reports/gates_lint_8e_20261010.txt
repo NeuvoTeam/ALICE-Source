@@ -1,0 +1,97 @@
+=== lint rank 8e gate evidence (final tree, all ten commits landed) ===
+
+--- git log --oneline (this sweep) ---
+b2f3aa9 refactor(lint): give the history list a real Vignette type (rank 8e, D10)
+ff9168a refactor(lint): type client-view's practice_package as the dual shape it is (rank 8e, D9)
+817f321 refactor(lint): narrow the legacy analyze route's catch binding (rank 8e, D8)
+ae98c24 refactor(lint): narrow the signup catch binding (rank 8e, D7)
+2740ba8 refactor(lint): type ClientLanding's onSelectClient prop (rank 8e, D6)
+77c2917 refactor(lint): type the dashboard's onSelectClient handler (rank 8e, D5)
+f542313 refactor(lint): drop the practice page's PracticePackage shadow and any-typed reads (rank 8e, D4)
+77e5010 refactor(lint): type the MCP gateway's env, backend call and error paths (rank 8e, D3)
+f292139 refactor(lint): type the vignette generator's homework/analysis paths (rank 8e, D2 - 5 of 12)
+0957c16 refactor(lint): type the 20 any sites in the client-nav store (rank 8e, D1)
+7341097 refactor(lint): delete the two unreferenced shadcn kit files
+
+--- git status --porcelain ---
+?? debug_reports/agy_8e_d1_20261010.txt
+?? debug_reports/agy_8e_d2_20261010.txt
+?? debug_reports/agy_8e_d2_continue_20261010.txt
+?? debug_reports/agy_8e_d3_d4_20261010.txt
+?? debug_reports/agy_8e_d5_d8_20261010.txt
+?? debug_reports/agy_8e_d9_d11_20261010.txt
+?? debug_reports/agy_8e_d9_fix_20261010.txt
+?? debug_reports/build_8e_after_20261010.txt
+?? debug_reports/gates_lint_8e_20261010.txt
+?? debug_reports/lint_8e_after.json
+?? debug_reports/lint_8e_after_20261010.txt
+?? debug_reports/lint_8e_before.json
+?? debug_reports/lint_8e_before_20261010.txt
+?? debug_reports/lint_8e_d1_after.json
+?? debug_reports/lint_8e_d2_after.json
+?? debug_reports/routes_8e_after_20261010.txt
+?? debug_reports/routes_8e_before_prevbuild.txt
+?? debug_reports/routes_8e_diff_20261010.txt
+?? debug_reports/test_8e_20261010.txt
+?? debug_reports/tmp_app_practice__sessionId__page.tsx.json
+?? debug_reports/tmp_workers_mcp-gateway_src_index.ts.json
+?? scratch/
+
+--- npx tsc --noEmit ---
+exit=0
+
+--- npm run lint (tail) ---
+  12:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+✖ 25 problems (0 errors, 25 warnings)
+
+
+--- eslint . -f json rule totals ---
+files linted: 120  files with findings: 14
+--- rule totals ---
+  11  react-hooks/set-state-in-effect
+   8  @typescript-eslint/no-explicit-any
+   2  react/no-unescaped-entities
+   2  import/no-anonymous-default-export
+   1  @typescript-eslint/no-unused-expressions
+   1  react-hooks/exhaustive-deps
+TOTAL findings: 25  (errors 0, warnings 25)
+--- @typescript-eslint/no-explicit-any: 8 sites in 2 files ---
+  7  D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+      216:46
+      412:46
+      422:37
+      423:39
+      500:46
+      509:37
+      510:39
+  1  D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+      109:17
+
+--- npm test (summaries) ---
+131:35/35 checks passed
+149:12/12 checks passed
+170:15/15 checks passed
+
+--- npm run build route block (13 routes) ---
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze/session
+├ ƒ /cases/[caseId]/sessions/[sessionId]
+├ ○ /client-login
+├ ○ /dashboard
+├ ○ /forgot-password
+├ ƒ /homework/[sessionId]
+├ ○ /login
+├ ƒ /practice/[sessionId]
+├ ƒ /practitioner/tasks/[id]/review
+├ ○ /signup
+└ ○ /test-auth
+
+--- diff vs rank 8d's build route block (empty = byte-identical) ---
+(end of diff)
+
+--- md5 of the route block, both sides ---
+bab5456e751481302dfcd14942ada88c *debug_reports/routes_8e_before_prevbuild.txt
+bab5456e751481302dfcd14942ada88c *debug_reports/routes_8e_after_20261010.txt

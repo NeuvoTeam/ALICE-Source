@@ -1,0 +1,3 @@
+docs:check — ok (no behaviour-affecting path changed).
+[alan da00e38] chore(lint): remove the four dead rule downgrades — restore real severity (lint 8k)
+ 2 files changed, 25 insertions(+), 27 deletions(-)

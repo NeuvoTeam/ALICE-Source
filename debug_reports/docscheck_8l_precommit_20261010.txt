@@ -1,0 +1,6 @@
+
+> my-project@0.1.0 docs:check
+> node scripts/check-docs.mjs && copy /Y D:\Work\Neuvo\ALICE\Source\documentation.md D:\Work\Neuvo\ALICE\Source\.obsidian_sync\ALICE_Master_Docs.md
+
+docs:check — ok (no behaviour-affecting path changed).
+        1 file(s) copied.

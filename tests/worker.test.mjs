@@ -9,10 +9,12 @@
  * `"type": "module"`, so Node would otherwise parse its ESM syntax as CommonJS.
  */
 import assert from "node:assert/strict"
-import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { readFileSync } from "node:fs"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
+import * as esbuild from "esbuild"
 
 const WORKER_SOURCE = new URL("../backend/CloudFlare.js", import.meta.url)
 
@@ -61,6 +63,7 @@ const env = {
   ALLOWED_ORIGINS: "http://localhost:3000",
   PUBLIC_APP_URL: "http://localhost:3000",
   CLIENT_LINK_SECRET: "test-client-link-secret-0123456789",
+  REVIEW_QUEUE_CURSOR_SECRET: "test-review-queue-cursor-secret-0123456789",
 }
 
 const NOTES = "Client reports low mood and avoids social contact."
@@ -95,20 +98,62 @@ async function signLink(sessionId, exp, secret = env.CLIENT_LINK_SECRET) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
+/**
+ * Signs a review queue cursor exactly as the Worker does, allowing the harness
+ * to produce valid, expired, non-ISO, or altered keyset cursors.
+ */
+async function signReviewCursor(payload, secret = env.REVIEW_QUEUE_CURSOR_SECRET) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  const jsonStr = JSON.stringify(payload)
+  const view = new TextEncoder().encode(jsonStr)
+  let binary = ""
+  for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i])
+  const encodedPayload = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`cursor|${encodedPayload}`)
+  )
+
+  const sigView = new Uint8Array(signature)
+  let sigBinary = ""
+  for (let i = 0; i < sigView.length; i++) sigBinary += String.fromCharCode(sigView[i])
+  const encodedSig = btoa(sigBinary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+
+  return `${encodedPayload}.${encodedSig}`
+}
+
 const inAnHour = () => Math.floor(Date.now() / 1000) + 3600
 
 const tempDir = await mkdtemp(join(tmpdir(), "alice-worker-test-"))
 const workerFile = join(tempDir, "CloudFlare.mjs")
 
-await copyFile(WORKER_SOURCE, workerFile)
+await esbuild.build({
+  entryPoints: [fileURLToPath(WORKER_SOURCE)],
+  bundle: true,
+  outfile: workerFile,
+  format: "esm",
+})
 
 const worker = (await import(pathToFileURL(workerFile).href)).default
 
 let calls = []
 let groqSteps = []
 
-/** Stubs Groq *and* Supabase REST, recording every outbound request. */
-function installFetch(steps) {
+/**
+ * Stubs Groq *and* Supabase REST, recording every outbound request.
+ * `supabaseRows(href)` may return the rows for a given Supabase URL; returning
+ * `undefined` (or omitting it) falls back to the default owned session row.
+ */
+function installFetch(steps, { supabaseRows } = {}) {
   groqSteps = steps
   calls = []
 
@@ -143,6 +188,36 @@ function installFetch(steps) {
     }
 
     if (!isGroq) {
+      const override = supabaseRows ? supabaseRows(href, init) : undefined
+
+      if (override !== undefined) {
+        if (override instanceof Response) {
+          return override
+        }
+        return new Response(JSON.stringify(override), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      }
+
+      if (href.includes("practice_task_submissions")) {
+        const method = init.method || "GET"
+        if (method === "GET") {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        }
+        if (method === "POST" || method === "PATCH") {
+          return new Response(
+            JSON.stringify([
+              record.body ? { id: "sub-auto", ...record.body } : { id: "sub-auto" },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        }
+      }
+
       // Supabase REST with `Prefer: return=representation` answers with an array.
       // The row carries the ownership chain the Worker walks before any
       // session-scoped work: `checkSessionAccess` reads `client_id` (or the
@@ -210,6 +285,10 @@ async function call(method, path, payload, overrideEnv = env, options = {}) {
 
   if (options.token !== null) {
     headers.Authorization = options.token || VALID_TOKEN
+  }
+
+  if (options.headers) {
+    Object.assign(headers, options.headers)
   }
 
   const res = await worker.fetch(
@@ -676,6 +755,7 @@ async function main() {
   assert.deepEqual(Object.keys(r.body).sort(), [
     "homework",
     "practiceHomework",
+    "practiceTask",
     "quiz",
     "sessionId",
     "title",
@@ -747,7 +827,7 @@ async function main() {
   const tamperExp = inAnHour()
   const tamperSig = await signLink("session-0001", tamperExp)
   const tampered =
-    tamperSig.slice(0, -1) + (tamperSig.endsWith("A") ? "B" : "A")
+    (tamperSig[0] === "a" ? "b" : "a") + tamperSig.slice(1)
 
   installFetch([{ content: VALID }])
   r = await call(
@@ -808,9 +888,1021 @@ async function main() {
   )
   assert.equal(r.status, 403)
   pass("links: missing CLIENT_LINK_SECRET fails closed")
+
+  /* 34. Regression: cross-session disclosure via practice_task_submissions fallback is removed. */
+  const regressionExp = inAnHour()
+  const regressionSig = await signLink("session-empty", regressionExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      // Return a session row with NO homework/practice package
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: "session-empty",
+            client_id: "client-1",
+            name: "Empty Session",
+            practice_package: null,
+            homework: [],
+          }
+        ]
+      }
+      // If the removed fallback query were still made, it would return this cross-session row
+      if (href.includes("practice_task_submissions")) {
+        return [
+          {
+            form_data: {
+              task_type: "thought_record",
+              situation: "Another session's very private thoughts",
+            },
+          },
+        ]
+      }
+      return undefined
+    }
+  })
+
+  r = await call(
+    "GET",
+    `/client-homework/session-empty?exp=${regressionExp}&sig=${regressionSig}`,
+    null,
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.deepEqual(r.body.practiceHomework, [])
+  assert.equal(r.body.practiceTask, null)
+  assert.ok(!JSON.stringify(r.body).includes("private thoughts"), "must not surface other session's content")
+  pass("regression: no cross-session disclosure via submissions fallback")
+
+  /* 33. /generate/structured-task normalizes nested 3 C's thought_record from Groq */
+  const NESTED_THOUGHT_RECORD = JSON.stringify({
+    type: "thought_record",
+    catch: {
+      situation: "Overwhelmed in session",
+      automatic_thought: "I cannot do therapy",
+      emotions: [{ label: "Anxiety", intensity: 75 }]
+    },
+    check: {
+      evidence_for: ["Felt tired"],
+      evidence_against: ["Made progress before"]
+    },
+    correct: {
+      balanced_thought: "Therapy takes time"
+    },
+    outcome_emotion_intensity: 35
+  });
+
+  installFetch([{ content: NESTED_THOUGHT_RECORD }]);
+  r = await call("POST", "/generate/structured-task", {
+    sessionContext: "Client felt overwhelmed and tired during therapy",
+    activityFormat: "thought_record",
+    modalities: ["CBT"]
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.task_type, "thought_record");
+  assert.equal(r.body.situation, "Overwhelmed in session");
+  assert.equal(r.body.automatic_thought, "I cannot do therapy");
+  assert.equal(r.body.evidence_for, "Felt tired");
+  assert.equal(r.body.evidence_against, "Made progress before");
+  assert.equal(r.body.balanced_thought, "Therapy takes time");
+  assert.equal(r.body.outcome_emotion_intensity, 35);
+  pass("structured-task: normalizes nested 3 C's output from LLM");
+
+  /* 34. /generate/structured-task rejects invalid request payload with 400 */
+  r = await call("POST", "/generate/structured-task", {
+    sessionContext: "",
+    activityFormat: "thought_record"
+  });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, "INVALID_REQUEST");
+  pass("structured-task: invalid request schema returns 400");
+
+  /* 35. Client submission scoping guard: body id belonging to another session or null session_id must be refused */
+  const clientSessId = "session-path-01"
+  const clientExp = inAnHour()
+  const clientSig = await signLink(clientSessId, clientExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: clientSessId,
+            client_id: "client-sess-owner",
+            name: "Session Path 01",
+          },
+        ]
+      }
+      if (href.includes("practice_task_submissions")) {
+        // Scoped check must return [] if the submission does not belong to this path session
+        if (href.includes("session_id=eq.session-path-01")) {
+          return []
+        }
+        // If an unscoped check were performed:
+        return [
+          {
+            id: "foreign-sub-01",
+            session_id: "session-other-99",
+            status: "draft",
+          },
+        ]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${clientSessId}?exp=${clientExp}&sig=${clientSig}`,
+    {
+      id: "foreign-sub-01",
+      task_type: "thought_record",
+      form_data: { situation: "Attacking foreign session" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 404)
+  assert.equal(r.body.error, "Submission not found")
+  const checkSubCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "GET"
+  )
+  assert.ok(checkSubCall, "must query practice_task_submissions")
+  assert.ok(
+    checkSubCall.url.includes("session_id=eq.session-path-01"),
+    "submission lookup MUST be scoped by session_id"
+  )
+  assert.ok(
+    checkSubCall.url.includes("id=eq.foreign-sub-01"),
+    "submission lookup must include id"
+  )
+  assert.equal(writeCalls().length, 0, "must not write anything when scoping check fails")
+  pass("client-submission: foreign body id is refused and strictly scoped by path session")
+
+  /* 36. Valid client-link commit: sends explicit null practitioner_id, resolves client_id from session, writes submitted_at, and receipt returns only id and status */
+  const commitSessId = "session-valid-01"
+  const commitExp = inAnHour()
+  const commitSig = await signLink(commitSessId, commitExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [
+          {
+            id: commitSessId,
+            client_id: "client-resolved-123",
+            name: "Session Valid 01",
+          },
+        ]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("id=eq.sub-draft-01") && href.includes("session_id=eq.session-valid-01")) {
+          const isPatch = href.includes("status=eq.draft")
+          return [
+            {
+              id: "sub-draft-01",
+              session_id: commitSessId,
+              client_id: "client-resolved-123",
+              status: isPatch ? "pending_practitioner_review" : "draft",
+            },
+          ]
+        }
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-01" }]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${commitSessId}?exp=${commitExp}&sig=${commitSig}`,
+    {
+      id: "sub-draft-01",
+      task_type: "thought_record",
+      form_data: { situation: "Valid thought record" },
+      status: "pending_practitioner_review",
+      practitioner_id: "fake-doctor-id",
+      client_id: "fake-client-id",
+    },
+    env,
+    { token: null }
+  )
+
+  assert.equal(r.status, 200)
+  assert.deepEqual(Object.keys(r.body).sort(), ["id", "status"])
+  assert.equal(r.body.id, "sub-draft-01")
+  assert.equal(r.body.status, "pending_practitioner_review")
+
+  const patchCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "PATCH"
+  )
+  assert.ok(patchCall, "PATCH call must have been made")
+  assert.ok(
+    patchCall.url.includes("id=eq.sub-draft-01") &&
+      patchCall.url.includes("session_id=eq.session-valid-01") &&
+      patchCall.url.includes("status=eq.draft"),
+    "PATCH filter must be id=eq.<id>&session_id=eq.<path>&status=eq.draft"
+  )
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(patchCall.body, "practitioner_id"),
+    "practitioner_id must be present in PATCH body"
+  )
+  assert.equal(patchCall.body.practitioner_id, null, "practitioner_id must be explicitly null")
+  assert.equal(patchCall.body.status, "pending_practitioner_review")
+  assert.ok(patchCall.body.submitted_at, "submitted_at must be written in the same statement")
+
+  const auditCall = supabaseCalls().find(
+    (c) => c.url.includes("status_audit_log") && c.method === "POST"
+  )
+  assert.ok(auditCall, "status_audit_log write must be attempted")
+  assert.equal(auditCall.body.submission_id, "sub-draft-01")
+  assert.equal(auditCall.body.previous_status, "draft", "audit log previous_status must be 'draft' on draft update transition")
+  assert.equal(auditCall.body.new_status, "pending_practitioner_review")
+  assert.equal(auditCall.body.changed_by_user_id, null, "audit log changed_by_user_id must be null")
+
+  pass("client-submission: valid commit sends explicit null practitioner_id, submitted_at, and scoped receipt")
+
+  /* 37. Client submission security gates: 409 on non-draft update, 400 on disallowed status, case_formulations client_id fallback, and 413 on payload limit */
+  const secSessId = "session-sec-01"
+  const secExp = inAnHour()
+  const secSig = await signLink(secSessId, secExp)
+
+  // 37a. Disallowed status returns 400
+  installFetch([{ content: VALID }])
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "approved",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 400)
+  assert.ok(r.body.error.includes("status"), "must reject status outside allowlist")
+
+  // 37b. Cannot update non-draft submission (409)
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: secSessId, client_id: "c1", name: "Sec Sess" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        return [{ id: "sub-already-pending", session_id: secSessId, status: "pending_practitioner_review" }]
+      }
+      return undefined
+    },
+  })
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      id: "sub-already-pending",
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, "Only draft submissions can be updated")
+
+  // 37c. Case formulations client_id fallback when sessions.client_id is null
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: secSessId, client_id: null, case_formulations: { client_id: "client-from-cf" } }]
+      }
+      return undefined
+    },
+  })
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Fresh draft" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  const insertCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "POST"
+  )
+  assert.ok(insertCall, "INSERT call must be made")
+  assert.equal(insertCall.body.client_id, "client-from-cf", "client_id must resolve from case_formulations")
+  assert.equal(insertCall.body.practitioner_id, null, "practitioner_id must be explicit null on insert")
+  assert.equal(insertCall.body.session_id, secSessId, "session_id must match path")
+
+  // 37d. Payload size limit (64 KB) returns 413
+  const hugeFormData = { huge: "x".repeat(65 * 1024) }
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: hugeFormData,
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 413)
+
+  // 37e. Content-Length header cap (> 64 KB) returns 413 before body read
+  r = await call(
+    "POST",
+    `/client-submissions/${secSessId}?exp=${secExp}&sig=${secSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    {
+      token: null,
+      headers: { "Content-Length": "70000" },
+    }
+  )
+  assert.equal(r.status, 413)
+  assert.ok(r.body.error.includes("64 KB"))
+  pass("client-submission: allowlist 400, non-draft 409, case_formulations client_id fallback, and 413 payload cap")
+
+  /* 39. Client submission: truthful previous_status in status_audit_log (F5) */
+  const directSessId = "session-direct-01"
+  const directExp = inAnHour()
+  const directSig = await signLink(directSessId, directExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
+      if (href.includes("/sessions")) {
+        return [{ id: directSessId, client_id: "client-direct-123", name: "Session Direct" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (method === "GET") return []
+        return [{ id: "sub-direct-new", session_id: directSessId, client_id: "client-direct-123", status: "pending_practitioner_review" }]
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-direct-01" }]
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${directSessId}?exp=${directExp}&sig=${directSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Direct pending submission" },
+      status: "pending_practitioner_review",
+    },
+    env,
+    { token: null }
+  )
+
+  assert.equal(r.status, 200)
+  const directAuditCall = supabaseCalls().find(
+    (c) => c.url.includes("status_audit_log") && c.method === "POST"
+  )
+  assert.ok(directAuditCall, "status_audit_log write must be attempted on direct commit")
+  assert.equal(directAuditCall.body.previous_status, null, "direct insert commit must record null previous_status")
+  assert.equal(directAuditCall.body.new_status, "pending_practitioner_review")
+  assert.equal(directAuditCall.body.changed_by_user_id, null)
+  pass("client-submission: direct insert commit records null previous_status in audit log")
+
+  /* 40. Client submission: task_type allowlist rejects garbage and accepts all allowed types (F2) */
+  const taskTypeSessId = "session-tasktype-01"
+  const taskTypeExp = inAnHour()
+  const taskTypeSig = await signLink(taskTypeSessId, taskTypeExp)
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("/sessions")) {
+        return [{ id: taskTypeSessId, client_id: "client-tt", name: "Session TT" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        return [{ id: "sub-tt", session_id: taskTypeSessId, client_id: "client-tt", status: "draft" }]
+      }
+      return undefined
+    },
+  })
+
+  // Disallowed task_type is rejected with 400
+  r = await call(
+    "POST",
+    `/client-submissions/${taskTypeSessId}?exp=${taskTypeExp}&sig=${taskTypeSig}`,
+    {
+      task_type: "unrecognized_garbage_task",
+      form_data: { test: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 400)
+  assert.ok(r.body.error.includes("task_type"), "must reject task_type outside allowlist")
+
+  // Each of the 5 allowed values is accepted (200)
+  const allowedTaskTypes = [
+    "activity_log",
+    "thought_record",
+    "behavioural_experiment",
+    "two_choice_worksheet",
+    "reflection_prompt",
+  ]
+  for (const allowedType of allowedTaskTypes) {
+    r = await call(
+      "POST",
+      `/client-submissions/${taskTypeSessId}?exp=${taskTypeExp}&sig=${taskTypeSig}`,
+      {
+        task_type: allowedType,
+        form_data: { test: true },
+        status: "draft",
+      },
+      env,
+      { token: null }
+    )
+    assert.equal(r.status, 200, `task_type '${allowedType}' must be accepted`)
+    assert.equal(r.body.status, "draft")
+  }
+  pass("client-submission: task_type allowlist refuses garbage (400) and accepts each allowed value")
+
+  /* 41. Client submission: resolve-first by session_id, idempotent retries return 200 with same id, pending review does not overwrite, and race backstop catches 23505 */
+  const rslvSessId = "session-rslv-01"
+  const rslvExp = inAnHour()
+  const rslvSig = await signLink(rslvSessId, rslvExp)
+
+  let sessionSubmissions = []
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
+      if (href.includes("/sessions")) {
+        return [{ id: rslvSessId, client_id: "client-rslv-1", name: "Session Resolve" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (method === "GET") {
+          assert.ok(href.includes(`session_id=eq.${rslvSessId}`), "lookup MUST be scoped by session_id")
+          return sessionSubmissions.slice()
+        }
+        if (method === "POST") {
+          const b = init?.body ? JSON.parse(init.body) : {}
+          const newRow = {
+            id: "sub-created-first",
+            session_id: rslvSessId,
+            client_id: "client-rslv-1",
+            status: b.status || "draft",
+            task_type: b.task_type,
+            form_data: b.form_data,
+          }
+          sessionSubmissions.push(newRow)
+          return [newRow]
+        }
+        if (method === "PATCH") {
+          const b = init?.body ? JSON.parse(init.body) : {}
+          if (sessionSubmissions.length > 0) {
+            sessionSubmissions[0] = {
+              ...sessionSubmissions[0],
+              ...b,
+            }
+            return [sessionSubmissions[0]]
+          }
+          return []
+        }
+      }
+      if (href.includes("status_audit_log")) {
+        return [{ id: "audit-rslv-01" }]
+      }
+      return undefined
+    },
+  })
+
+  // 41a. POST for a session with no row creates one (200 with new row id)
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 1 },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "draft")
+  const firstInsertCall = supabaseCalls().find(
+    (c) => c.url.includes("practice_task_submissions") && c.method === "POST"
+  )
+  assert.ok(firstInsertCall, "must create row when no row exists")
+
+  // 41b. A second POST for the same session with no id returns 200 with the SAME row id (not duplicate, not 409)
+  const callsBeforeSecondPost = supabaseCalls().length
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 2 },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first", "second POST must return SAME row id")
+  assert.equal(r.body.status, "draft")
+  const newPostCalls = supabaseCalls()
+    .slice(callsBeforeSecondPost)
+    .filter((c) => c.url.includes("practice_task_submissions") && c.method === "POST")
+  assert.equal(newPostCalls.length, 0, "second POST must not execute another INSERT")
+
+  // 41c. Commit transition: transitions draft to pending_practitioner_review
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 3 },
+      status: "pending_practitioner_review",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200)
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "pending_practitioner_review")
+
+  // 41d. POST when the row is already pending_practitioner_review does not overwrite and returns that row (200, not 409)
+  const callsBeforePendingRetry = supabaseCalls().length
+  r = await call(
+    "POST",
+    `/client-submissions/${rslvSessId}?exp=${rslvExp}&sig=${rslvSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { step: 4, malicious_overwrite: true },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200, "retry must not return 409")
+  assert.equal(r.body.id, "sub-created-first")
+  assert.equal(r.body.status, "pending_practitioner_review")
+  const writesDuringPendingRetry = supabaseCalls()
+    .slice(callsBeforePendingRetry)
+    .filter((c) => (c.method === "POST" && c.url.includes("practice_task_submissions")) || c.method === "PATCH")
+  assert.equal(writesDuringPendingRetry.length, 0, "must not overwrite pending submission")
+
+  // 41e. Race backstop: if INSERT hits unique violation (23505), selects by session_id and returns 200 with existing row
+  const raceSessId = "session-race-01"
+  const raceExp = inAnHour()
+  const raceSig = await signLink(raceSessId, raceExp)
+
+  let raceInsertAttempted = false
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href, init) => {
+      const method = init?.method || "GET"
+      if (href.includes("/sessions")) {
+        return [{ id: raceSessId, client_id: "client-race-1", name: "Session Race" }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (method === "GET") {
+          if (!raceInsertAttempted) return []
+          return [{ id: "sub-race-winner", session_id: raceSessId, client_id: "client-race-1", status: "draft" }]
+        }
+        if (method === "POST") {
+          raceInsertAttempted = true
+          return new Response(
+            JSON.stringify({
+              code: "23505",
+              message: 'duplicate key value violates unique constraint "practice_task_submissions_session_unique"',
+              details: `Key (session_id)=(${raceSessId}) already exists.`,
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } }
+          )
+        }
+      }
+      return undefined
+    },
+  })
+
+  r = await call(
+    "POST",
+    `/client-submissions/${raceSessId}?exp=${raceExp}&sig=${raceSig}`,
+    {
+      task_type: "thought_record",
+      form_data: { situation: "Concurrent submit" },
+      status: "draft",
+    },
+    env,
+    { token: null }
+  )
+  assert.equal(r.status, 200, "race backstop must return 200, not error")
+  assert.equal(r.body.id, "sub-race-winner")
+  assert.equal(r.body.status, "draft")
+
+  pass("client-submission: resolve-first creates row, retry returns same id (200), pending does not overwrite, and 23505 race backstop returns 200")
+
+  /* 42. Queue: route is authed only (never public, missing/bad token fails closed with 401) */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions", null, env, { token: null })
+  assert.equal(r.status, 401)
+  assert.equal(authCalls().length, 0, "missing token must not call auth service")
+  assert.equal(supabaseCalls().length, 0, "unauthenticated request must never reach database")
+
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions", null, env, { token: "Bearer bad-token" })
+  assert.equal(r.status, 401)
+  assert.equal(supabaseCalls().length, 0, "invalid token must never reach database")
+  pass("queue: route requires auth, not public, fails closed before reaching database")
+
+  /* 43. Queue: status allowlist prevents filter injection; disallowed values return 400 with 0 queries */
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions?status=invalid_status")
+  assert.equal(r.status, 400)
+  assert.equal(supabaseCalls().length, 0, "disallowed status must issue no queries")
+
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions?status=in.(pending_practitioner_review,malicious_injection)")
+  assert.equal(r.status, 400)
+  assert.equal(supabaseCalls().length, 0, "injection in in.(...) must issue no queries")
+
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions?status=or=(id.eq.1)")
+  assert.equal(r.status, 400)
+  assert.equal(supabaseCalls().length, 0, "injection in status must issue no queries")
+  pass("queue: disallowed status returns 400 without issuing query")
+
+  /* 44. Queue: limit clamped in [1, 200]; <=0, floats, strings refused (400); >200 clamped */
+  for (const badLimit of ["0", "-1", "-10", "NaN", "abc", "1.5"]) {
+    installFetch([{ content: VALID }])
+    r = await call("GET", `/tasks/submissions?limit=${badLimit}`)
+    assert.equal(r.status, 400, `limit=${badLimit} must be refused with 400`)
+  }
+
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions?limit=500")
+  assert.equal(r.status, 200)
+  const clampedRowsCall = supabaseCalls().find((c) => c.url.includes("select=id,client_id"))
+  assert.ok(clampedRowsCall, "must query rows")
+  assert.ok(clampedRowsCall.url.includes("limit=201"), "limit 500 must be clamped to 200 (+1 for cursor)")
+  pass("queue: limit <=0/non-integer refused (400), limit above max clamped to 200")
+
+  /* 45. Queue: tenant scoping and client_id intersection; foreign id yields empty */
+  const callerClientId = "11111111-1111-1111-1111-111111111111"
+  const foreignClientId = "22222222-2222-2222-2222-222222222222"
+
+  // 45a. Non-UUID client_id refused with 400
+  installFetch([{ content: VALID }])
+  r = await call("GET", "/tasks/submissions?client_id=not-a-valid-uuid")
+  assert.equal(r.status, 400)
+
+  // 45b. Valid foreign UUID is intersected: query carries client_id=in.(caller) AND client_id=eq.foreign
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) {
+        return [{ client_id: callerClientId }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        // Intersected query for foreign client yields empty
+        return []
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", `/tasks/submissions?client_id=${foreignClientId}`)
+  assert.equal(r.status, 200)
+  assert.deepEqual(r.body.rows, [])
+  const foreignRowsCall = supabaseCalls().find((c) => c.url.includes("select=id,client_id"))
+  assert.ok(foreignRowsCall.url.includes(`client_id=in.(${callerClientId})`), "must carry caller tenant predicate")
+  assert.ok(foreignRowsCall.url.includes(`client_id=eq.${foreignClientId}`), "must carry intersected client_id")
+  pass("queue: foreign client_id yields empty, query carries caller tenant predicate AND client_id")
+
+  /* 46. Queue: counts carries tenant predicate and client_id; pending_total carries tenant predicate ONLY */
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) {
+        return [{ client_id: callerClientId }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("status=eq.pending_practitioner_review")) {
+          // Caseload total pending: 3
+          return [{ status: "pending_practitioner_review" }, { status: "pending_practitioner_review" }, { status: "pending_practitioner_review" }]
+        }
+        if (href.includes("select=status")) {
+          // Client-scoped counts: 1 pending, 1 draft
+          return [{ status: "pending_practitioner_review" }, { status: "draft" }]
+        }
+        return []
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", `/tasks/submissions?client_id=${callerClientId}`)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.counts.pending_practitioner_review, 1)
+  assert.equal(r.body.counts.draft, 1)
+  assert.equal(r.body.pending_total, 3, "pending_total must reflect total caseload, not filtered client")
+
+  const countsCall = supabaseCalls().find(
+    (c) => c.url.includes("select=status") && !c.url.includes("status=eq.pending_practitioner_review")
+  )
+  const pendingCall = supabaseCalls().find((c) => c.url.includes("status=eq.pending_practitioner_review"))
+  assert.ok(countsCall, "counts call must be present")
+  assert.ok(pendingCall, "pending_total call must be present")
+  assert.ok(countsCall.url.includes(`client_id=in.(${callerClientId})`), "counts call must carry tenant predicate")
+  assert.ok(countsCall.url.includes(`client_id=eq.${callerClientId}`), "counts call must honour client_id")
+  assert.ok(pendingCall.url.includes(`client_id=in.(${callerClientId})`), "pending_total must carry tenant predicate")
+  assert.ok(!pendingCall.url.includes(`client_id=eq.${callerClientId}`), "pending_total must NEVER honour client_id")
+  assert.ok(!countsCall.url.includes("limit="), "counts must never have limit")
+  assert.ok(!countsCall.url.includes("cursor="), "counts must never have cursor")
+  assert.ok(!pendingCall.url.includes("cursor="), "pending_total must never have cursor")
+  pass("queue: counts carries tenant and client_id; pending_total carries tenant ONLY")
+
+  /* 47. Queue: count-only mode (?count_only=1) returns { counts, pending_total } with no rows or cursor */
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) {
+        return [{ client_id: callerClientId }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("status=eq.pending_practitioner_review")) {
+          return [{ status: "pending_practitioner_review" }]
+        }
+        if (href.includes("select=status")) {
+          return [{ status: "pending_practitioner_review" }, { status: "reviewed" }]
+        }
+        return []
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", "/tasks/submissions?count_only=1")
+  assert.equal(r.status, 200)
+  assert.equal(r.body.counts.pending_practitioner_review, 1)
+  assert.equal(r.body.counts.reviewed, 1)
+  assert.equal(r.body.pending_total, 1)
+  assert.equal(r.body.rows, undefined, "rows key must NOT be present in count_only mode")
+  assert.equal(r.body.next_cursor, undefined, "next_cursor must NOT be present in count_only mode")
+  const rowQueries = supabaseCalls().filter((c) => c.url.includes("select=id,client_id"))
+  assert.equal(rowQueries.length, 0, "count_only mode must never execute row query")
+  pass("queue: ?count_only=1 returns counts and pending_total with no rows key")
+
+  /* 48. Queue: No N+1 on 40-row page; embeds sessions, reflections, clients; omits form_data */
+  const fortyRows = Array.from({ length: 40 }, (_, i) => ({
+    id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
+    client_id: callerClientId,
+    task_type: "activity_log",
+    status: "pending_practitioner_review",
+    submitted_at: `2026-10-${String((i % 28) + 1).padStart(2, "0")}T10:00:00Z`,
+    created_at: "2026-10-01T08:00:00Z",
+    updated_at: "2026-10-01T09:00:00Z",
+    session_id: `11111111-2222-3333-4444-${String(i + 1).padStart(12, "0")}`,
+    sessions: { name: `Session ${i + 1}` },
+    client_reflections: [{ id: `ref-${i}-1` }, { id: `ref-${i}-2` }],
+    clients: { full_name: `Client ${i + 1}` },
+    form_data: { confidential: "PHI content" },
+  }))
+
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) {
+        return [{ client_id: callerClientId }]
+      }
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("status=eq.pending_practitioner_review") && href.includes("select=status")) {
+          return fortyRows.map((r) => ({ status: r.status }))
+        }
+        if (href.includes("select=status")) {
+          return fortyRows.map((r) => ({ status: r.status }))
+        }
+        if (href.includes("select=id,client_id")) {
+          return fortyRows
+        }
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", "/tasks/submissions?limit=50")
+  assert.equal(r.status, 200)
+  assert.equal(r.body.rows.length, 40)
+  for (const row of r.body.rows) {
+    assert.equal(row.reflection_count, 2, "reflection_count must arrive from embed")
+    assert.ok(row.session_name.startsWith("Session "), "session_name must arrive from embed")
+    assert.ok(row.client_name.startsWith("Client "), "client_name must be resolved server-side")
+    assert.equal(row.form_data, undefined, "form_data must NEVER be in list payload")
+  }
+  const subQueryCount = supabaseCalls().filter((c) => c.url.includes("practice_task_submissions")).length
+  assert.equal(subQueryCount, 3, "must be exactly 3 practice_task_submissions requests (counts, pending_total, rows), NEVER N+1")
+  pass("queue: No N+1 on 40-row page; embeds session_name and reflection_count, omits form_data")
+
+  /* 49. Queue: Keyset cursor crosses NULL submitted_at boundary, NULLs sort last, direction mismatch 400 */
+  const historicalAndNewRows = [
+    {
+      id: "00000000-0000-0000-0000-000000000001",
+      client_id: callerClientId,
+      task_type: "thought_record",
+      status: "pending_practitioner_review",
+      submitted_at: "2026-10-01T12:00:00Z",
+      created_at: "2026-10-01T08:00:00Z",
+      updated_at: "2026-10-01T09:00:00Z",
+      session_id: null,
+      sessions: null,
+      client_reflections: [],
+      clients: { full_name: "Client 1" },
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000002",
+      client_id: callerClientId,
+      task_type: "thought_record",
+      status: "pending_practitioner_review",
+      submitted_at: "2026-10-02T12:00:00Z",
+      created_at: "2026-10-02T08:00:00Z",
+      updated_at: "2026-10-02T09:00:00Z",
+      session_id: null,
+      sessions: null,
+      client_reflections: [],
+      clients: { full_name: "Client 2" },
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000003",
+      client_id: callerClientId,
+      task_type: "thought_record",
+      status: "pending_practitioner_review",
+      submitted_at: null, // historical row
+      created_at: "2026-09-01T08:00:00Z",
+      updated_at: "2026-09-01T09:00:00Z",
+      session_id: null,
+      sessions: null,
+      client_reflections: [],
+      clients: { full_name: "Historical Client" },
+    },
+  ]
+
+  // Page 1 (limit=2, FIFO asc order): expect row 1 then row 2; NULL row 3 is LAST
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) return [{ client_id: callerClientId }]
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("select=id,client_id")) return historicalAndNewRows
+        return []
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", "/tasks/submissions?status=pending_practitioner_review&limit=2")
+  assert.equal(r.status, 200)
+  assert.equal(r.body.rows.length, 2)
+  assert.equal(r.body.rows[0].id, "00000000-0000-0000-0000-000000000001")
+  assert.equal(r.body.rows[1].id, "00000000-0000-0000-0000-000000000002")
+  assert.ok(r.body.next_cursor, "must issue signed next_cursor")
+
+  const page1Cursor = r.body.next_cursor
+
+  // Tampered cursor must return 400
+  installFetch([{ content: VALID }])
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${page1Cursor}tampered`)
+  assert.equal(r.status, 400)
+
+  // Direction mismatch must return 400 (Clause 2)
+  installFetch([{ content: VALID }])
+  r = await call("GET", `/tasks/submissions?order=desc&cursor=${page1Cursor}`)
+  assert.equal(r.status, 400, "direction mismatch between cursor asc and order desc must return 400")
+
+  // Page 2: Keyset crosses NULL boundary to fetch historical row 3 (Clause 1)
+  installFetch([{ content: VALID }], {
+    supabaseRows: (href) => {
+      if (href.includes("clinician_clients")) return [{ client_id: callerClientId }]
+      if (href.includes("practice_task_submissions")) {
+        if (href.includes("select=id,client_id")) return historicalAndNewRows
+        return []
+      }
+      return undefined
+    },
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&limit=2&cursor=${page1Cursor}`)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.rows.length, 1)
+  assert.equal(r.body.rows[0].id, "00000000-0000-0000-0000-000000000003")
+  assert.equal(r.body.rows[0].submitted_at, null, "historical row with NULL submitted_at must sort last")
+  assert.equal(r.body.next_cursor, null, "end of list must yield null next_cursor")
+  pass("queue: keyset crosses NULL boundary, NULLs sort last, direction mismatch refused")
+
+  /* 50. Queue: missing or short REVIEW_QUEUE_CURSOR_SECRET fails closed (503 CURSOR_SECRET_UNCONFIGURED) */
+  installFetch([{ content: VALID }])
+  const envNoCursorSecret = { ...env }
+  delete envNoCursorSecret.REVIEW_QUEUE_CURSOR_SECRET
+  r = await call("GET", "/tasks/submissions", null, envNoCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.ok(
+    r.body.error && r.body.error.includes("REVIEW_QUEUE_CURSOR_SECRET"),
+    "error message must name REVIEW_QUEUE_CURSOR_SECRET"
+  )
+  assert.equal(supabaseCalls().length, 0, "missing cursor secret must issue 0 database queries")
+
+  // Short cursor secret (< 16 chars) must also fail closed
+  installFetch([{ content: VALID }])
+  const envShortCursorSecret = { ...env, REVIEW_QUEUE_CURSOR_SECRET: "short-secret" }
+  r = await call("GET", "/tasks/submissions", null, envShortCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.equal(supabaseCalls().length, 0, "short cursor secret must issue 0 database queries")
+
+  // Whitespace-only secret trims to empty and fails closed
+  installFetch([{ content: VALID }])
+  const envBlankCursorSecret = { ...env, REVIEW_QUEUE_CURSOR_SECRET: "          " }
+  r = await call("GET", "/tasks/submissions", null, envBlankCursorSecret)
+  assert.equal(r.status, 503)
+  assert.equal(r.body.code, "CURSOR_SECRET_UNCONFIGURED")
+  assert.equal(supabaseCalls().length, 0, "blank cursor secret must issue 0 database queries")
+  pass("queue: missing or short cursor secret fails closed with 503 CURSOR_SECRET_UNCONFIGURED without querying database")
+
+  /* 51. Queue: validly signed cursor with absent or non-ISO submitted_at (when is_null=false) refused with 400 */
+  // 51a. submitted_at absent from payload when is_null: false
+  installFetch([{ content: VALID }])
+  const cursorMissingSubmittedAt = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorMissingSubmittedAt}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "absent submitted_at must issue 0 queries")
+
+  // 51b. submitted_at null when is_null: false
+  installFetch([{ content: VALID }])
+  const cursorNullSubmittedAt = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: null,
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorNullSubmittedAt}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "null submitted_at with is_null=false must issue 0 queries")
+
+  // 51c. submitted_at non-ISO string ("not-a-date")
+  installFetch([{ content: VALID }])
+  const cursorGarbageDate = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "not-an-iso-date",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorGarbageDate}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "non-ISO submitted_at must issue 0 queries")
+
+  // 51d. submitted_at date-only (not a strict datetime)
+  installFetch([{ content: VALID }])
+  const cursorDateOnly = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "2026-10-01",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorDateOnly}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "date-only submitted_at must issue 0 queries")
+
+  // 51e. submitted_at injection probe
+  installFetch([{ content: VALID }])
+  const cursorInjection = await signReviewCursor({
+    id: "00000000-0000-0000-0000-000000000001",
+    submitted_at: "2026-10-01T10:00:00Z),status.eq.draft",
+    is_null: false,
+    dir: "asc",
+  })
+  r = await call("GET", `/tasks/submissions?status=pending_practitioner_review&cursor=${cursorInjection}`)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, "Invalid cursor: keyset payload validation failed")
+  assert.equal(supabaseCalls().length, 0, "injected submitted_at must issue 0 queries")
+
+  pass("queue: validly signed cursor with absent or non-ISO submitted_at refused with 400")
 }
 
-const TOTAL_CHECKS = 32
+// Derived from the number of pass() calls in this file so adding a check never stales the count.
+const TOTAL_CHECKS = (
+  readFileSync(fileURLToPath(import.meta.url), "utf8").match(/^\s*pass\(/gm) || []
+).length
 
 main()
   .then(() => console.log(`\n${passed}/${TOTAL_CHECKS} checks passed`))
@@ -819,4 +1911,5 @@ main()
     process.exitCode = 1
   })
   .finally(() => rm(tempDir, { recursive: true, force: true }))
+
 

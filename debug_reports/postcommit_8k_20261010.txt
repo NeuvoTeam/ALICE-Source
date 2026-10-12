@@ -1,0 +1,85 @@
+=== post-commit verification on the committed tree (da00e38) ===
+2026-10-10T20:54:32+1100
+--- git show --stat --name-status ---
+commit da00e3828f519b6cbc40801643f657927545b6e5
+Author: AChoy <choy.apy@gmail.com>
+Date:   Sat Oct 10 20:54:25 2026 +1100
+
+    chore(lint): remove the four dead rule downgrades — restore real severity (lint 8k)
+    
+    Operator-approved (card t_0c86d33b, "Approved" + "Also fold the fourth dead exception
+    into the same logic as the other 3"): four entries are deleted from the exception block in
+    eslint.config.mjs — `@typescript-eslint/no-explicit-any` (0 sites since rank 8h),
+    `react-hooks/refs` (0 since rank 8c), `react-hooks/purity` (0 since rank 8d) and
+    `react/no-unescaped-entities` (0 since rank 8f).
+    
+    Each sat at `warn` where the extended configs assign `error`. The restored severity was
+    established by measurement, not assumption: `eslint --print-config` against
+    `scratch/probe-8k.config.mjs` (the base config with the exception block and both scoped
+    overrides stripped) reports severity 2 for all four, against 1 with the exception — all four
+    go strictly stricter.
+    
+    `npm run lint` is unchanged at 117 matched files, 0 errors / 4 warnings, exit 0: none of the
+    four rules reported a finding on this tree, so this card restores severity without clearing
+--- branch state ---
+## alan...origin/alan [ahead 24]
+ M next-env.d.ts
+da00e38 chore(lint): remove the four dead rule downgrades — restore real severity (lint 8k)
+587776b chore(archive): archive the three orphaned kit files and record the orphaned embla dependency (lint 8j)
+f766e92 fix(ui): un-shadow the mono fallback — the mono token names the family literally (lint 8i)
+--- git status --porcelain ---
+ M next-env.d.ts
+?? debug_reports/agy_8h_run.txt
+?? debug_reports/agy_8k_run.txt
+?? debug_reports/build_8g_final_20261010.txt
+?? debug_reports/build_8j_committed_20261010.txt
+?? debug_reports/build_8k_20261010.txt
+?? debug_reports/commit_8j_output.txt
+?? debug_reports/commit_8k_output.txt
+?? debug_reports/draft_8k_docs_20261010.md
+?? debug_reports/lint_8k_after.json
+?? debug_reports/lint_8k_before.json
+?? debug_reports/lint_8k_probe.json
+?? debug_reports/postcommit_8j_20261010.txt
+?? debug_reports/postcommit_8k_20261010.txt
+?? debug_reports/printcfg_8k_probe.json
+?? debug_reports/printcfg_8k_real.json
+?? debug_reports/routes_8k_after_20261010.txt
+?? debug_reports/routes_8k_diff_20261010.txt
+?? debug_reports/test_8k_20261010.txt
+?? scratch/
+--- lint (json) ---
+eslint exit=0
+files linted : 117
+problems     : 4 = errors 0 + warnings 4
+--- per rule ---
+  4 react-hooks/set-state-in-effect
+       components/tasks/DynamicTaskForm.tsx:404
+       components/tasks/DynamicTaskForm.tsx:529
+       components/vignette-generator.tsx:177
+       hooks/use-clinical-workspace.ts:40
+--- npm run lint ---
+✖ 4 problems (0 errors, 4 warnings)
+
+npm run lint exit=0
+--- npx tsc --noEmit ---
+tsc exit=0
+--- npm test ---
+35/35 checks passed
+12/12 checks passed
+15/15 checks passed
+test exit=0
+--- npm run build ---
+build exit=0
+bab5456e751481302dfcd14942ada88c *debug_reports/routes_8k_postcommit_20261010.txt
+routes diff exit=0
+next-env.d.ts restored, status:
+ M next-env.d.ts
+--- npm run docs:check ---
+
+> my-project@0.1.0 docs:check
+> node scripts/check-docs.mjs && copy /Y D:\Work\Neuvo\ALICE\Source\documentation.md D:\Work\Neuvo\ALICE\Source\.obsidian_sync\ALICE_Master_Docs.md
+
+docs:check — ok (no behaviour-affecting path changed).
+        1 file(s) copied.
+docs:check exit=0

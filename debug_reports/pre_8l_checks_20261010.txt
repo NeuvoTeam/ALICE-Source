@@ -1,0 +1,41 @@
+=== restore spec resolves? ===
+git cat-file -e 300ec86:hooks/use-clinical-workspace.ts -> exit 0
+git cat-file -e 3ade9ba:hooks/use-clinical-workspace.ts -> exit 0
+
+=== line endings of the files agy will edit ===
+eslint.config.mjs:                                JavaScript source, Unicode text, UTF-8 text
+documentation.md:                                 Unicode text, UTF-8 text, with very long lines (635), with CRLF line terminators
+archive/2026-10-10-unreferenced-ui-kit/README.md: Unicode text, UTF-8 text, with very long lines (985)
+
+=== target strings must each occur exactly once (fixed-string grep) ===
+  count=1  file=documentation.md  target=| `hooks/` | `use-clinical-workspace.ts` (local-only workspace — see §8), `us
+  count=1  file=documentation.md  target=`lib/clinical-hierarchy.ts` + `hooks/use-clinical-workspace.ts` implement a **se
+  count=1  file=documentation.md  target=`lib/vignette-restore.ts` rebuilds a 3-step UI state from its records.
+  count=1  file=documentation.md  target=Nothing in the shipped dashboard consumes it: `/dashboard` renders `ClientLandin
+  count=1  file=documentation.md  target=| Two hierarchy models | `stores/useClientNavStore.ts` (Worker-backed, in use) v
+  count=1  file=documentation.md  target=Restore instructions and per-file hashes: `archive/2026-10-10-unreferenced-ui-ki
+  count=1  file=documentation.md  target=It lints 117 files (`npx eslint . -f json`, the count of matched files: 130 at t
+  count=1  file=documentation.md  target=  4 warnings (2026-10-10, after lint rank 8k — see §13.4 for the per-rank his
+  count=1  file=documentation.md  target=  It reports 0 errors / 4 warnings on the current tree (§13.4, after rank 8k); 
+  count=1  file=documentation.md  target=  four surviving sites are all deliberately retained with a written reason in th
+  count=1  file=eslint.config.mjs  target=      // 4 sites across 3 files after lint rank 8g (2026-10-10, card t_2d4d0225)
+  count=1  file=archive/2026-10-10-unreferenced-ui-kit/README.md  target=# Unreferenced UI Kit Archive
+  count=1  file=archive/2026-10-10-unreferenced-ui-kit/README.md  target=**These files are not live code.** Nothing in `app/`
+  count=1  file=archive/2026-10-10-unreferenced-ui-kit/README.md  target=Note on `hooks/use-mobile.ts`: it is the one file of the three whose restore sou
+  count=1  file=archive/2026-10-10-unreferenced-ui-kit/README.md  target=- `git checkout bdc3923 -- hooks/use-mobile.ts`
+  count=1  file=archive/2026-10-10-unreferenced-ui-kit/README.md  target=- `git cat-file blob bdc3923:hooks/use-mobile.ts > hooks/use-mobile.ts`
+
+=== the §13.4 row (#13) must stay untouched: its current tail ===
+ replacement sentence for the §11.1 bullet and a boilerplate reason column in the exceptions table), re-ran `tsc`, the linter, the suites and the build on the tree, applied the documentation text and made the commit. |
+
+=== pre-edit hashes ===
+7d4c6096864edb2aacdd51ebec677aaf30ca350e
+90818ee5e7fcdbc49709d8564d286c2b9d9608a4
+e3c3947b77121f119d33adc57d0b7392160bd25e
+d3fc40e5565a835632007e35bf9dc05d985c2f4e473d921c85ca30e5bb83c067 *eslint.config.mjs
+bda5ab9359244e6096d7e153e81c9c23b96381f6b4794131a12fa95a0d11e51f *documentation.md
+8f4b1f0e38847fef8c141e7395b13db08e86dd29d29bf7d0ad1cbaf3eac3b85c *archive/2026-10-10-unreferenced-ui-kit/README.md
+    85 eslint.config.mjs
+  1401 documentation.md
+   107 archive/2026-10-10-unreferenced-ui-kit/README.md
+  1593 total

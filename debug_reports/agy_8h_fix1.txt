@@ -1,0 +1,159 @@
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  404:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:404:7
+  402 |   useEffect(() => {
+  403 |     if (externalSubmissionId) {
+> 404 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  405 |     }
+  406 |   }, [externalSubmissionId]);
+  407 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  529:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:529:5
+  527 |   useEffect(() => {
+  528 |     if (!persist) return;
+> 529 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  530 |     return () => {
+  531 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  532 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+  177:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:177:7
+  175 |     if (!session) {
+  176 |       hydratedSessionRef.current = null
+> 177 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  178 |       setStep(1)
+  179 |       setSessionInput("")
+  180 |       setAnalysis(null)  react-hooks/set-state-in-effect
+
+✖ 3 problems (0 errors, 3 warnings)
+
+
+> my-project@0.1.0 lint
+> eslint .
+
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx
+  404:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:404:7
+  402 |   useEffect(() => {
+  403 |     if (externalSubmissionId) {
+> 404 |       setSubmissionId(externalSubmissionId);
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  405 |     }
+  406 |   }, [externalSubmissionId]);
+  407 |   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");  react-hooks/set-state-in-effect
+  529:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\tasks\DynamicTaskForm.tsx:529:5
+  527 |   useEffect(() => {
+  528 |     if (!persist) return;
+> 529 |     triggerAutoSave();
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  530 |     return () => {
+  531 |       if (debounceRef.current) clearTimeout(debounceRef.current);
+  532 |     };                                            react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx
+  177:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\components\vignette-generator.tsx:177:7
+  175 |     if (!session) {
+  176 |       hydratedSessionRef.current = null
+> 177 |       setDegradedWarning(null)
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  178 |       setStep(1)
+  179 |       setSessionInput("")
+  180 |       setAnalysis(null)  react-hooks/set-state-in-effect
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts
+  40:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Work\Neuvo\ALICE\Source\hooks\use-clinical-workspace.ts:40:5
+  38 |     if (selectedClientId && findClient(hierarchy, selectedClientId)) return
+  39 |     const c = hierarchy.clients[0]
+> 40 |     setSelectedClientId(c.id)
+     |     ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  41 |     setSelectedCaseId(c.cases[0]?.id ?? null)
+  42 |     setSelectedSessionId(c.cases[0]?.sessions[0]?.id ?? null)
+  43 |   }, [hierarchy, selectedClientId])  react-hooks/set-state-in-effect
+
+✖ 4 problems (0 errors, 4 warnings)
+
+ M components/client-view.tsx
+ M components/tasks/DynamicTaskForm.tsx
+ M components/vignette-generator.tsx
+ M lib/export-practice-pdf.ts
+ M lib/practice-package.ts
+ M stores/useClientNavStore.ts
+ M types/tasks.ts
+?? debug_reports/agy_8h_run.txt
+?? debug_reports/agy_8h_transcript.txt
+?? debug_reports/build_8g_final_20261010.txt
+?? debug_reports/lint_8h_before_20261010.txt
+?? scratch/
+warning: in the working copy of 'components/client-view.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/tasks/DynamicTaskForm.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/practice-package.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'stores/useClientNavStore.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'types/tasks.ts', LF will be replaced by CRLF the next time Git touches it
+ components/client-view.tsx           | 13 +--------
+ components/tasks/DynamicTaskForm.tsx | 51 ++++++++++++++++++++++++++++++++++--
+ components/vignette-generator.tsx    | 50 +++++++++++++++++++++--------------
+ lib/export-practice-pdf.ts           | 20 +++++++++-----
+ lib/practice-package.ts              | 25 +++++++++++++++++-
+ stores/useClientNavStore.ts          |  9 ++++---
+ types/tasks.ts                       | 29 ++++++++++++++------
+ 7 files changed, 144 insertions(+), 53 deletions(-)
+
+Changed in this fix: I expanded the StructuredTaskResponse type in components/vignette-generator.tsx to include error and detail fields, and merged the two @/lib/practice-package imports in components/client-view.tsx.
+Deviations from brief: I followed the brief exactly and did not deviate from any of the instructions.

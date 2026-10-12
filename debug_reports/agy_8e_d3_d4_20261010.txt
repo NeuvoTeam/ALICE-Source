@@ -1,0 +1,187 @@
+1. `npx tsc --noEmit` → exit 0
+(Raw output is completely empty)
+
+2. `npx eslint "workers/mcp-gateway/src/index.ts" "app/practice/[sessionId]/page.tsx" -f json -o /dev/null; echo $?`
+Both files report **0** `@typescript-eslint/no-explicit-any` errors (exit 0).
+
+3. `git diff --stat`
+```
+ app/practice/[sessionId]/page.tsx | 32 ++++++++++++++++----------------
+ workers/mcp-gateway/src/index.ts  | 27 +++++++++++++++++++--------
+ 2 files changed, 35 insertions(+), 24 deletions(-)
+```
+
+**Full `git diff`:**
+```diff
+diff --git a/app/practice/[sessionId]/page.tsx b/app/practice/[sessionId]/page.tsx
+index 8a9487d..69a3c95 100644
+--- a/app/practice/[sessionId]/page.tsx
++++ b/app/practice/[sessionId]/page.tsx
+@@ -7,9 +7,10 @@ import { CheckCircle2, Circle, Loader2, Sparkles, AlertCircle } from "lucide-rea
+ import { DynamicTaskForm, type TaskVariant } from "@/components/tasks/DynamicTaskForm";
+ import ReflectionCanvas from "@/components/canvas/ReflectionCanvas";
+ 
+-type PracticePackage = {
+-  homework: any[];
+-};
++import type { PracticePackage } from "@/lib/practice-package";
++
++/** The shared PracticePackage projected to the single homework member this route returns. */
++type PracticeHomework = Pick<PracticePackage, "homework">;
+ 
+ /** The clinician's chosen activity, as projected by GET /client-homework/:id. */
+ type PracticeTask = {
+@@ -38,21 +39,20 @@ function readPracticeTask(value: unknown): PracticeTask | null {
+ type SessionData = {
+   id?: string;
+   name?: string;
+-  practicePackage?: PracticePackage | null;
++  practicePackage?: PracticeHomework | null;
+   practiceTask?: PracticeTask | null;
+ };
+ 
+-function getTaskLabel(item: any): string {
++function getTaskLabel(item: unknown): string {
+   if (typeof item === "string") return item;
+   if (!item || typeof item !== "object") return String(item);
+-  return (
+-    item.task ||
+-    item.description ||
+-    item.title ||
+-    item.question ||
+-    item.prompt ||
+-    JSON.stringify(item)
+-  );
++  const val =
++    ("task" in item && item.task) ||
++    ("description" in item && item.description) ||
++    ("title" in item && item.title) ||
++    ("question" in item && item.question) ||
++    ("prompt" in item && item.prompt);
++  return val ? String(val) : JSON.stringify(item);
+ }
+ 
+ export default function PracticePage() {
+@@ -121,8 +121,8 @@ export default function PracticePage() {
+         });
+ 
+         setError(null);
+-      } catch (err: any) {
+-        setError(err?.message || "Unable to load practice tasks");
++      } catch (err) {
++        setError((err instanceof Error ? err.message : null) || "Unable to load practice tasks");
+       } finally {
+         setLoading(false);
+       }
+@@ -273,7 +273,7 @@ export default function PracticePage() {
+             </div>
+           ) : (
+             <div className="space-y-3 pt-2">
+-              {homework.map((item: any, index: number) => {
++              {homework.map((item, index: number) => {
+                 const label = getTaskLabel(item);
+                 const isDone = !!completed[index];
+ 
+diff --git a/workers/mcp-gateway/src/index.ts b/workers/mcp-gateway/src/index.ts
+index e2269ab..14deeeb 100644
+--- a/workers/mcp-gateway/src/index.ts
++++ b/workers/mcp-gateway/src/index.ts
+@@ -1,5 +1,16 @@
++/** Bindings this gateway is deployed with (`wrangler.jsonc`): the MCP token secret
++ *  and the service binding to the ALICE backend. */
++type Env = {
++  MCP_TOKEN?: string
++  BACKEND: { fetch(request: Request): Promise<Response> }
++}
++
++function errorMessage(err: unknown): string | undefined {
++  return err instanceof Error ? err.message : undefined;
++}
++
+ export default {
+-  async fetch(req: Request, env: any): Promise<Response> {
++  async fetch(req: Request, env: Env): Promise<Response> {
+     const url = new URL(req.url);
+ 
+     /* =========================
+@@ -45,10 +56,10 @@ export default {
+           headers: { "Content-Type": "application/json" }
+         });
+ 
+-      } catch (err: any) {
++      } catch (err) {
+         return json({
+           error: "Debug failed",
+-          message: err?.message
++          message: errorMessage(err)
+         }, 500);
+       }
+     }
+@@ -104,7 +115,7 @@ export default {
+         const { tool, input } = body;
+ 
+         // ✅ helper for calling backend
+-        const callBackend = async (path: string, options: any = {}) => {
++        const callBackend = async (path: string, options: { method?: string, body?: unknown } = {}) => {
+           const res = await env.BACKEND.fetch(
+             new Request(`https://backend${path}`, {
+               method: options.method || "GET",
+@@ -183,11 +194,11 @@ export default {
+ 
+         return json({ error: "Unknown tool" }, 400);
+ 
+-      } catch (err: any) {
++      } catch (err) {
+         return json({
+           error: "Execution failed",
+-          message: err?.message,
+-          stack: err?.stack
++          message: errorMessage(err),
++          stack: err instanceof Error ? err.stack : undefined
+         }, 500);
+       }
+     }
+@@ -215,7 +226,7 @@ function notFound() {
+ /* =========================
+    ✅ JSON HELPER
+    ========================= */
+-function json(data: any, status = 200) {
++function json(data: unknown, status = 200) {
+   return new Response(JSON.stringify(data), {
+     status,
+     headers: { "Content-Type": "application/json" }
+```
+
+4. Tables
+
+**File 1: `workers/mcp-gateway/src/index.ts`**
+
+| Line (old) | Change |
+| --- | --- |
+| Top of file | Added `Env` type block and `errorMessage` helper above `export default` |
+| Line 2 | `async fetch(req: Request, env: any): Promise<Response>` → `async fetch(req: Request, env: Env): Promise<Response>` |
+| Line 48 | `} catch (err: any) {` → `} catch (err) {` |
+| Line 51 | `message: err?.message` → `message: errorMessage(err)` *(Yields `err.message` if `Error`, else `undefined` so that `JSON.stringify` naturally drops the key identically to how `err?.message` evaluated to `undefined` for non-errors)* |
+| Line 107 | `const callBackend = async (path: string, options: any = {}) => {` → `const callBackend = async (path: string, options: { method?: string, body?: unknown } = {}) => {` |
+| Line 186 | `} catch (err: any) {` → `} catch (err) {` |
+| Line 189-190 | `message: err?.message`, `stack: err?.stack` → `message: errorMessage(err)`, `stack: err instanceof Error ? err.stack : undefined` |
+| Line 218 | `function json(data: any, status = 200) {` → `function json(data: unknown, status = 200) {` |
+
+
+**File 2: `app/practice/[sessionId]/page.tsx`**
+
+| Line (old) | Change |
+| --- | --- |
+| Line 10-12 | Deleted shadow `type PracticePackage`, replaced with `import type { PracticePackage }` and `type PracticeHomework = Pick<PracticePackage, "homework">;` |
+| Line 41 | `practicePackage?: PracticePackage | null;` → `practicePackage?: PracticeHomework | null;` (Since `PracticePackage` was no longer re-declared here) |
+| Line 46 | `function getTaskLabel(item: any): string {` → `function getTaskLabel(item: unknown): string {` |
+| Line 49-54 | Converted loose access to strict `"key" in item` checks: `const val = ("task" in item && item.task) || ("description" in item && item.description) || ...` |
+| Line 56 | **Flagged adjustment:** `return val ? String(val) : JSON.stringify(item);`. The `String()` cast was required to truthfully narrow the runtime expression without assuming the narrowed object keys yielded explicit strings. |
+| Line 124 | `} catch (err: any) {` → `} catch (err) {` |
+| Line 125 | `setError(err?.message || "Unable to load practice tasks");` → `setError((err instanceof Error ? err.message : null) || "Unable to load practice tasks");` |
+| Line 276 | `{homework.map((item: any, index: number) => {` → `{homework.map((item, index: number) => {` |
+
+
+5. Additional details surfaced:
+* **Object-handling code reachability in `page.tsx`:** Under the officially declared type (`homework: string[]`), `item` inside `homework.map` strictly evaluates to `string`. The `getTaskLabel(item: unknown)` safely allows `item` in, but because it is typed as a string at runtime, the code will reliably return early on the first branch (`typeof item === "string"`). The remaining object-handling code is therefore **unreachable** given a compliant payload type, but the logic was left in place exactly as asked.
+* Nothing unexpected surfaced outside of these findings.
