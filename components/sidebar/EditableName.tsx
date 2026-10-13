@@ -11,11 +11,11 @@ type Props = {
   isEditing?: boolean
   onEditChange?: (editing: boolean) => void
   /**
-   * Whether the inline rename pencil stays tappable on coarse pointers.
-   * The session row turns this off: on a 390 px drawer the pencil's 44 px box
-   * sat across the row's geometric centre and squeezed the session name to
-   * 31 px. Sessions keep rename reachable via the kebab's "Rename session".
-   * Case rows have no menu, so they keep the pencil.
+   * Whether the inline rename pencil stays visible and tappable on coarse pointers.
+   * Both the case row and the session row pass false: a 44px pencil box sat across
+   * the row's own centre on a 390px drawer and squeezed the name; on touch each row
+   * renames from its kebab menu (session: "Rename session"; case: "Rename case").
+   * ClientNode's client header is the only caller that leaves it at the default true.
    */
   showPencilOnCoarse?: boolean
 }
@@ -70,7 +70,11 @@ export default function EditableName({
   }
 
   return (
-    <div className="flex items-center gap-1 min-w-0 w-full">
+    <div className="flex items-center justify-between gap-1 min-w-0 w-full">
+      {/* justify-between keeps the pencil at the far right of the name region: with a short
+          name it otherwise sits straight after the text on the row's centre, renaming instead
+          of selecting/expanding. Coarse path is untouched because the pencil is display:none
+          there (one flex child => no free space to distribute). */}
       
       {/* ===================== VIEW MODE ===================== */}
       {!isEditing && (

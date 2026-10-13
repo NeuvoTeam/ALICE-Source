@@ -275,18 +275,23 @@ routed to `/login` rather than failing silently — and a `confirm()`-gated dele
 The action rows and the inline-rename pencil are rendered only on hover or keyboard focus
 (`hidden group-hover:flex group-focus-within:flex`), so a session name gets the full row
 width when idle instead of being permanently truncated to make room for icons that are not
-drawn; every interactive element in the tree carries a visible `focus-visible` ring. The
-whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
+drawn; every interactive element in the tree carries a visible `focus-visible` ring. In view mode,
+`EditableName` uses `justify-between` so that at fine-pointer desktop widths the inline rename pencil
+sits at the end of the row's name region, so the row's centre selects/expands rather than renaming.
+The whole shell takes its surface, text and hover colours from the `sidebar-*` tokens
 (`app/globals.css`) rather than hardcoded Tailwind greys, so it follows the dark theme.
 `components/clinical-folder-tree.tsx` was an unused alternate; it was deleted on 2026-10-10 once the per-file reference search proved no consumer (see §13.3).
 
-On a coarse pointer the case row carries a single 44x44 **More case actions** kebab — *New session in
-case*, *Rename case*, and a separator-gated *Delete case* — instead of the three hover-only icons
-(`pointer-coarse:hidden` on that cluster, `showPencilOnCoarse={false}` for the inline pencil), so a
-thumb gets one stable, adequately sized target; the fine-pointer row is untouched and still reveals
-its actions on hover or focus. Measured at a 390px viewport (233px case row): a case name that used
-to clip at 14.8px now clamps at 108.8px, every interactive element in the row is at least 44x44, and
-the row's centre still selects or expands the case instead of landing on a control. A delete the
+On a coarse pointer both the case and the session row hide the inline pencil
+(`showPencilOnCoarse={false}`) and rename from their kebab menu (session: *Rename session*; case:
+*Rename case*), while `ClientNode`'s client header retains the inline pencil. For the case row, a single
+44x44 **More case actions** kebab — *New session in case*, *Rename case*, and a separator-gated *Delete case* —
+replaces the three hover-only icons (`pointer-coarse:hidden` on that cluster), so a thumb gets one stable,
+adequately sized target; the fine-pointer row keeps the same hover/focus-revealed actions; only the inline pencil's
+position moved, as described above.
+Measured at a 390px viewport (233px case row): a case name that used to clip at 14.8px now clamps at 108.8px,
+every interactive element in the row is at least 44x44, and the row's centre still selects or expands the case
+instead of landing on a control. A delete the
 backend rejects now surfaces instead of failing silently: `deleteSession`/`deleteCase` keep the
 optimistic row, and `SessionNode`/`CaseNode` read the store's `error` flag after the call and raise a
 destructive `useToast` notification — **Delete failed** carrying the server's message; a successful
