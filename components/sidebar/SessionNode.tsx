@@ -2,6 +2,7 @@
 
 import { Trash, Copy, Check, ExternalLink, FileText, MoreHorizontal, Pencil } from "lucide-react";
 import { useClientNavStore } from "@/stores/useClientNavStore";
+import { useToast } from "@/hooks/use-toast";
 import EditableName from "./EditableName";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -56,10 +57,23 @@ export function SessionNode({
   } = useClientNavStore();
 
   const isSelected = selectedSessionId === session.id;
+  const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"copy" | "open" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleDeleteSession = async () => {
+    if (!confirm("Delete this session?")) return;
+
+    useClientNavStore.setState({ error: null });
+    await deleteSession(caseId, session.id);
+
+    const { error } = useClientNavStore.getState();
+    if (error) {
+      toast({ title: "Delete failed", description: error, variant: "destructive" });
+    }
+  };
 
   // ✅ COPY — mint a fresh signed link, then copy it
   const handleCopy = async (e: React.MouseEvent) => {
@@ -208,11 +222,7 @@ export function SessionNode({
             <DropdownMenuItem
               variant="destructive"
               className="pointer-coarse:min-h-11"
-              onClick={() => {
-                if (confirm("Delete this session?")) {
-                  deleteSession(caseId, session.id);
-                }
-              }}
+              onClick={() => void handleDeleteSession()}
             >
               <Trash className="mr-2 h-3.5 w-3.5" />
               <span>Delete session</span>
